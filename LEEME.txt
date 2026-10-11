@@ -1,0 +1,26 @@
+MECÁNICA TOAPANTA VÉLEZ — Sistema de facturas
+===============================================
+
+1_Programa_Windows
+   Monitor de Facturas: vigila C:\Facturas, sube cada PDF al portal y lo envía
+   por WhatsApp con el saludo según la hora. Las instrucciones completas están
+   en 1_Programa_Windows\LEEME.md (construir el .exe, instalar y configurar).
+
+2_Pagina_Hostinger
+   public_html\   Copia de la página tal como está hoy en mecanicatoapantavelez.com:
+                  portal de clientes, sugerencias y panel /admin.
+   config.ejemplo.php
+                  Plantilla de config.php. El config.php real NO va incluido porque
+                  tiene las contraseñas de la base de datos; en Hostinger ya existe
+                  y no se debe reemplazar.
+
+Notas
+   - Las tablas nuevas (sucursales, sugerencias, ajustes) se crean solas la primera
+     vez que se abre la página. Las tablas originales (clients, invoices,
+     portal_access_links) ya existen en la base de datos de Hostinger.
+   - Al subir carpetas por el Administrador de archivos de Hostinger, revisa que no
+     queden carpetas renombradas como "lib.1234": debe quedar una sola carpeta lib
+     con bootstrap.php, app.php y admin_secret.php.
+   - lib\admin_secret.php tiene solo el hash de la contraseña INICIAL del panel. Si
+     ya la cambiaste desde el panel, la nueva vive en la base de datos y esta no se usa.
+   - La limpieza de facturas vencidas la hace cron_cleanup.php (Cron Job de Hostinger).

@@ -1,0 +1,15 @@
+DirectoryIndex index.php
+
+<IfModule mod_headers.c>
+    Header always set X-Robots-Tag "noindex, nofollow"
+    Header always set X-Frame-Options "DENY"
+</IfModule>
+
+<FilesMatch "^_">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Deny from all
+    </IfModule>
+</FilesMatch>

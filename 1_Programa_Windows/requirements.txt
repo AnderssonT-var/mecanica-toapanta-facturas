@@ -1,0 +1,4 @@
+requests>=2.31
+pystray>=0.19
+pillow>=9.0
+# selenium solo hace falta si usas metodo = web
