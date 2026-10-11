@@ -4,6 +4,19 @@ Sistema real en producción para un taller mecánico: automatiza el envío de fa
 
 **En producción:** [mecanicatoapantavelez.com](https://mecanicatoapantavelez.com)
 
+
+## Capturas
+
+**Portal del cliente: sus facturas en el celular**
+
+![Portal del cliente: sus facturas en el celular](docs/capturas/portal-cliente.jpg)
+
+**Panel del taller: clientes y facturas**
+
+![Panel del taller: clientes y facturas](docs/capturas/panel-clientes.jpg)
+
+_Capturas tomadas con datos de prueba._
+
 ## Cómo funciona
 
 1. **Monitor de facturas (Windows, Python).** Vigila la carpeta `C:\Facturas`; cuando aparece un PDF nuevo lo sube al portal y envía el enlace al cliente por WhatsApp, con un saludo según la hora del día. Reintenta los envíos fallidos y se instala como ejecutable con inicio automático.
