@@ -7,6 +7,8 @@ Sistema real en producción para un taller mecánico: automatiza el envío de fa
 
 ## Capturas
 
+**Demo interactiva (datos ficticios):** [anderssont-var.github.io/AnderssonT-var.github/demos/mecanica/](https://anderssont-var.github.io/AnderssonT-var.github/demos/mecanica/)
+
 **Portal del cliente: sus facturas en el celular**
 
 ![Portal del cliente: sus facturas en el celular](docs/capturas/portal-cliente.jpg)
