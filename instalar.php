@@ -1,8 +1,8 @@
 <?php
 // Instalador de un solo uso: copia la actualización a su lugar y se borra a sí mismo.
-header('Content-Type: application/json; charset=utf-8');
+header('Content-Type: text/plain; charset=utf-8');
 header('Cache-Control: no-store');
-if (!hash_equals('7049b899649eb10c418ddf9241025f3b042a90aff1951eec212d6bd93498b889', hash('sha256', (string)($_GET['t'] ?? '')))) { http_response_code(404); exit('{}'); }
+if (!hash_equals('7049b899649eb10c418ddf9241025f3b042a90aff1951eec212d6bd93498b889', hash('sha256', (string)($_GET['t'] ?? '')))) { exit('instalador listo (token requerido)'); }
 $raiz = dirname(__DIR__);
 $archivos = [
     'lib/app.php' => 'd7f9936b6c1a8628a3721f3451264f4d1d256c155f4ff98b9066dcc01ecb1ab5',

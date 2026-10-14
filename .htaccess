@@ -1,4 +1,0 @@
-Require all denied
-<Files "instalar.php">
-    Require all granted
-</Files>
