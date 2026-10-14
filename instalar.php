@@ -2,6 +2,9 @@
 // Instalador de un solo uso: copia la actualización a su lugar y se borra a sí mismo.
 header('Content-Type: text/plain; charset=utf-8');
 header('Cache-Control: no-store');
+ini_set('display_errors', '1');
+error_reporting(E_ALL);
+register_shutdown_function(function () { $e = error_get_last(); if ($e && in_array($e['type'], [E_ERROR, E_PARSE, E_COMPILE_ERROR, E_CORE_ERROR], true)) echo "\nFATAL: {$e['message']} linea {$e['line']}"; });
 if (!hash_equals('7049b899649eb10c418ddf9241025f3b042a90aff1951eec212d6bd93498b889', hash('sha256', (string)($_GET['t'] ?? '')))) { exit('instalador listo (token requerido)'); }
 $raiz = dirname(__DIR__);
 $archivos = [
@@ -9,7 +12,8 @@ $archivos = [
     'admin/facturar.php' => '72461879a2578fa79dca9e89971fd978e6aebc60009accfc89b5d5458612b586',
     'api/agente.php' => '7fc1255551ae86072c6427e2aa6f8959ac8a976331455fb5cb740e5f308fb11a',
 ];
-$respaldo = dirname($raiz) . '/respaldo_web_' . date('Ymd_His');
+$respaldo = $raiz . '/../respaldo_web_' . gmdate('Ymd_His');
+if (isset($_GET['probar'])) { echo json_encode(['raiz' => $raiz, 'php' => PHP_VERSION, 'escribible' => is_writable($raiz . '/lib/app.php'), 'archivos' => array_map(fn($r) => is_file(__DIR__ . '/archivos/' . $r), array_keys($archivos))]); exit; }
 $res = ['ok' => true, 'archivos' => []];
 foreach ($archivos as $rel => $sha) {
     $origen = __DIR__ . '/archivos/' . $rel;
