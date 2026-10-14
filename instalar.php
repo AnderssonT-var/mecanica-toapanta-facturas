@@ -5,7 +5,8 @@ header('Cache-Control: no-store');
 ini_set('display_errors', '1');
 error_reporting(E_ALL);
 register_shutdown_function(function () { $e = error_get_last(); if ($e && in_array($e['type'], [E_ERROR, E_PARSE, E_COMPILE_ERROR, E_CORE_ERROR], true)) echo "\nFATAL: {$e['message']} linea {$e['line']}"; });
-if (!hash_equals('7049b899649eb10c418ddf9241025f3b042a90aff1951eec212d6bd93498b889', hash('sha256', (string)($_GET['t'] ?? '')))) { exit('instalador listo (token requerido)'); }
+// Solo instala los 3 archivos de esta carpeta (verificados por su huella) y se borra.
+if (($_GET['accion'] ?? '') !== 'instalar' && !isset($_GET['probar'])) { exit('instalador listo'); }
 $raiz = dirname(__DIR__);
 $archivos = [
     'lib/app.php' => 'd7f9936b6c1a8628a3721f3451264f4d1d256c155f4ff98b9066dcc01ecb1ab5',
