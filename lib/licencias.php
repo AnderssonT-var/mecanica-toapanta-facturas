@@ -218,5 +218,17 @@ function respuesta_token(array $l, string $equipo): array {
     'estado' => $est['code'],
     'fechaServidor' => hoy(),
     'soporte' => ajuste('whatsapp', ''),
+    'soporteInfo' => datos_soporte(),
+  ];
+}
+
+function datos_soporte(): array {
+  return [
+    'desarrollador' => ajuste('soporte_desarrollador', 'A.T.'),
+    'whatsapp' => ajuste('whatsapp', ''),
+    'telefono' => ajuste('soporte_telefono', ''),
+    'email' => ajuste('soporte_email', ''),
+    'web' => ajuste('soporte_web', ''),
+    'horario' => ajuste('soporte_horario', ''),
   ];
 }

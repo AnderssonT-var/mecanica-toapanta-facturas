@@ -13,8 +13,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       fijar_ajuste('dias_sin_conexion', (string)max(1, min(90, (int)$_POST['dias_sin_conexion'])));
       fijar_ajuste('equipos_defecto', (string)max(1, min(100, (int)$_POST['equipos_defecto'])));
       fijar_ajuste('gracia_defecto', (string)max(0, min(30, (int)$_POST['gracia_defecto'])));
-      fijar_ajuste('whatsapp', mb_substr(trim((string)$_POST['whatsapp']), 0, 40));
       aviso('Ajustes guardados.');
+    } elseif ($accion === 'soporte') {
+      $email = trim((string)($_POST['soporte_email'] ?? ''));
+      if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) throw new RuntimeException('El correo de soporte no es válido.');
+      $web = trim((string)($_POST['soporte_web'] ?? ''));
+      if ($web !== '' && !preg_match('~^https?://~i', $web)) $web = 'https://' . $web;
+      if ($web !== '' && !filter_var($web, FILTER_VALIDATE_URL)) throw new RuntimeException('La página web de soporte no es válida.');
+      fijar_ajuste('soporte_desarrollador', mb_substr(trim((string)($_POST['soporte_desarrollador'] ?? '')), 0, 60));
+      fijar_ajuste('whatsapp', mb_substr(trim((string)($_POST['whatsapp'] ?? '')), 0, 40));
+      fijar_ajuste('soporte_telefono', mb_substr(trim((string)($_POST['soporte_telefono'] ?? '')), 0, 40));
+      fijar_ajuste('soporte_email', mb_substr($email, 0, 120));
+      fijar_ajuste('soporte_web', mb_substr($web, 0, 160));
+      fijar_ajuste('soporte_horario', mb_substr(trim((string)($_POST['soporte_horario'] ?? '')), 0, 120));
+      aviso('Datos de soporte guardados. Los programas los reciben en su próxima verificación de licencia.');
     } elseif ($accion === 'clave') {
       $r = db()->prepare('SELECT hash FROM admins WHERE id = ?');
       $r->execute([$admin['id']]);
@@ -62,9 +74,21 @@ cabecera_html('Ajustes', $admin, 'ajustes');
           <label>Días que el programa puede trabajar sin conectarse<input type="number" name="dias_sin_conexion" min="1" max="90" value="<?= e(ajuste('dias_sin_conexion', '15')) ?>"></label>
           <label>Días de gracia por defecto<input type="number" name="gracia_defecto" min="0" max="30" value="<?= e(ajuste('gracia_defecto', '3')) ?>"></label>
           <label>Equipos por defecto en licencias nuevas<input type="number" name="equipos_defecto" min="1" max="100" value="<?= e(ajuste('equipos_defecto', '1')) ?>"></label>
-          <label>WhatsApp de soporte (se muestra en el programa)<input name="whatsapp" value="<?= e(ajuste('whatsapp', '')) ?>"></label>
         </div>
         <button class="btn btn-dark">Guardar</button></form>
+    </section>
+    <section class="card"><h2>Soporte (se muestra en el programa)</h2>
+      <p class="muted">Aparece en el botón "Desarrollado por…" y en la pantalla de activación de cada programa instalado.</p>
+      <form method="post" class="form"><?= campo_csrf() ?><input type="hidden" name="accion" value="soporte">
+        <div class="g2">
+          <label>Desarrollado por<input name="soporte_desarrollador" maxlength="60" value="<?= e(ajuste('soporte_desarrollador', 'A.T.')) ?>"></label>
+          <label>WhatsApp<input name="whatsapp" maxlength="40" value="<?= e(ajuste('whatsapp', '')) ?>" placeholder="+593 99 999 9999"></label>
+          <label>Teléfono<input name="soporte_telefono" maxlength="40" value="<?= e(ajuste('soporte_telefono', '')) ?>"></label>
+          <label>Correo<input type="email" name="soporte_email" maxlength="120" value="<?= e(ajuste('soporte_email', '')) ?>"></label>
+          <label>Página web<input name="soporte_web" maxlength="160" value="<?= e(ajuste('soporte_web', '')) ?>" placeholder="https://"></label>
+          <label>Horario de atención<input name="soporte_horario" maxlength="120" value="<?= e(ajuste('soporte_horario', '')) ?>" placeholder="Lun a Vie 08:00 a 18:00"></label>
+        </div>
+        <button class="btn btn-dark">Guardar soporte</button></form>
     </section>
     <section class="card"><h2>Administradores</h2>
       <table><thead><tr><th>Usuario</th><th>Nombre</th><th>Último acceso</th><th>Estado</th><th></th></tr></thead><tbody>
