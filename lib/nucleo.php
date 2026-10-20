@@ -5,7 +5,7 @@ declare(strict_types=1);
 if (!defined('FX_PORTAL')) { http_response_code(403); exit; }
 date_default_timezone_set('America/Guayaquil');
 
-const FX_VERSION = '1.0.6';
+const FX_VERSION = '1.0.7';
 const FX_PLANES = [
   'LOCAL' => ['label' => 'Local', 'desc' => 'Programa de escritorio con datos solo en el equipo'],
   'WEB'   => ['label' => 'Web',   'desc' => 'Solo navegador, datos en la nube'],
@@ -114,13 +114,10 @@ function mod11(string $id, array $c, int $pos): bool {
   return $dv !== 10 && $dv === (int)$id[$pos];
 }
 
+// El SRI no valida dígito verificador del RUC (hay RUC válidos de sociedades y entidades públicas que no cumplen
+// el módulo 11): se aceptan 13 dígitos con establecimiento distinto de 000. Igual que en el programa de escritorio.
 function validar_ruc(string $id): bool {
-  if (!preg_match('/^\d{13}$/', $id)) return false;
-  $t = (int)$id[2];
-  if ($t < 6) return validar_cedula(substr($id, 0, 10)) && substr($id, 10) !== '000';
-  if ($t === 9) return mod11($id, [4, 3, 2, 7, 6, 5, 4, 3, 2], 9) && substr($id, 10) !== '000';
-  if ($t === 6) return mod11($id, [3, 2, 7, 6, 5, 4, 3, 2], 8) && substr($id, 9) !== '0000';
-  return false;
+  return (bool)preg_match('/^\d{13}$/', $id) && substr($id, 10) !== '000' && !preg_match('/^0+$/', substr($id, 0, 10));
 }
 
 // ---------- Firma de licencias (Ed25519, compatible con el programa de escritorio) ----------
