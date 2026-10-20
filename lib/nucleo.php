@@ -5,7 +5,7 @@ declare(strict_types=1);
 if (!defined('FX_PORTAL')) { http_response_code(403); exit; }
 date_default_timezone_set('America/Guayaquil');
 
-const FX_VERSION = '1.0.8';
+const FX_VERSION = '1.0.9';
 const FX_PLANES = [
   'LOCAL' => ['label' => 'Local', 'desc' => 'Programa de escritorio con datos solo en el equipo'],
   'WEB'   => ['label' => 'Web',   'desc' => 'Solo navegador, datos en la nube'],
@@ -285,7 +285,7 @@ function cabecera_html(string $titulo, ?array $admin, string $activo = ''): void
 }
 
 function pie_html(): void {
-  echo '</main><footer class="wrap pie">Portal de licencias v' . FX_VERSION . '</footer></body></html>';
+  echo '</main><footer class="wrap pie">Portal de licencias v' . FX_VERSION . '</footer><script src="assets/app.js?v=' . FX_VERSION . '"></script></body></html>';
 }
 
 function insignia(array $estado): string {

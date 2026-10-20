@@ -63,7 +63,7 @@ $in = fn($k, $label, $extra = '') => '<label>' . $label . '<input name="' . $k .
 <?php if ($l): ?><div class="row"><?= insignia(estado_licencia($l)) ?><span class="mono muted"><?= e(codigo_licencia($l)) ?></span></div><?php endif; ?></div>
 <?php if ($error): ?><div class="aviso t-r" role="alert"><?= e($error) ?></div><?php endif; ?>
 
-<div class="cols">
+<div class="cols lateral-primero">
 <section class="card col-2">
   <h2>Datos de la licencia</h2>
   <form method="post" class="form">
@@ -160,10 +160,9 @@ $in = fn($k, $label, $extra = '') => '<label>' . $label . '<input name="' . $k .
   <?php foreach ($pagos as $pg): ?>
     <div class="kv"><span><?= fecha_ec($pg['fecha']) ?> · <?= e($pg['metodo']) ?><span class="sub"><?= (int)$pg['meses'] ?> mes(es) · vence <?= fecha_ec($pg['vence_nuevo']) ?><?= $pg['referencia'] ? ' · ' . e($pg['referencia']) : '' ?></span></span><b>$<?= number_format((float)$pg['monto'], 2) ?></b></div>
   <?php endforeach; ?>
-  <h2 style="margin-top:14px">Historial</h2>
+  <h2 class="sep">Historial</h2>
   <?php foreach ($evs as $ev): ?><div class="ev"><span class="badge t-n"><?= e($ev['tipo']) ?></span><span class="sub"><?= e($ev['detalle']) ?> · <?= e(substr($ev['creado'], 0, 16)) ?></span></div><?php endforeach; ?>
 </section>
 </div>
 <?php endif; ?>
-<script src="assets/app.js?v=<?= FX_VERSION ?>"></script>
 <?php pie_html();

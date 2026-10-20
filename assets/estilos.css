@@ -63,6 +63,7 @@ tfoot td { border-bottom: 0; }
 .kv.claro span { color: #B9C3D3; }
 .ev { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--border); }
 .ev .sub { width: 100%; }
+h2.sep { margin-top: 14px; }
 .empty { padding: 22px; text-align: center; color: var(--muted); background: var(--bg); border-radius: 10px; }
 
 .form { display: flex; flex-direction: column; gap: 12px; margin: 0; }
@@ -108,4 +109,38 @@ body.centro { min-height: 100vh; display: flex; align-items: center; justify-con
   .top nav { order: 3; flex: 0 0 100%; flex-wrap: nowrap; justify-content: space-between; gap: 0; padding: 2px 0 10px; overflow-x: auto; scrollbar-width: none; }
   .top nav::-webkit-scrollbar { display: none; }
   .top nav a { white-space: nowrap; flex-shrink: 0; padding: 6px clamp(3px, 1vw, 12px); font-size: clamp(11px, 3.15vw, 14px); }
+}
+
+/* Fechas en iOS: el control nativo no respeta el ancho del contenedor. */
+input[type="date"] { -webkit-appearance: none; appearance: none; display: block; min-width: 0; max-width: 100%; text-align: left; }
+input[type="date"]::-webkit-date-and-time-value { text-align: left; }
+label, .g2 > * { min-width: 0; }
+
+/* Celular: cada fila de tabla se vuelve una ficha con "columna: valor". */
+@media (max-width: 700px) {
+  .wrap { padding-left: 14px; padding-right: 14px; }
+  .card { padding: 16px 14px; }
+  .tabla { overflow: visible; }
+  table.resp, table.resp tbody, table.resp tr, table.resp td { display: block; width: 100%; }
+  table.resp thead { display: none; }
+  table.resp tbody tr { padding: 10px 0; border-bottom: 1px solid var(--border); }
+  table.resp tbody tr:last-child { border-bottom: 0; }
+  table.resp td { border: 0; padding: 3px 0; display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 14px; align-items: baseline; text-align: right; overflow-wrap: anywhere; }
+  table.resp td:not(:first-child):not(.sin-label) > * { grid-column: 2; justify-self: end; }
+  table.resp td.vacio { display: none; }
+  table.resp td::before { content: attr(data-label); grid-column: 1; grid-row: 1 / span 4; text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+  table.resp td:first-child { display: block; text-align: left; padding-bottom: 6px; font-size: 15px; }
+  table.resp td:first-child::before { display: none; }
+  table.resp td.sin-label { display: block; padding-top: 8px; }
+  table.resp td.sin-label::before { display: none; }
+  table.resp td.sin-label:empty { display: none; }
+  table.resp td.sin-label form, table.resp td.sin-label .btn { width: 100%; }
+  table.resp td .sub { text-align: inherit; }
+  .kpis { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .kpi { padding: 12px 14px; }
+  .kpi b { font-size: 22px; }
+  .kpi.dark { grid-column: 1 / -1; }
+  table.resp tfoot, table.resp tfoot tr { display: block; width: 100%; }
+  table.resp tfoot tr { display: flex; justify-content: space-between; padding-top: 10px; border-top: 2px solid var(--ink); }
+  table.resp tfoot td { display: block; width: auto; padding: 0; border: 0; }
 }

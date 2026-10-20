@@ -47,7 +47,7 @@ cabecera_html('Panel', $admin, 'panel');
     <?php foreach (FX_PLANES as $k => $p): $n = 0; foreach ($porPlan as $x) if ($x['plan'] === $k) $n = (int)$x['n']; ?>
       <div class="kv"><span><?= e($p['label']) ?></span><b><?= $n ?></b></div>
     <?php endforeach; ?>
-    <h2 style="margin-top:14px">Actividad reciente</h2>
+    <h2 class="sep">Actividad reciente</h2>
     <?php foreach ($actividad as $ev): ?>
       <div class="ev"><span class="badge t-n"><?= e($ev['tipo']) ?></span> <span><?= e($ev['cliente'] ?? '') ?></span><span class="sub"><?= e($ev['detalle']) ?> · <?= e(substr($ev['creado'], 0, 16)) ?></span></div>
     <?php endforeach; ?>
