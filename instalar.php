@@ -7,6 +7,8 @@ require __DIR__ . '/lib/esquema.php';
 date_default_timezone_set('America/Guayaquil');
 
 const FX_CONFIG = __DIR__ . '/config.php';
+// Código de instalación de un solo uso (solo se guarda su SHA-256). Vacío = sin código.
+const FX_CODIGO_INSTALACION = 'e2e16ca49320b30e3e363a9ac59b1f59f0dac4a1cb19f7a0644b90fbe2e69e79';
 header('X-Frame-Options: DENY');
 header('X-Content-Type-Options: nosniff');
 
@@ -26,6 +28,7 @@ if (is_file(FX_CONFIG)) {
   if (!preg_match('/^[a-z0-9_.-]{3,40}$/i', $v('usuario'))) $errores[] = 'El usuario administrador debe tener entre 3 y 40 letras, números, puntos o guiones.';
   if (strlen((string)($_POST['clave'] ?? '')) < 10) $errores[] = 'La contraseña del administrador debe tener al menos 10 caracteres.';
   if (($_POST['clave'] ?? '') !== ($_POST['clave2'] ?? '')) $errores[] = 'Las contraseñas no coinciden.';
+  if (FX_CODIGO_INSTALACION !== '' && !hash_equals(FX_CODIGO_INSTALACION, hash('sha256', strtoupper($v('codigo'))))) $errores[] = 'El código de instalación no es correcto.';
   if (!function_exists('sodium_crypto_sign_seed_keypair')) $errores[] = 'Tu PHP no tiene la extensión sodium. En Hostinger: hPanel › Avanzado › Configuración de PHP › activa "sodium".';
 
   if (!$errores) {
@@ -89,6 +92,7 @@ if (is_file(FX_CONFIG)) {
     <p class="muted">Créala en hPanel › Bases de datos › Administración. Usa una base de datos nueva y vacía.</p>
     <input type="hidden" name="driver" value="<?= getenv('FX_PERMITIR_SQLITE') ? h($v('driver', 'mysql')) : 'mysql' ?>">
     <div class="g2">
+      <?php if (FX_CODIGO_INSTALACION !== ''): ?><label>Código de instalación<input name="codigo" required autocomplete="off"></label><?php endif; ?>
       <label>Servidor<input name="db_host" value="<?= h($v('db_host', 'localhost')) ?>"></label>
       <label>Nombre de la base de datos<input name="db_nombre" value="<?= h($v('db_nombre')) ?>" placeholder="u123456789_licencias"></label>
       <label>Usuario<input name="db_usuario" value="<?= h($v('db_usuario')) ?>" placeholder="u123456789_admin"></label>
