@@ -5,7 +5,7 @@ declare(strict_types=1);
 if (!defined('FX_PORTAL')) { http_response_code(403); exit; }
 date_default_timezone_set('America/Guayaquil');
 
-const FX_VERSION = '1.0.7';
+const FX_VERSION = '1.0.8';
 const FX_PLANES = [
   'LOCAL' => ['label' => 'Local', 'desc' => 'Programa de escritorio con datos solo en el equipo'],
   'WEB'   => ['label' => 'Web',   'desc' => 'Solo navegador, datos en la nube'],
@@ -277,7 +277,7 @@ function cabecera_html(string $titulo, ?array $admin, string $activo = ''): void
   if ($admin) {
     $item = fn($k, $url, $t) => '<a href="' . $url . '"' . ($activo === $k ? ' class="on"' : '') . '>' . $t . '</a>';
     echo '<header class="top"><div class="wrap top-in"><a class="marca" href="panel.php"><span class="logo">FX</span><span>Licencias <b>' . $marca . '</b></span></a>';
-    echo '<nav>' . $item('panel', 'panel.php', 'Panel') . $item('licencias', 'licencias.php', 'Licencias') . $item('pagos', 'pagos.php', 'Pagos') . $item('eventos', 'eventos.php', 'Actividad') . $item('ajustes', 'ajustes.php', 'Ajustes') . '</nav>';
+    echo '<nav>' . $item('panel', 'panel.php', 'Panel') . $item('licencias', 'licencias.php', 'Licencias') . $item('pagos', 'pagos.php', 'Pagos') . $item('eventos', 'eventos.php', 'Actividad') . $item('versiones', 'versiones.php', 'Versiones') . $item('ajustes', 'ajustes.php', 'Ajustes') . '</nav>';
     echo '<form method="post" action="logout.php" class="salir">' . campo_csrf() . '<span>' . e($admin['nombre'] ?: $admin['usuario']) . '</span><button class="btn btn-sm">Salir</button></form></div></header>';
   }
   echo '<main class="wrap">';
