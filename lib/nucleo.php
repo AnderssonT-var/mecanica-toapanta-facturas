@@ -5,7 +5,7 @@ declare(strict_types=1);
 if (!defined('FX_PORTAL')) { http_response_code(403); exit; }
 date_default_timezone_set('America/Guayaquil');
 
-const FX_VERSION = '1.0.5';
+const FX_VERSION = '1.0.6';
 const FX_PLANES = [
   'LOCAL' => ['label' => 'Local', 'desc' => 'Programa de escritorio con datos solo en el equipo'],
   'WEB'   => ['label' => 'Web',   'desc' => 'Solo navegador, datos en la nube'],

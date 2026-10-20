@@ -219,6 +219,7 @@ function respuesta_token(array $l, string $equipo): array {
     'fechaServidor' => hoy(),
     'soporte' => ajuste('whatsapp', ''),
     'soporteInfo' => datos_soporte(),
+    'versionMinima' => ajuste('version_minima', ''),
   ];
 }
 

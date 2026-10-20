@@ -1,0 +1,10 @@
+# Archivos de actualización del programa (latest.yml, instalador y blockmap). Solo descarga.
+Options -Indexes
+<FilesMatch "\.(yml)$">
+  <IfModule mod_headers.c>
+    Header set Cache-Control "no-cache, must-revalidate"
+  </IfModule>
+</FilesMatch>
+<FilesMatch "\.(php|phtml|phar|tmp)$">
+  Require all denied
+</FilesMatch>
