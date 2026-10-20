@@ -230,5 +230,6 @@ function datos_soporte(): array {
     'email' => ajuste('soporte_email', ''),
     'web' => ajuste('soporte_web', ''),
     'horario' => ajuste('soporte_horario', ''),
+    'rucProveedor' => ajuste('ruc_proveedor', ''),
   ];
 }

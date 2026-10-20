@@ -20,6 +20,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $web = trim((string)($_POST['soporte_web'] ?? ''));
       if ($web !== '' && !preg_match('~^https?://~i', $web)) $web = 'https://' . $web;
       if ($web !== '' && !filter_var($web, FILTER_VALIDATE_URL)) throw new RuntimeException('La página web de soporte no es válida.');
+      $rucProv = preg_replace('/\D/', '', (string)($_POST['ruc_proveedor'] ?? ''));
+      if ($rucProv !== '' && !validar_ruc($rucProv)) throw new RuntimeException('El RUC del proveedor no es válido.');
+      fijar_ajuste('ruc_proveedor', $rucProv);
       fijar_ajuste('soporte_desarrollador', mb_substr(trim((string)($_POST['soporte_desarrollador'] ?? '')), 0, 60));
       fijar_ajuste('whatsapp', mb_substr(trim((string)($_POST['whatsapp'] ?? '')), 0, 40));
       fijar_ajuste('soporte_telefono', mb_substr(trim((string)($_POST['soporte_telefono'] ?? '')), 0, 40));
@@ -82,6 +85,7 @@ cabecera_html('Ajustes', $admin, 'ajustes');
       <form method="post" class="form"><?= campo_csrf() ?><input type="hidden" name="accion" value="soporte">
         <div class="g2">
           <label>Desarrollado por<input name="soporte_desarrollador" maxlength="60" value="<?= e(ajuste('soporte_desarrollador', 'A.T.')) ?>"></label>
+          <label>RUC del proveedor del sistema (tu RUC, va en cada comprobante como "RUC Proveedor")<input name="ruc_proveedor" maxlength="13" inputmode="numeric" value="<?= e(ajuste('ruc_proveedor', '')) ?>"></label>
           <label>WhatsApp<input name="whatsapp" maxlength="40" value="<?= e(ajuste('whatsapp', '')) ?>" placeholder="+593 99 999 9999"></label>
           <label>Teléfono<input name="soporte_telefono" maxlength="40" value="<?= e(ajuste('soporte_telefono', '')) ?>"></label>
           <label>Correo<input type="email" name="soporte_email" maxlength="120" value="<?= e(ajuste('soporte_email', '')) ?>"></label>
