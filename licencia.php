@@ -3,6 +3,7 @@ declare(strict_types=1);
 define('FX_PORTAL', true);
 require __DIR__ . '/lib/nucleo.php';
 require __DIR__ . '/lib/licencias.php';
+require __DIR__ . '/lib/nube.php';
 $admin = exigir_admin();
 
 $id = (int)($_GET['id'] ?? 0);
@@ -38,6 +39,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         registrar_evento($id, 'CORREO', $ok ? 'Clave enviada a ' . $l['email'] : 'Fallo al enviar a ' . $l['email']);
         aviso($ok ? 'Clave enviada a ' . $l['email'] . '.' : 'El servidor no pudo enviar el correo.', $ok ? 'g' : 'r');
         break;
+      case 'web_usuario':
+        try {
+          nube_guardar_usuario($id, (string)($_POST['usuario'] ?? ''), (string)($_POST['nombre'] ?? ''), (string)($_POST['clave'] ?? ''), (string)($_POST['rol'] ?? 'ADMIN'), !isset($_POST['inactivo']));
+        } catch (ErrorNube $ex) { throw new ErrorLicencia('DATOS', $ex->getMessage()); }
+        aviso('Usuario web guardado.');
+        break;
+      case 'web_quitar': nube_eliminar_usuario($id, (int)$_POST['uid']); aviso('Usuario web quitado.'); break;
       default: throw new ErrorLicencia('DATOS', 'Acción desconocida.');
     }
     redirigir('licencia.php?id=' . $id);
@@ -143,7 +151,8 @@ $in = fn($k, $label, $extra = '') => '<label>' . $label . '<input name="' . $k .
 </div>
 
 <div class="cols">
-<section class="card col-2">
+<div class="col-2 pila">
+<section class="card">
   <div class="card-head"><h2>Equipos</h2><span class="muted"><?= count(array_filter($equipos, fn($x) => (int)$x['activo'])) ?> de <?= (int)$l['equipos_max'] ?> en uso</span></div>
   <?php if (!$equipos): ?><div class="empty">Aún no se activa en ningún equipo.</div><?php else: ?>
   <table><thead><tr><th>Equipo</th><th>Versión</th><th>Activado</th><th>Último contacto</th><th>Estado</th><th></th></tr></thead><tbody>
@@ -154,6 +163,25 @@ $in = fn($k, $label, $extra = '') => '<label>' . $label . '<input name="' . $k .
     <td class="right"><?php if ((int)$q['activo']): ?><form method="post"><?= campo_csrf() ?><input type="hidden" name="accion" value="liberar"><input type="hidden" name="equipo" value="<?= (int)$q['id'] ?>"><button class="btn btn-sm" data-confirmar="¿Liberar este equipo? Dejará de poder facturar.">Liberar</button></form><?php endif; ?></td></tr>
   <?php endforeach; ?></tbody></table><?php endif; ?>
 </section>
+<?php if (in_array($l['plan'], ['FULL', 'WEB'], true)): $resNube = nube_resumen_licencia($id); $usuWeb = nube_usuarios_licencia($id); ?>
+<section class="card">
+  <div class="card-head"><h2>Nube y app web</h2><a class="link" href="app/" target="_blank" rel="noopener">Abrir app web</a></div>
+  <?php if (!$resNube): ?><div class="empty">El programa del cliente todavía no sincroniza con la nube.</div><?php else: ?>
+  <?php foreach ($resNube as $rn): ?><div class="kv"><span class="mono"><?= e($rn['perfil']) ?><span class="sub"><?= (int)$rn['docs'] ?> comprobantes · <?= (int)$rn['n'] ?> registros en total</span></span><span><?= $rn['ultima_sync'] ? 'Sincronizó ' . e(substr((string)$rn['ultima_sync'], 0, 16)) : 'Sin sincronizar' ?></span></div><?php endforeach; ?>
+  <?php endif; ?>
+  <h2 class="sep">Usuarios de la app web</h2>
+  <?php if (!$usuWeb): ?><div class="empty">Sin usuarios. El cliente los crea desde el programa (Nube y respaldos › Acceso web) o puedes crearlos aquí.</div><?php endif; ?>
+  <?php foreach ($usuWeb as $uw): ?><div class="kv"><span><b><?= e($uw['usuario']) ?></b><span class="sub"><?= e($uw['nombre']) ?> · <?= e($uw['rol']) ?><?= (int)$uw['activo'] ? '' : ' · desactivado' ?> · último acceso: <?= e(substr((string)$uw['ultimo_acceso'], 0, 16) ?: 'nunca') ?></span></span>
+    <form method="post"><?= campo_csrf() ?><input type="hidden" name="accion" value="web_quitar"><input type="hidden" name="uid" value="<?= (int)$uw['id'] ?>"><button class="btn btn-sm" data-confirmar="¿Quitar el acceso web de <?= e($uw['usuario']) ?>?">Quitar</button></form></div><?php endforeach; ?>
+  <form method="post" class="form"><?= campo_csrf() ?><input type="hidden" name="accion" value="web_usuario">
+    <div class="g2"><label>Usuario o correo<input name="usuario" required></label><label>Nombre<input name="nombre"></label>
+    <label>Contraseña nueva (mín. 8)<input type="password" name="clave" minlength="8" autocomplete="new-password"></label>
+    <label>Rol<select name="rol"><option value="ADMIN">Administrador</option><option value="VENDEDOR">Vendedor</option><option value="CONSULTA">Solo consulta</option></select></label></div>
+    <span class="small muted">Si el usuario ya existe, se le cambia la contraseña (sirve para recuperar el acceso).</span>
+    <button class="btn">Crear o restablecer usuario</button></form>
+</section>
+<?php endif; ?>
+</div>
 <section class="card col-1">
   <h2>Pagos</h2>
   <?php if (!$pagos): ?><div class="empty">Sin pagos registrados.</div><?php endif; ?>

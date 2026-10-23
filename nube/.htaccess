@@ -1,0 +1,10 @@
+# API de la nube del plan Full. Todo pasa por index.php; la carpeta datos/ (respaldos) nunca se sirve.
+Options -Indexes
+DirectoryIndex index.php
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^datos(/|$) - [F,L]
+  RewriteCond %{HTTP:Authorization} .
+  RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+  RewriteRule ^api/(.*)$ index.php?r=$1 [QSA,L]
+</IfModule>
