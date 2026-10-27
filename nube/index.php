@@ -5,6 +5,7 @@
 //   GET  api/sync/pull?desde=N         baja cambios (de la web u otros equipos) desde la revisión N
 //   PUT  api/backup                    sube el respaldo completo (.db) del perfil
 //   GET  api/backup/latest             descarga el último respaldo
+//   POST api/series/reservar {series}  aparta los puntos de emisión (001-001) para este equipo
 //   POST api/pedidos/tomar {id}        reserva una factura hecha en la web para emitirla en este equipo
 //   GET  api/usuarios · POST api/usuarios · DELETE api/usuarios?id=N   usuarios de la app web
 // Autenticación: Authorization: Bearer <licencia FX1>, X-Ruc: <RUC del perfil>.
@@ -52,6 +53,11 @@ try {
     $desde = max(0, (int)($_GET['desde'] ?? 0));
     nube_marcar_contacto($lic, $perfil, $a['equipo']);
     salir(200, ['ok' => true] + nube_pull($lic, $perfil, $desde));
+  }
+  if ($ruta === 'series/reservar' && $metodo === 'POST') {
+    $in = cuerpo_json(8192);
+    if ($a['equipo'] === '') throw new ErrorNube(400, 'La licencia no identifica al equipo.');
+    salir(200, ['ok' => true] + nube_reservar_series($lic, $perfil, $a['equipo'], array_slice((array)($in['series'] ?? []), 0, 20)));
   }
   if ($ruta === 'pedidos/tomar' && $metodo === 'POST') {
     $in = cuerpo_json(4096);

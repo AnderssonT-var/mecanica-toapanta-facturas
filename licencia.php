@@ -169,6 +169,10 @@ $in = fn($k, $label, $extra = '') => '<label>' . $label . '<input name="' . $k .
   <?php if (!$resNube): ?><div class="empty">El programa del cliente todavía no sincroniza con la nube.</div><?php else: ?>
   <?php foreach ($resNube as $rn): ?><div class="kv"><span class="mono"><?= e($rn['perfil']) ?><span class="sub"><?= (int)$rn['docs'] ?> comprobantes · <?= (int)$rn['n'] ?> registros en total</span></span><span><?= $rn['ultima_sync'] ? 'Sincronizó ' . e(substr((string)$rn['ultima_sync'], 0, 16)) : 'Sin sincronizar' ?></span></div><?php endforeach; ?>
   <?php endif; ?>
+  <?php $seriesLic = nube_series_licencia($id); if ($seriesLic): ?>
+  <h2 class="sep">Puntos de emisión por equipo</h2>
+  <?php foreach ($seriesLic as $se): ?><div class="kv"><span class="mono"><?= e($se['serie']) ?><span class="sub"><?= e($se['perfil']) ?></span></span><span><?= e($se['nombre']) ?><?= (int)$se['activo'] === 1 ? '' : ' <span class="badge t-n">equipo liberado</span>' ?></span></div><?php endforeach; ?>
+  <?php endif; ?>
   <h2 class="sep">Usuarios de la app web</h2>
   <?php if (!$usuWeb): ?><div class="empty">Sin usuarios. El cliente los crea desde el programa (Nube y respaldos › Acceso web) o puedes crearlos aquí.</div><?php endif; ?>
   <?php foreach ($usuWeb as $uw): ?><div class="kv"><span><b><?= e($uw['usuario']) ?></b><span class="sub"><?= e($uw['nombre']) ?> · <?= e($uw['rol']) ?><?= (int)$uw['activo'] ? '' : ' · desactivado' ?> · último acceso: <?= e(substr((string)$uw['ultimo_acceso'], 0, 16) ?: 'nunca') ?></span></span>

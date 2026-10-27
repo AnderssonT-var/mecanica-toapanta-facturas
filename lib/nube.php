@@ -29,6 +29,7 @@ function nube_esquema(): void {
     $d->exec("CREATE TABLE IF NOT EXISTS nube_usuarios (id INTEGER PRIMARY KEY AUTOINCREMENT, licencia_id INTEGER NOT NULL, usuario TEXT NOT NULL UNIQUE, nombre TEXT NOT NULL DEFAULT '',
       hash TEXT NOT NULL, rol TEXT NOT NULL DEFAULT 'ADMIN', activo INTEGER NOT NULL DEFAULT 1, creado TEXT NOT NULL, ultimo_acceso TEXT NULL)");
     $d->exec("CREATE TABLE IF NOT EXISTS nube_perfiles (licencia_id INTEGER NOT NULL, perfil TEXT NOT NULL, datos TEXT NOT NULL, ultima_sync TEXT NOT NULL, equipo TEXT NOT NULL DEFAULT '', PRIMARY KEY (licencia_id, perfil))");
+    $d->exec("CREATE TABLE IF NOT EXISTS nube_series (licencia_id INTEGER NOT NULL, perfil TEXT NOT NULL, serie TEXT NOT NULL, equipo TEXT NOT NULL, nombre TEXT NOT NULL DEFAULT '', desde TEXT NOT NULL, ultimo_uso TEXT NOT NULL, PRIMARY KEY (licencia_id, perfil, serie))");
   } else {
     $d->exec("CREATE TABLE IF NOT EXISTS nube_registros (
       licencia_id INT UNSIGNED NOT NULL, perfil CHAR(13) NOT NULL, tabla VARCHAR(20) NOT NULL, id VARCHAR(64) NOT NULL,
@@ -44,6 +45,8 @@ function nube_esquema(): void {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
     $d->exec("CREATE TABLE IF NOT EXISTS nube_perfiles (licencia_id INT UNSIGNED NOT NULL, perfil CHAR(13) NOT NULL, datos MEDIUMTEXT NOT NULL, ultima_sync DATETIME NOT NULL,
       equipo VARCHAR(120) NOT NULL DEFAULT '', PRIMARY KEY (licencia_id, perfil)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    $d->exec("CREATE TABLE IF NOT EXISTS nube_series (licencia_id INT UNSIGNED NOT NULL, perfil CHAR(13) NOT NULL, serie CHAR(7) NOT NULL, equipo VARCHAR(64) NOT NULL,
+      nombre VARCHAR(120) NOT NULL DEFAULT '', desde DATETIME NOT NULL, ultimo_uso DATETIME NOT NULL, PRIMARY KEY (licencia_id, perfil, serie)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
   }
   $listo = true;
 }
@@ -242,6 +245,61 @@ function nube_cambiar_pedido(int $lic, string $perfil, string $id, string $de, s
     $d->rollBack();
     throw $e;
   }
+}
+
+// ---------- Puntos de emisión por equipo ----------
+// Cada establecimiento-punto (001-001) de un RUC pertenece a un solo equipo activo de la licencia: así dos computadoras
+// nunca generan el mismo número de comprobante, aunque trabajen sin internet. Si el dueño libera el equipo en el portal,
+// su punto queda libre para otro.
+function nube_reservar_series(int $lic, string $perfil, string $equipo, array $series): array {
+  $d = db();
+  $mysql = fx_config()['db']['driver'] !== 'sqlite';
+  $nombreEq = '';
+  $q = $d->prepare('SELECT nombre FROM equipos WHERE licencia_id = ? AND equipo = ?');
+  $q->execute([$lic, $equipo]);
+  $nombreEq = (string)($q->fetchColumn() ?: 'Equipo');
+  $res = [];
+  $d->beginTransaction();
+  try {
+    foreach (array_unique($series) as $serie) {
+      $serie = (string)$serie;
+      if (!preg_match('/^\d{3}-\d{3}$/', $serie)) continue;
+      $q = $d->prepare('SELECT s.equipo, s.nombre, e.activo FROM nube_series s LEFT JOIN equipos e ON e.licencia_id = s.licencia_id AND e.equipo = s.equipo WHERE s.licencia_id = ? AND s.perfil = ? AND s.serie = ?' . ($mysql ? ' FOR UPDATE' : ''));
+      $q->execute([$lic, $perfil, $serie]);
+      $f = $q->fetch();
+      if ($f && $f['equipo'] !== $equipo && (int)$f['activo'] === 1) {
+        $res[$serie] = ['propia' => false, 'equipo' => $f['nombre'] ?: 'otro equipo'];
+        continue;
+      }
+      if ($f) $d->prepare('UPDATE nube_series SET equipo = ?, nombre = ?, ultimo_uso = ?' . ($f['equipo'] !== $equipo ? ', desde = ?' : '') . ' WHERE licencia_id = ? AND perfil = ? AND serie = ?')
+        ->execute(array_merge([$equipo, $nombreEq, ahora()], $f['equipo'] !== $equipo ? [ahora()] : [], [$lic, $perfil, $serie]));
+      else $d->prepare('INSERT INTO nube_series (licencia_id, perfil, serie, equipo, nombre, desde, ultimo_uso) VALUES (?, ?, ?, ?, ?, ?, ?)')->execute([$lic, $perfil, $serie, $equipo, $nombreEq, ahora(), ahora()]);
+      $res[$serie] = ['propia' => true, 'equipo' => $nombreEq];
+    }
+    $d->commit();
+  } catch (Throwable $e) {
+    $d->rollBack();
+    throw $e;
+  }
+  return ['series' => $res, 'libre' => nube_punto_libre($lic, $perfil, $equipo, $series)];
+}
+
+// Primer punto de emisión libre del mismo establecimiento (para proponerlo al equipo que choca).
+function nube_punto_libre(int $lic, string $perfil, string $equipo, array $series): string {
+  $estab = '001';
+  foreach ($series as $s) if (preg_match('/^(\d{3})-\d{3}$/', (string)$s, $m)) { $estab = $m[1]; break; }
+  $q = db()->prepare('SELECT s.serie FROM nube_series s JOIN equipos e ON e.licencia_id = s.licencia_id AND e.equipo = s.equipo AND e.activo = 1 WHERE s.licencia_id = ? AND s.perfil = ? AND s.equipo <> ?');
+  $q->execute([$lic, $perfil, $equipo]);
+  $ocupadas = array_flip($q->fetchAll(PDO::FETCH_COLUMN));
+  for ($i = 1; $i < 1000; $i++) { $s = $estab . '-' . str_pad((string)$i, 3, '0', STR_PAD_LEFT); if (!isset($ocupadas[$s])) return $s; }
+  return '';
+}
+
+function nube_series_licencia(int $lic): array {
+  nube_esquema();
+  $q = db()->prepare('SELECT s.perfil, s.serie, s.nombre, s.ultimo_uso, e.activo FROM nube_series s LEFT JOIN equipos e ON e.licencia_id = s.licencia_id AND e.equipo = s.equipo WHERE s.licencia_id = ? ORDER BY s.perfil, s.serie');
+  $q->execute([$lic]);
+  return $q->fetchAll();
 }
 
 // ---------- Respaldos (archivo .db completo del perfil) ----------
