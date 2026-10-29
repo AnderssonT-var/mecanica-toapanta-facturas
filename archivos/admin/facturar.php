@@ -108,6 +108,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         json_salida(200, ['ok' => true, 'id' => (int)$pdo->lastInsertId()]);
     }
 
+    if ($accion === 'pantalla') {
+        // lo que se está escribiendo, para la pantalla del cliente
+        $fase = (string)($_POST['fase'] ?? '');
+        if (!in_array($fase, PANTALLA_FASES, true)) json_salida(422, ['ok' => false]);
+        $limites = ['nombre' => 200, 'ruc' => 13, 'direccion' => 255, 'telefono' => 10, 'email' => 160,
+            'detalle' => 300, 'base' => 14, 'iva' => 14, 'iva_txt' => 20, 'total' => 14];
+        $datos = [];
+        if ($fase !== 'vacio') {
+            foreach ($limites as $k => $max) {
+                $datos[$k] = mb_substr(trim(preg_replace('/\s+/u', ' ', (string)($_POST[$k] ?? ''))), 0, $max);
+            }
+        }
+        $e = pantalla_leer($pdo);
+        $igual = $e['fase'] === $fase && $e['datos'] == $datos;
+        if (!$igual) {
+            $e = ['v' => (int)$e['v'] + 1, 'fase' => $fase, 'datos' => $datos, 'resp' => ''];
+        }
+        pantalla_guardar($pdo, $e);
+        json_salida(200, ['ok' => true, 'v' => (int)$e['v']]);
+    }
+
     if ($accion === 'cancelar' || $accion === 'reintentar' || $accion === 'cerrar') {
         $id = (int)($_POST['id'] ?? 0);
         [$desde, $hacia] = [
@@ -125,6 +146,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     json_salida(400, ['ok' => false, 'error' => 'Acción desconocida']);
 }
 
+if (($_GET['ver'] ?? '') === 'pantalla') {
+    $e = pantalla_leer($pdo);
+    $activa = (bool)$pdo->query('SELECT 1 FROM pantalla_disp WHERE aprobado = 1 AND visto > NOW() - INTERVAL 1 MINUTE LIMIT 1')->fetchColumn();
+    json_salida(200, ['ok' => true, 'v' => (int)$e['v'], 'fase' => $e['fase'], 'resp' => $e['resp'], 'activa' => $activa]);
+}
+
 if (($_GET['ver'] ?? '') === 'estado') {
     $filas = $pdo->query("SELECT * FROM fs_cola WHERE created_at > NOW() - INTERVAL 3 DAY
         OR estado IN ('cola','procesando','registrada','enviada_pend','error','revisar') ORDER BY id DESC LIMIT 30")->fetchAll();
@@ -134,6 +161,7 @@ if (($_GET['ver'] ?? '') === 'estado') {
 // ---------------------------------------------------------------- página
 $pc = estado_pc($pdo);
 $sinClientes = !(int)$pdo->query('SELECT COUNT(*) FROM fs_clientes')->fetchColumn();
+$hayPantalla = pantallas_aprobadas($pdo) > 0;
 admin_inicio($pdo, 'Facturar', 'facturar');
 ?>
 <style>
@@ -174,6 +202,9 @@ admin_inicio($pdo, 'Facturar', 'facturar');
 .est-enviada_pend { background: #e6f4ea; color: #6b4a00; }
 .est-error, .est-revisar { background: var(--error-fondo); color: var(--error); }
 .oculto { display: none !important; }
+.pantalla-est { font-size: .9rem; font-weight: 700; padding: 8px 12px; border-radius: 10px; background: #eef1f2; color: var(--suave); }
+.pantalla-est.p-ok { background: var(--ok-fondo); color: var(--ok); }
+.pantalla-est.p-mal { background: var(--error-fondo); color: var(--error); }
 </style>
 
 <div class="fact">
@@ -228,6 +259,7 @@ admin_inicio($pdo, 'Facturar', 'facturar');
 <section id="confirmar" class="caja oculto" aria-labelledby="t_conf">
 <h2 id="t_conf">¿Todo está bien?</h2>
 <dl id="resumen" class="resumen"></dl>
+<?php if ($hayPantalla): ?><p id="pantalla_est" class="pantalla-est" role="status">Mostrando en la pantalla del cliente…</p><?php endif; ?>
 <p id="error2" class="alerta alerta-error oculto" role="alert"></p>
 <button type="button" id="enviar" class="boton boton-principal boton-grande">Sí, facturar</button>
 <button type="button" id="corregir" class="boton boton-claro">Corregir</button>
@@ -245,6 +277,7 @@ admin_inicio($pdo, 'Facturar', 'facturar');
   var csrf = document.querySelector('input[name="csrf"]').value;
   var IVA = <?= json_encode(FS_IVA) ?>;
   var form = $('form'), ultimoRuc = '', repetir = false, origen = 'nuevo';
+  var HAY_PANTALLA = <?= $hayPantalla ? 'true' : 'false' ?>, tPantalla = null, tGracias = null, tVigilar = null;
 
   function r2(n) { return Math.round((n + Number.EPSILON) * 100) / 100; }
   function conIva() { return form.querySelector('input[name="con_iva"]:checked').value === '1'; }
@@ -279,6 +312,42 @@ admin_inicio($pdo, 'Facturar', 'facturar');
       .then(function (r) { return r.json().then(function (j) { j._codigo = r.status; return j; }); });
   }
   function perfil() { return form.querySelector('input[name="perfil"]:checked').value; }
+
+  // --- pantalla del cliente: muestra lo que se escribe; el cliente confirma o pide corregir
+  function aPantalla(fase) {
+    if (!HAY_PANTALLA) return;
+    clearTimeout(tPantalla); clearTimeout(tGracias);
+    var d = desglose(valor()), datos = { accion: 'pantalla', fase: fase };
+    if (fase !== 'vacio') {
+      datos.nombre = $('nombre').value.toUpperCase(); datos.ruc = $('ruc').value;
+      datos.direccion = $('direccion').value.toUpperCase();
+      datos.telefono = $('sin_whatsapp').checked ? '' : $('telefono').value.replace(/\D/g, '');
+      datos.email = $('email').value.trim().toLowerCase();
+      datos.detalle = ($('detalle').value || '').toUpperCase();
+      datos.base = d.base.toFixed(2); datos.iva = d.iva.toFixed(2); datos.total = d.total.toFixed(2);
+      datos.iva_txt = conIva() ? 'IVA 15 %' : 'IVA 0 %';
+    }
+    post(datos).catch(function () {});
+  }
+  function aPantallaLuego() {
+    if (!HAY_PANTALLA || $('datos').classList.contains('oculto')) return;
+    clearTimeout(tPantalla); tPantalla = setTimeout(function () { aPantalla('llenando'); }, 450);
+  }
+  function vigilarPantalla(activo) {
+    clearInterval(tVigilar);
+    if (!HAY_PANTALLA || !activo) return;
+    var est = $('pantalla_est');
+    est.className = 'pantalla-est'; est.textContent = 'Mostrando en la pantalla del cliente…';
+    tVigilar = setInterval(function () {
+      fetch('facturar.php?ver=pantalla', { credentials: 'same-origin', cache: 'no-store' })
+        .then(function (r) { return r.json(); }).then(function (j) {
+          if (!j.activa) { est.className = 'pantalla-est'; est.textContent = 'La pantalla del cliente no está conectada.'; return; }
+          if (j.resp === 'ok') { est.className = 'pantalla-est p-ok'; est.textContent = '✓ El cliente confirmó que sus datos están correctos.'; }
+          else if (j.resp === 'corregir') { est.className = 'pantalla-est p-mal'; est.textContent = '✗ El cliente dice que hay un error. Pregúntale qué corregir.'; }
+          else { est.className = 'pantalla-est'; est.textContent = 'Esperando que el cliente revise sus datos en la pantalla…'; }
+        }).catch(function () {});
+    }, 2000);
+  }
   function mostrarError(id, txt) { $(id).textContent = txt; $(id).classList.toggle('oculto', !txt); }
 
   function buscar() {
@@ -302,6 +371,7 @@ admin_inicio($pdo, 'Facturar', 'facturar');
       $('nombre_nota').textContent = origen === 'nuevo' ? '(obligatorio)' : '(lo pone FactuSYS)';
       $('dir_nota').textContent = (origen === 'nuevo' && ruc.length === 10) ? '(obligatoria)' : '(opcional)';
       $('datos').classList.remove('oculto');
+      aPantalla('llenando');
       var vacio = ['nombre', 'direccion', 'telefono', 'email'].filter(function (k) { return !$(k).value; })[0];
       (vacio ? $(vacio) : $('total')).focus();
     }).catch(function () { mostrar('nuevo', 'Sin conexión. Intenta de nuevo.', true); })
@@ -328,6 +398,8 @@ admin_inicio($pdo, 'Facturar', 'facturar');
   $('total').addEventListener('input', pintarDesglose);
   form.querySelectorAll('input[name="con_iva"]').forEach(function (r) { r.addEventListener('change', pintarDesglose); });
   $('sin_whatsapp').addEventListener('change', function () { $('telefono').disabled = this.checked; });
+  ['nombre', 'direccion', 'telefono', 'email', 'detalle', 'total'].forEach(function (k) { $(k).addEventListener('input', aPantallaLuego); });
+  form.addEventListener('change', aPantallaLuego);
 
   form.addEventListener('submit', function (ev) {
     ev.preventDefault();
@@ -354,9 +426,11 @@ admin_inicio($pdo, 'Facturar', 'facturar');
     $('enviar').textContent = 'Sí, facturar';
     form.classList.add('oculto'); $('confirmar').classList.remove('oculto');
     window.scrollTo(0, 0);
+    aPantalla('revisar'); vigilarPantalla(true);
   });
   $('corregir').addEventListener('click', function () {
     $('confirmar').classList.add('oculto'); form.classList.remove('oculto');
+    vigilarPantalla(false); aPantalla('llenando');
   });
   $('enviar').addEventListener('click', function () {
     var b = this; b.disabled = true; b.textContent = 'Enviando…';
@@ -368,6 +442,9 @@ admin_inicio($pdo, 'Facturar', 'facturar');
     if (repetir) datos.repetir = '1';
     post(datos).then(function (j) {
       if (j.ok) {
+        vigilarPantalla(false);
+        aPantalla('gracias');
+        tGracias = setTimeout(function () { aPantalla('vacio'); }, 20000);
         form.reset(); pintarDesglose(); ultimoRuc = '';
         $('datos').classList.add('oculto'); $('origen').className = 'origen oculto';
         $('telefono').disabled = false;

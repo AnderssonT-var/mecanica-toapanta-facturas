@@ -1,20 +1,16 @@
 <?php
 // Instalador de un solo uso: copia la actualización a su lugar y se borra a sí mismo.
-header('Content-Type: text/plain; charset=utf-8');
+header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
-ini_set('display_errors', '1');
-error_reporting(E_ALL);
-register_shutdown_function(function () { $e = error_get_last(); if ($e && in_array($e['type'], [E_ERROR, E_PARSE, E_COMPILE_ERROR, E_CORE_ERROR], true)) echo "\nFATAL: {$e['message']} linea {$e['line']}"; });
-// Solo instala los 3 archivos de esta carpeta (verificados por su huella) y se borra.
-if (($_GET['accion'] ?? '') !== 'instalar' && !isset($_GET['probar'])) { exit('instalador listo'); }
+if (!hash_equals('cca2f07c2568b9f0a42ff37690028c68846e8df56db6d0aa73b201936e237777', hash('sha256', (string)($_GET['t'] ?? '')))) { http_response_code(404); exit('{}'); }
 $raiz = dirname(__DIR__);
 $archivos = [
-    'lib/app.php' => 'd7f9936b6c1a8628a3721f3451264f4d1d256c155f4ff98b9066dcc01ecb1ab5',
-    'admin/facturar.php' => '72461879a2578fa79dca9e89971fd978e6aebc60009accfc89b5d5458612b586',
-    'api/agente.php' => '7fc1255551ae86072c6427e2aa6f8959ac8a976331455fb5cb740e5f308fb11a',
+    'lib/app.php' => '098ec13dcdec0ca66f7e8caaec98e81973522e1b9a852032745b94a427174c8e',
+    'admin/facturar.php' => 'c1746038c4ca7b72670aa5e6a67c12da8deef161a7affaa3ee60fa1eca39e9a0',
+    'admin/configuracion.php' => '03b170eb8752575c2c10e3a61cdcf2fbd254af945617d9b0a2708e9d83b1e6ae',
+    'pantalla.php' => 'bcbaa18d791d4e316e351da8d046287c2cecfa7ccf5bd29b01a7077d73840bf1',
 ];
-$respaldo = $raiz . '/../respaldo_web_' . gmdate('Ymd_His');
-if (isset($_GET['probar'])) { echo json_encode(['raiz' => $raiz, 'php' => PHP_VERSION, 'escribible' => is_writable($raiz . '/lib/app.php'), 'archivos' => array_map(fn($r) => is_file(__DIR__ . '/archivos/' . $r), array_keys($archivos))]); exit; }
+$respaldo = dirname($raiz) . '/respaldo_web_' . date('Ymd_His');
 $res = ['ok' => true, 'archivos' => []];
 foreach ($archivos as $rel => $sha) {
     $origen = __DIR__ . '/archivos/' . $rel;

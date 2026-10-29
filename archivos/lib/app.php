@@ -94,6 +94,54 @@ function app_schema(PDO $pdo): void {
     if (!$pdo->query("SHOW COLUMNS FROM fs_cola LIKE 'origen'")->fetch()) {
         $pdo->exec("ALTER TABLE fs_cola ADD origen VARCHAR(10) NOT NULL DEFAULT 'nuevo' AFTER con_iva");
     }
+    // Teléfonos autorizados como «pantalla del cliente» (se emparejan con un código de 6 dígitos)
+    $pdo->exec("CREATE TABLE IF NOT EXISTS pantalla_disp (
+        id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        token_hash CHAR(64) NOT NULL,
+        codigo CHAR(6) NOT NULL,
+        nombre VARCHAR(60) NOT NULL DEFAULT '',
+        aprobado TINYINT(1) NOT NULL DEFAULT 0,
+        creado DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        visto DATETIME NULL,
+        UNIQUE KEY uq_pantalla_token (token_hash),
+        KEY idx_pantalla_codigo (codigo)
+    ) $opciones");
+}
+
+// ---------------------------------------------------------------------------
+// Pantalla del cliente: lo que se está facturando, para que el cliente lo revise
+// ---------------------------------------------------------------------------
+
+const PANTALLA_CADUCA_SEG = 900;    // datos de un cliente sin cambios por 15 min: la pantalla se limpia
+const PANTALLA_FASES = ['vacio', 'llenando', 'revisar', 'gracias'];
+
+function pantalla_leer(PDO $pdo): array {
+    $st = $pdo->query("SELECT svalue FROM site_settings WHERE skey = 'pantalla_estado'");
+    $e = $st ? json_decode((string)$st->fetchColumn(), true) : null;
+    if (!is_array($e)) $e = [];
+    $e += ['v' => 0, 'fase' => 'vacio', 'datos' => [], 'resp' => '', 't' => 0];
+    if ($e['fase'] !== 'vacio' && time() - (int)$e['t'] > PANTALLA_CADUCA_SEG) {
+        $e['fase'] = 'vacio';
+        $e['datos'] = [];
+    }
+    return $e;
+}
+
+function pantalla_guardar(PDO $pdo, array $e): void {
+    $e['t'] = time();
+    guardar_ajuste($pdo, 'pantalla_estado', json_encode($e, JSON_UNESCAPED_UNICODE));
+}
+
+/** El teléfono-pantalla que hace la consulta (por su llave), o null. */
+function pantalla_dispositivo(PDO $pdo, string $token): ?array {
+    if (!preg_match('/^[a-f0-9]{64}$/', $token)) return null;
+    $st = $pdo->prepare('SELECT * FROM pantalla_disp WHERE token_hash = :h');
+    $st->execute(['h' => hash('sha256', $token)]);
+    return $st->fetch() ?: null;
+}
+
+function pantallas_aprobadas(PDO $pdo): int {
+    return (int)$pdo->query('SELECT COUNT(*) FROM pantalla_disp WHERE aprobado = 1')->fetchColumn();
 }
 
 // ---------------------------------------------------------------------------
