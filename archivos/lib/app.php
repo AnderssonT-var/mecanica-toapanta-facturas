@@ -152,25 +152,65 @@ function pantalla_poner(PDO $pdo, string $fase, array $entrada): array {
     return $e;
 }
 
-// Cartel (neón o LED) que se ve en la pantalla del cliente cuando no hay una factura en curso
+// Cartel de la pantalla del cliente (cuando no hay una factura en curso): la hora y los
+// mensajes se turnan, cada uno con su estilo (neón o LED) y su color.
 const PANTALLA_CARTEL_ESTILOS = ['neon' => 'Neón', 'led' => 'Letrero LED'];
-const PANTALLA_CARTEL_COLORES = ['rosa' => 'Rosa', 'azul' => 'Azul', 'verde' => 'Verde', 'ambar' => 'Ámbar',
-    'rojo' => 'Rojo', 'blanco' => 'Blanco'];
 const PANTALLA_CARTEL_VELOCIDADES = ['lenta' => 'Lenta', 'normal' => 'Normal', 'rapida' => 'Rápida'];
+const PANTALLA_COLORES_VIEJOS = ['rosa' => '#ff2bd6', 'azul' => '#29d9ff', 'verde' => '#39ff7a', 'ambar' => '#ffb020',
+    'rojo' => '#ff3b3b', 'blanco' => '#f4f4f4'];
 const PANTALLA_CARTEL_DEFECTO = [
-    'mensajes' => ['BIENVENIDOS', 'MECÁNICA TOAPANTA VÉLEZ', 'MANTENIMIENTO Y REPUESTOS', 'GRACIAS POR SU PREFERENCIA'],
-    'estilo' => 'neon', 'color' => 'rosa', 'velocidad' => 'normal',
+    'hora' => ['activa' => true, 'estilo' => 'led', 'color' => '#29d9ff', 'segundos' => 10, 'formato' => '12', 'fecha' => true],
+    'mensajes' => [
+        ['texto' => 'BIENVENIDOS', 'color' => '#ff2bd6'],
+        ['texto' => 'MECÁNICA TOAPANTA VÉLEZ', 'color' => '#ffb020'],
+        ['texto' => 'MANTENIMIENTO Y REPUESTOS', 'color' => '#39ff7a'],
+        ['texto' => 'GRACIAS POR SU PREFERENCIA', 'color' => '#29d9ff'],
+    ],
+    'estilo' => 'neon', 'segundos_mensaje' => 5, 'velocidad' => 'normal', 'fondo' => '#050506',
 ];
 
+function pantalla_color(string $c, string $defecto): string {
+    $c = strtolower(trim($c));
+    if (isset(PANTALLA_COLORES_VIEJOS[$c])) return PANTALLA_COLORES_VIEJOS[$c];
+    return preg_match('/^#[0-9a-f]{6}$/', $c) ? $c : $defecto;
+}
+
+/** Configuración del cartel, siempre completa y válida (acepta el formato anterior). */
 function pantalla_cartel(PDO $pdo): array {
     $st = $pdo->query("SELECT svalue FROM site_settings WHERE skey = 'pantalla_cartel'");
     $c = $st ? json_decode((string)$st->fetchColumn(), true) : null;
-    $c = is_array($c) ? $c + PANTALLA_CARTEL_DEFECTO : PANTALLA_CARTEL_DEFECTO;
-    $c['mensajes'] = array_values(array_filter(array_map('strval', (array)$c['mensajes']), 'strlen')) ?: PANTALLA_CARTEL_DEFECTO['mensajes'];
-    if (!isset(PANTALLA_CARTEL_ESTILOS[$c['estilo']])) $c['estilo'] = 'neon';
-    if (!isset(PANTALLA_CARTEL_COLORES[$c['color']])) $c['color'] = 'rosa';
-    if (!isset(PANTALLA_CARTEL_VELOCIDADES[$c['velocidad']])) $c['velocidad'] = 'normal';
-    return $c;
+    return pantalla_cartel_normalizar(is_array($c) ? $c : []);
+}
+
+function pantalla_cartel_normalizar(array $c): array {
+    $d = PANTALLA_CARTEL_DEFECTO;
+    $colorViejo = pantalla_color((string)($c['color'] ?? ''), '#ff2bd6');      // formato anterior: un color para todo
+    $h = is_array($c['hora'] ?? null) ? $c['hora'] + $d['hora'] : $d['hora'];
+    $hora = [
+        'activa' => (bool)$h['activa'],
+        'estilo' => isset(PANTALLA_CARTEL_ESTILOS[$h['estilo']]) ? $h['estilo'] : 'led',
+        'color' => pantalla_color((string)$h['color'], $d['hora']['color']),
+        'segundos' => max(3, min(120, (int)$h['segundos'])),
+        'formato' => (string)$h['formato'] === '24' ? '24' : '12',
+        'fecha' => (bool)$h['fecha'],
+    ];
+    $mensajes = [];
+    $lista = array_key_exists('mensajes', $c) ? (array)$c['mensajes'] : $d['mensajes'];
+    foreach ($lista as $m) {
+        $texto = is_array($m) ? (string)($m['texto'] ?? '') : (string)$m;
+        $texto = mb_substr(trim(preg_replace('/\s+/u', ' ', $texto)), 0, 60);
+        if ($texto === '') continue;
+        $mensajes[] = ['texto' => $texto, 'color' => pantalla_color(is_array($m) ? (string)($m['color'] ?? '') : '', $colorViejo)];
+        if (count($mensajes) >= 12) break;
+    }
+    return [
+        'hora' => $hora,
+        'mensajes' => $mensajes,
+        'estilo' => isset(PANTALLA_CARTEL_ESTILOS[$c['estilo'] ?? '']) ? $c['estilo'] : 'neon',
+        'segundos_mensaje' => max(2, min(60, (int)($c['segundos_mensaje'] ?? 5))),
+        'velocidad' => isset(PANTALLA_CARTEL_VELOCIDADES[$c['velocidad'] ?? '']) ? $c['velocidad'] : 'normal',
+        'fondo' => pantalla_color((string)($c['fondo'] ?? ''), '#050506'),
+    ];
 }
 
 function pantalla_activa(PDO $pdo): bool {
