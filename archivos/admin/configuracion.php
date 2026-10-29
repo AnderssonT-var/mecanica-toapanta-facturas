@@ -203,8 +203,9 @@ formulario_sucursal($enEdicion[0] ?? []);
 
 <section class="caja" id="pantalla">
 <h2>Pantalla del cliente</h2>
-<p class="muted">Un teléfono en el mostrador muestra al cliente sus datos y el valor a pagar mientras facturas, y el cliente toca
-«Mis datos están correctos» o «Hay un error». Lo ves en Facturar, antes de enviar.</p>
+<p class="muted">Un teléfono en el mostrador muestra al cliente sus datos y el valor a pagar mientras haces la factura en
+FactuSYS (el programa de la PC los lee de la pantalla), y el cliente toca «Mis datos están correctos» o «Hay un error».
+El WhatsApp solo se envía cuando el cliente confirma; si marca un error, el programa te avisa y no lo envía.</p>
 <ol class="muted" style="margin:0;padding-left:20px">
 <li>En ese teléfono abre <b style="word-break:break-all"><?= e(preg_replace('#^https?://#', '', rtrim((string)($config['portal_url'] ?? 'https://mecanicatoapantavelez.com'), '/'))) ?>/pantalla.php</b> y toca la pantalla (puedes guardarla en la pantalla de inicio).</li>
 <li>Aparece un código de 6 números: escríbelo aquí abajo.</li>

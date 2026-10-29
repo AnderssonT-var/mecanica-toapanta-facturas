@@ -230,6 +230,8 @@ button:active { transform: scale(.98); }
     lista.appendChild(fila('Celular (WhatsApp)', d.telefono));
     lista.appendChild(fila('Correo', d.email));
     if (d.detalle) lista.appendChild(fila('Detalle', d.detalle));
+    $('t_base').parentNode.style.display = d.base ? '' : 'none';
+    $('t_iva').parentNode.style.display = d.base ? '' : 'none';
     $('t_base').textContent = d.base || '0.00';
     $('t_iva').textContent = d.iva || '0.00';
     $('t_iva_txt').textContent = d.iva_txt || 'IVA 0 %';

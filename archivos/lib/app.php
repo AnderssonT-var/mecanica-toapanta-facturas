@@ -132,6 +132,30 @@ function pantalla_guardar(PDO $pdo, array $e): void {
     guardar_ajuste($pdo, 'pantalla_estado', json_encode($e, JSON_UNESCAPED_UNICODE));
 }
 
+/** Pone en la pantalla del cliente una fase y sus datos. Si los datos o la fase cambian,
+ *  la respuesta anterior del cliente se borra (debe revisar otra vez). Devuelve el estado. */
+function pantalla_poner(PDO $pdo, string $fase, array $entrada): array {
+    if (!in_array($fase, PANTALLA_FASES, true)) throw new InvalidArgumentException('fase');
+    $limites = ['nombre' => 200, 'ruc' => 13, 'direccion' => 255, 'telefono' => 10, 'email' => 160,
+        'detalle' => 300, 'base' => 14, 'iva' => 14, 'iva_txt' => 20, 'total' => 14];
+    $datos = [];
+    if ($fase !== 'vacio') {
+        foreach ($limites as $k => $max) {
+            $datos[$k] = mb_substr(trim(preg_replace('/\s+/u', ' ', (string)($entrada[$k] ?? ''))), 0, $max);
+        }
+    }
+    $e = pantalla_leer($pdo);
+    if (!($e['fase'] === $fase && $e['datos'] == $datos)) {
+        $e = ['v' => (int)$e['v'] + 1, 'fase' => $fase, 'datos' => $datos, 'resp' => ''];
+    }
+    pantalla_guardar($pdo, $e);
+    return $e;
+}
+
+function pantalla_activa(PDO $pdo): bool {
+    return (bool)$pdo->query('SELECT 1 FROM pantalla_disp WHERE aprobado = 1 AND visto > NOW() - INTERVAL 1 MINUTE LIMIT 1')->fetchColumn();
+}
+
 /** El teléfono-pantalla que hace la consulta (por su llave), o null. */
 function pantalla_dispositivo(PDO $pdo, string $token): ?array {
     if (!preg_match('/^[a-f0-9]{64}$/', $token)) return null;

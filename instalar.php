@@ -2,13 +2,14 @@
 // Instalador de un solo uso: copia la actualización a su lugar y se borra a sí mismo.
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
-if (!hash_equals('cca2f07c2568b9f0a42ff37690028c68846e8df56db6d0aa73b201936e237777', hash('sha256', (string)($_GET['t'] ?? '')))) { http_response_code(404); exit('{}'); }
+if (!hash_equals('e46fac13356b244edfe77f3f49044e592cd670b9b9aff63160e73420c2286bb5', hash('sha256', (string)($_GET['t'] ?? '')))) { http_response_code(404); exit('{}'); }
 $raiz = dirname(__DIR__);
 $archivos = [
-    'lib/app.php' => '098ec13dcdec0ca66f7e8caaec98e81973522e1b9a852032745b94a427174c8e',
-    'admin/facturar.php' => 'c1746038c4ca7b72670aa5e6a67c12da8deef161a7affaa3ee60fa1eca39e9a0',
-    'admin/configuracion.php' => '03b170eb8752575c2c10e3a61cdcf2fbd254af945617d9b0a2708e9d83b1e6ae',
-    'pantalla.php' => 'bcbaa18d791d4e316e351da8d046287c2cecfa7ccf5bd29b01a7077d73840bf1',
+    'lib/app.php' => '2e2a1914b12247fdf50eff55a513e62f3c7b02db7cdede4196ab1a3cc7c0b476',
+    'admin/facturar.php' => 'f5c2fc0a9fff1fc2cab5130f01030b3c056c711de1945ed102951b43b06a497b',
+    'admin/configuracion.php' => '4c61a46274c310d8976d937a7340a5790c005b73f63b5982713314724d27cac0',
+    'pantalla.php' => '4224a75bd2411fab32096821b8023024da70fb3d44b31de791323e9ebfc09850',
+    'api/agente.php' => '47bc87641e11dbf25ef25c7222a2cd57b9b2e45fccdb413634dcd9b1fc26d33c',
 ];
 $respaldo = dirname($raiz) . '/respaldo_web_' . date('Ymd_His');
 $res = ['ok' => true, 'archivos' => []];

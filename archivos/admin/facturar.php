@@ -112,20 +112,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // lo que se está escribiendo, para la pantalla del cliente
         $fase = (string)($_POST['fase'] ?? '');
         if (!in_array($fase, PANTALLA_FASES, true)) json_salida(422, ['ok' => false]);
-        $limites = ['nombre' => 200, 'ruc' => 13, 'direccion' => 255, 'telefono' => 10, 'email' => 160,
-            'detalle' => 300, 'base' => 14, 'iva' => 14, 'iva_txt' => 20, 'total' => 14];
-        $datos = [];
-        if ($fase !== 'vacio') {
-            foreach ($limites as $k => $max) {
-                $datos[$k] = mb_substr(trim(preg_replace('/\s+/u', ' ', (string)($_POST[$k] ?? ''))), 0, $max);
-            }
-        }
-        $e = pantalla_leer($pdo);
-        $igual = $e['fase'] === $fase && $e['datos'] == $datos;
-        if (!$igual) {
-            $e = ['v' => (int)$e['v'] + 1, 'fase' => $fase, 'datos' => $datos, 'resp' => ''];
-        }
-        pantalla_guardar($pdo, $e);
+        $e = pantalla_poner($pdo, $fase, $_POST);
         json_salida(200, ['ok' => true, 'v' => (int)$e['v']]);
     }
 
@@ -148,8 +135,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 if (($_GET['ver'] ?? '') === 'pantalla') {
     $e = pantalla_leer($pdo);
-    $activa = (bool)$pdo->query('SELECT 1 FROM pantalla_disp WHERE aprobado = 1 AND visto > NOW() - INTERVAL 1 MINUTE LIMIT 1')->fetchColumn();
-    json_salida(200, ['ok' => true, 'v' => (int)$e['v'], 'fase' => $e['fase'], 'resp' => $e['resp'], 'activa' => $activa]);
+    json_salida(200, ['ok' => true, 'v' => (int)$e['v'], 'fase' => $e['fase'], 'resp' => $e['resp'], 'activa' => pantalla_activa($pdo)]);
 }
 
 if (($_GET['ver'] ?? '') === 'estado') {
