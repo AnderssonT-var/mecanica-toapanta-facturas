@@ -120,6 +120,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         volver('pantalla');
     }
 
+    if ($accion === 'pantalla_cartel') {
+        $lineas = preg_split('/\R/u', (string)($_POST['mensajes'] ?? ''));
+        $mensajes = [];
+        foreach ($lineas as $l) {
+            $l = mb_substr(trim(preg_replace('/\s+/u', ' ', $l)), 0, 60);
+            if ($l !== '') $mensajes[] = $l;
+        }
+        $mensajes = array_slice($mensajes, 0, 12);
+        $estilo = (string)($_POST['estilo'] ?? 'neon');
+        $color = (string)($_POST['color'] ?? 'rosa');
+        $velocidad = (string)($_POST['velocidad'] ?? 'normal');
+        if (!$mensajes) {
+            flash('Escribe al menos un mensaje para el cartel.', 'error');
+        } elseif (!isset(PANTALLA_CARTEL_ESTILOS[$estilo], PANTALLA_CARTEL_COLORES[$color], PANTALLA_CARTEL_VELOCIDADES[$velocidad])) {
+            flash('Opción no válida.', 'error');
+        } else {
+            guardar_ajuste($pdo, 'pantalla_cartel', json_encode(['mensajes' => $mensajes, 'estilo' => $estilo,
+                'color' => $color, 'velocidad' => $velocidad], JSON_UNESCAPED_UNICODE));
+            flash('Cartel guardado. La pantalla lo cambia en unos segundos.');
+        }
+        volver('pantalla');
+    }
+
     if ($accion === 'pantalla_quitar') {
         $pdo->prepare('DELETE FROM pantalla_disp WHERE id = :id')->execute(['id' => (int)($_POST['id'] ?? 0)]);
         flash('Pantalla quitada. Ese teléfono ya no verá los datos de los clientes.');
@@ -203,9 +226,9 @@ formulario_sucursal($enEdicion[0] ?? []);
 
 <section class="caja" id="pantalla">
 <h2>Pantalla del cliente</h2>
-<p class="muted">Un teléfono en el mostrador muestra al cliente sus datos y el valor a pagar mientras haces la factura en
-FactuSYS (el programa de la PC los lee de la pantalla), y el cliente toca «Mis datos están correctos» o «Hay un error».
-El WhatsApp solo se envía cuando el cliente confirma; si marca un error, el programa te avisa y no lo envía.</p>
+<p class="muted">Un teléfono en el mostrador le muestra al cliente sus datos y el valor a pagar mientras haces la factura en
+FactuSYS (el programa de la PC los lee de la pantalla). Cuando no hay una factura en curso muestra un cartel de neón o LED
+con tus mensajes.</p>
 <ol class="muted" style="margin:0;padding-left:20px">
 <li>En ese teléfono abre <b style="word-break:break-all"><?= e(preg_replace('#^https?://#', '', rtrim((string)($config['portal_url'] ?? 'https://mecanicatoapantavelez.com'), '/'))) ?>/pantalla.php</b> y toca la pantalla (puedes guardarla en la pantalla de inicio).</li>
 <li>Aparece un código de 6 números: escríbelo aquí abajo.</li>
@@ -216,6 +239,24 @@ El WhatsApp solo se envía cuando el cliente confirma; si marca un error, el pro
 <div class="campo"><label for="p_codigo">Código del teléfono</label><input id="p_codigo" name="codigo" inputmode="numeric" maxlength="6" pattern="\d{6}" placeholder="000000" required></div>
 <div class="campo"><label for="p_nombre">Nombre (opcional)</label><input id="p_nombre" name="nombre" maxlength="60" placeholder="Pantalla del mostrador"></div>
 <div class="campo" style="justify-content:flex-end"><button class="boton boton-principal" type="submit">Autorizar pantalla</button></div>
+</form>
+<?php $cartel = pantalla_cartel($pdo); ?>
+<h3 style="margin:8px 0 0">Cartel (cuando no hay factura)</h3>
+<form method="post" class="rejilla-form">
+<?= csrf_campo() ?>
+<input type="hidden" name="accion" value="pantalla_cartel">
+<div class="campo" style="grid-column:1/-1"><label for="c_mensajes">Mensajes (uno por línea, se van turnando)</label>
+<textarea id="c_mensajes" name="mensajes" rows="5" maxlength="900"><?= e(implode("\n", $cartel['mensajes'])) ?></textarea></div>
+<div class="campo"><label for="c_estilo">Estilo</label><select id="c_estilo" name="estilo">
+<?php foreach (PANTALLA_CARTEL_ESTILOS as $k => $t): ?><option value="<?= $k ?>"<?= $cartel['estilo'] === $k ? ' selected' : '' ?>><?= e($t) ?></option><?php endforeach; ?>
+</select></div>
+<div class="campo"><label for="c_color">Color</label><select id="c_color" name="color">
+<?php foreach (PANTALLA_CARTEL_COLORES as $k => $t): ?><option value="<?= $k ?>"<?= $cartel['color'] === $k ? ' selected' : '' ?>><?= e($t) ?></option><?php endforeach; ?>
+</select></div>
+<div class="campo"><label for="c_vel">Velocidad</label><select id="c_vel" name="velocidad">
+<?php foreach (PANTALLA_CARTEL_VELOCIDADES as $k => $t): ?><option value="<?= $k ?>"<?= $cartel['velocidad'] === $k ? ' selected' : '' ?>><?= e($t) ?></option><?php endforeach; ?>
+</select></div>
+<div class="campo" style="justify-content:flex-end"><button class="boton boton-principal" type="submit">Guardar cartel</button></div>
 </form>
 <?php $pantallas = $pdo->query('SELECT id, nombre, visto FROM pantalla_disp WHERE aprobado = 1 ORDER BY id')->fetchAll(); ?>
 <?php if ($pantallas): ?>

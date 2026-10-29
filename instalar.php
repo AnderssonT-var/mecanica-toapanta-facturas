@@ -2,14 +2,12 @@
 // Instalador de un solo uso: copia la actualización a su lugar y se borra a sí mismo.
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
-if (!hash_equals('e46fac13356b244edfe77f3f49044e592cd670b9b9aff63160e73420c2286bb5', hash('sha256', (string)($_GET['t'] ?? '')))) { http_response_code(404); exit('{}'); }
+if (!hash_equals('67140985eb02dc69d8172d0a07b1818b56d940c6868b89542858e29ac2f88c79', hash('sha256', (string)($_GET['t'] ?? '')))) { http_response_code(404); exit('{}'); }
 $raiz = dirname(__DIR__);
 $archivos = [
-    'lib/app.php' => '2e2a1914b12247fdf50eff55a513e62f3c7b02db7cdede4196ab1a3cc7c0b476',
-    'admin/facturar.php' => 'f5c2fc0a9fff1fc2cab5130f01030b3c056c711de1945ed102951b43b06a497b',
-    'admin/configuracion.php' => '4c61a46274c310d8976d937a7340a5790c005b73f63b5982713314724d27cac0',
-    'pantalla.php' => '4224a75bd2411fab32096821b8023024da70fb3d44b31de791323e9ebfc09850',
-    'api/agente.php' => '47bc87641e11dbf25ef25c7222a2cd57b9b2e45fccdb413634dcd9b1fc26d33c',
+    'lib/app.php' => '0291412142df73db99e8b853384de0f033e9c495566a1bef13ffbf40bd993534',
+    'admin/configuracion.php' => '3f6b525af33789f223ffb88c1561226c4f550471848a5fa976a8ac47b0c07f90',
+    'pantalla.php' => '4f6f4f04eaaa9a91e1e670a5c35c97b2c4daa520bb55d7a9ad2846036e79151d',
 ];
 $respaldo = dirname($raiz) . '/respaldo_web_' . date('Ymd_His');
 $res = ['ok' => true, 'archivos' => []];

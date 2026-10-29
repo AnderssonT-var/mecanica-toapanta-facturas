@@ -152,6 +152,27 @@ function pantalla_poner(PDO $pdo, string $fase, array $entrada): array {
     return $e;
 }
 
+// Cartel (neón o LED) que se ve en la pantalla del cliente cuando no hay una factura en curso
+const PANTALLA_CARTEL_ESTILOS = ['neon' => 'Neón', 'led' => 'Letrero LED'];
+const PANTALLA_CARTEL_COLORES = ['rosa' => 'Rosa', 'azul' => 'Azul', 'verde' => 'Verde', 'ambar' => 'Ámbar',
+    'rojo' => 'Rojo', 'blanco' => 'Blanco'];
+const PANTALLA_CARTEL_VELOCIDADES = ['lenta' => 'Lenta', 'normal' => 'Normal', 'rapida' => 'Rápida'];
+const PANTALLA_CARTEL_DEFECTO = [
+    'mensajes' => ['BIENVENIDOS', 'MECÁNICA TOAPANTA VÉLEZ', 'MANTENIMIENTO Y REPUESTOS', 'GRACIAS POR SU PREFERENCIA'],
+    'estilo' => 'neon', 'color' => 'rosa', 'velocidad' => 'normal',
+];
+
+function pantalla_cartel(PDO $pdo): array {
+    $st = $pdo->query("SELECT svalue FROM site_settings WHERE skey = 'pantalla_cartel'");
+    $c = $st ? json_decode((string)$st->fetchColumn(), true) : null;
+    $c = is_array($c) ? $c + PANTALLA_CARTEL_DEFECTO : PANTALLA_CARTEL_DEFECTO;
+    $c['mensajes'] = array_values(array_filter(array_map('strval', (array)$c['mensajes']), 'strlen')) ?: PANTALLA_CARTEL_DEFECTO['mensajes'];
+    if (!isset(PANTALLA_CARTEL_ESTILOS[$c['estilo']])) $c['estilo'] = 'neon';
+    if (!isset(PANTALLA_CARTEL_COLORES[$c['color']])) $c['color'] = 'rosa';
+    if (!isset(PANTALLA_CARTEL_VELOCIDADES[$c['velocidad']])) $c['velocidad'] = 'normal';
+    return $c;
+}
+
 function pantalla_activa(PDO $pdo): bool {
     return (bool)$pdo->query('SELECT 1 FROM pantalla_disp WHERE aprobado = 1 AND visto > NOW() - INTERVAL 1 MINUTE LIMIT 1')->fetchColumn();
 }
