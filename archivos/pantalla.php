@@ -78,8 +78,8 @@ body { background: var(--fondo); color: var(--tinta); font-family: system-ui, -a
   font-size: var(--t); line-height: 1.3; -webkit-text-size-adjust: 100%; -webkit-user-select: none; user-select: none; overflow: hidden; }
 body.oscuro { background: var(--cartel); }
 .pant { height: 100%; display: flex; flex-direction: column; padding: max(12px, 2.2vmin) max(14px, 3vmin) calc(max(12px, 2.2vmin) + env(safe-area-inset-bottom)); gap: 1.6vmin; overflow: hidden; }
-.cab { display: flex; align-items: center; gap: 10px; color: var(--acento); font-weight: 800; font-size: .95em; letter-spacing: .02em; flex: none; }
-.marca { background: var(--acento); color: #fff; border-radius: 8px; padding: .2em .45em; font-size: .9em; }
+.cab { flex: none; background: var(--acento); color: #fff; border-radius: 14px; padding: .45em .8em; text-align: center;
+  font-weight: 800; font-size: 1.25em; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; overflow: hidden; }
 body.oscuro .cab { display: none; }
 .vista { display: none; flex: 1; min-height: 0; flex-direction: column; gap: 2vmin; }
 .vista.activa { display: flex; }
@@ -89,27 +89,30 @@ h1 { margin: 0; font-size: 1.6em; line-height: 1.15; }
 .codigo { font-size: 3.2em; font-weight: 800; letter-spacing: .12em; color: var(--acento); font-variant-numeric: tabular-nums; }
 /* datos de la factura */
 .lleno { min-height: 0; }
-.lleno > .lado { display: flex; flex-direction: column; gap: 1.6vmin; min-height: 0; }
+.titulo-datos { flex: none; }
+.cuerpo { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 1.6vmin; }
 .tarjeta { background: #fff; border: 1px solid var(--borde); border-radius: 14px; padding: .6em .9em; overflow: hidden; }
 .dato { padding: .32em 0; border-bottom: 1px solid #edf1f2; min-width: 0; }
 .dato:last-child { border-bottom: 0; }
 .dato span { display: block; color: var(--suave); font-size: .68em; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
 .dato b { display: block; font-size: 1.15em; line-height: 1.2; word-break: break-word; }
 .dato b.una { white-space: nowrap; overflow: hidden; word-break: normal; }
-.dato b.vacio { color: #9aa8ae; font-weight: 500; font-style: italic; font-size: .95em; }
+.dato b.vacio { color: #9aa8ae; font-weight: 500; }
 .total { background: var(--acento); color: #fff; border-radius: 14px; padding: .7em .9em; display: flex; flex-direction: column; gap: .2em; }
 .total .lineas { display: flex; justify-content: space-between; font-size: .95em; opacity: .9; }
-.total .grande { display: flex; justify-content: space-between; align-items: baseline; font-weight: 800; gap: 10px; flex-wrap: wrap; }
+.total .grande { display: flex; justify-content: space-between; align-items: baseline; font-weight: 800; gap: 10px; flex-wrap: wrap; margin-top: auto; }
 .total .grande em { font-style: normal; font-size: 1em; }
 .total .grande strong { font-size: 2.6em; line-height: 1; font-variant-numeric: tabular-nums; margin-left: auto; }
 @media (orientation: landscape) {
-  .lleno.activa { display: grid; grid-template-columns: 1.6fr 1fr; align-items: start; gap: 2.5vmin; }
+  /* la tarjeta blanca y el total azul empiezan y terminan a la misma altura */
+  .cuerpo { display: grid; grid-template-columns: 1.6fr 1fr; align-items: stretch; gap: 2.5vmin; flex: none; }
   .lleno h1 { font-size: 1.3em; }
-  .lleno .tarjeta { display: grid; grid-template-columns: 1fr 1fr; column-gap: 1.2em; }
+  .lleno .tarjeta { display: grid; grid-template-columns: 1fr 1fr; column-gap: 1.2em; align-content: start; }
   .lleno .dato.ancho { grid-column: 1 / -1; }
+  .total { justify-content: flex-start; }
 }
 @media (orientation: portrait) {
-  .lleno.activa { justify-content: space-between; }
+  .cuerpo { justify-content: space-between; }
   .lleno .dato b { font-size: 1.25em; }
 }
 /* cartel */
@@ -132,7 +135,7 @@ h1 { margin: 0; font-size: 1.6em; line-height: 1.15; }
 </head>
 <body>
 <div class="pant">
-<div class="cab"><span class="marca">MTV</span><span><?= e(APP_NOMBRE_POR_DEFECTO) ?></span></div>
+<div class="cab"><?= e(APP_NOMBRE_POR_DEFECTO) ?></div>
 
 <section id="v_codigo" class="vista centro" aria-live="polite">
 <h1>Autorizar esta pantalla</h1>
@@ -148,14 +151,12 @@ h1 { margin: 0; font-size: 1.6em; line-height: 1.15; }
 </section>
 
 <section id="v_datos" class="vista lleno" aria-live="polite">
-<div class="lado">
-<div>
+<div class="titulo-datos">
 <h1>Revise sus datos</h1>
 <p class="sub">Así saldrá su factura electrónica.</p>
 </div>
+<div class="cuerpo">
 <div class="tarjeta" id="lista"></div>
-</div>
-<div class="lado">
 <div class="total">
 <div class="lineas"><span>Subtotal</span><span id="t_base">0.00</span></div>
 <div class="lineas"><span id="t_iva_txt">IVA</span><span id="t_iva">0.00</span></div>
@@ -209,12 +210,13 @@ h1 { margin: 0; font-size: 1.6em; line-height: 1.15; }
     });
     document.body.className = id === 'v_cartel' ? 'oscuro' : '';
     if (id !== 'v_datos') document.body.style.fontSize = '';
+    if (id !== 'v_cartel') setTimeout(ajustarCabecera, 0);
     if (id === 'v_cartel') cartel.empezar(); else cartel.pausar();
   }
   function fila(etiqueta, valor, ancho, unaLinea) {
     var d = document.createElement('div'); d.className = 'dato' + (ancho ? ' ancho' : '');
     var s = document.createElement('span'); s.textContent = etiqueta;
-    var b = document.createElement('b'); b.textContent = valor || 'Se completa al facturar';
+    var b = document.createElement('b'); b.textContent = valor || '—';
     b.className = !valor ? 'vacio' : (unaLinea ? 'una' : '');
     d.appendChild(s); d.appendChild(b); return d;
   }
@@ -228,7 +230,7 @@ h1 { margin: 0; font-size: 1.6em; line-height: 1.15; }
     var lista = $('lista'); lista.innerHTML = '';
     lista.appendChild(fila('Nombre / razón social', d.nombre, true));
     lista.appendChild(fila('Cédula / RUC', d.ruc, false, true));
-    lista.appendChild(fila('Celular (WhatsApp)', d.telefono, false, true));
+    lista.appendChild(fila('Teléfono', d.telefono, false, true));
     lista.appendChild(fila('Dirección', d.direccion, true));
     lista.appendChild(fila('Correo', d.email, true, true));
     if (d.detalle) lista.appendChild(fila('Detalle', d.detalle, true));
@@ -256,6 +258,14 @@ h1 { margin: 0; font-size: 1.6em; line-height: 1.15; }
       if (cabe()) { mejor = med; lo = med; } else hi = med;
     }
     document.body.style.fontSize = Math.floor(mejor * 0.97) + 'px';
+    ajustarCabecera();
+  }
+  // el nombre del taller siempre completo, de lado a lado
+  function ajustarCabecera() {
+    var c = document.querySelector('.cab');
+    c.style.fontSize = '';
+    var tam = parseFloat(getComputedStyle(c).fontSize);
+    for (var k = 0; k < 30 && c.scrollWidth > c.clientWidth + 1 && tam > 9; k++) { tam *= 0.94; c.style.fontSize = tam + 'px'; }
   }
 
   // ------------------------------------------------------------------ cartel
