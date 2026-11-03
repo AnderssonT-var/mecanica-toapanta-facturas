@@ -9,7 +9,7 @@ $logo = (string)($emp['logo'] ?? '');
 unset($emp['logo'], $emp['_ultima_sync'], $emp['tarifas']);
 header("Content-Security-Policy: default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:; frame-src 'self'; form-action 'self'; frame-ancestors 'none'");
 header('X-Content-Type-Options: nosniff');
-$datos = ['c' => $c, 'empresa' => $emp, 'logo' => str_starts_with($logo, 'data:image/') ? $logo : '', 'programa' => 'Facturador'];
+$datos = ['c' => $c, 'empresa' => $emp, 'logo' => str_starts_with($logo, 'data:image/') ? $logo : '', 'programa' => fx_marca()];
 ?><!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>RIDE <?= e($c['numero']) ?></title><link rel="stylesheet" href="assets/app.css?v=<?= FX_VERSION ?>"></head>
 <body class="pantalla-ride">

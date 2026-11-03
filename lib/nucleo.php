@@ -5,7 +5,20 @@ declare(strict_types=1);
 if (!defined('FX_PORTAL')) { http_response_code(403); exit; }
 date_default_timezone_set('America/Guayaquil');
 
-const FX_VERSION = '1.1.1';
+const FX_VERSION = '1.1.2';
+const FX_MARCA = 'Facmit';
+
+// Nombre del producto. Los portales instalados antes del cambio de marca guardaron el nombre anterior en su
+// configuración: se muestra siempre el actual.
+function fx_marca(): string {
+  $m = trim((string)(fx_config()['marca'] ?? ''));
+  return ($m === '' || strcasecmp($m, 'Facturador') === 0) ? FX_MARCA : $m;
+}
+
+// Logotipo (F con la flecha de emitir) para la baldosa lima del portal y de la app web.
+function fx_logo(int $t = 20): string {
+  return '<svg width="' . $t . '" height="' . $t . '" viewBox="8 8 48 48" fill="none" aria-hidden="true"><path d="M20 14v36M20 14h20M20 31h13" stroke="#0F1B2D" stroke-width="5.5" stroke-linecap="round"/><path d="M36 48l12-12M39 35.5h9.5V45" stroke="#0F1B2D" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+}
 const FX_PLANES = [
   'LOCAL' => ['label' => 'Local', 'desc' => 'Programa de escritorio con datos solo en el equipo'],
   'WEB'   => ['label' => 'Web',   'desc' => 'Solo navegador, datos en la nube'],
@@ -271,12 +284,12 @@ function cabecera_html(string $titulo, ?array $admin, string $activo = ''): void
   iniciar_sesion();
   $aviso = $_SESSION['aviso'] ?? null;
   unset($_SESSION['aviso']);
-  $marca = e(fx_config()['marca'] ?? 'Facturador');
+  $marca = e(fx_marca());
   echo '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
-  echo '<title>' . e($titulo) . ' · Licencias ' . $marca . '</title><link rel="stylesheet" href="assets/estilos.css?v=' . FX_VERSION . '"></head><body>';
+  echo '<title>' . e($titulo) . ' · Licencias ' . $marca . '</title><link rel="icon" href="app/assets/icono.svg"><link rel="stylesheet" href="assets/estilos.css?v=' . FX_VERSION . '"></head><body>';
   if ($admin) {
     $item = fn($k, $url, $t) => '<a href="' . $url . '"' . ($activo === $k ? ' class="on"' : '') . '>' . $t . '</a>';
-    echo '<header class="top"><div class="wrap top-in"><a class="marca" href="panel.php"><span class="logo">FX</span><span>Licencias <b>' . $marca . '</b></span></a>';
+    echo '<header class="top"><div class="wrap top-in"><a class="marca" href="panel.php"><span class="logo">' . fx_logo(20) . '</span><span>Licencias <b>' . $marca . '</b></span></a>';
     echo '<nav>' . $item('panel', 'panel.php', 'Panel') . $item('licencias', 'licencias.php', 'Licencias') . $item('pagos', 'pagos.php', 'Pagos') . $item('eventos', 'eventos.php', 'Actividad') . $item('versiones', 'versiones.php', 'Versiones') . $item('ajustes', 'ajustes.php', 'Ajustes') . '</nav>';
     echo '<form method="post" action="logout.php" class="salir">' . campo_csrf() . '<span>' . e($admin['nombre'] ?: $admin['usuario']) . '</span><button class="btn btn-sm">Salir</button></form></div></header>';
   }

@@ -1,5 +1,5 @@
 'use strict';
-// App web del Facturador: comportamientos generales y el formulario de factura.
+// App web de Facmit: comportamientos generales y el formulario de factura.
 (function () {
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];

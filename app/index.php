@@ -1,5 +1,5 @@
 <?php
-// App web del plan Full (Facturador en la nube). Una sola entrada: ./?v=<vista>
+// App web del plan Full (Facmit en la nube). Una sola entrada: ./?v=<vista>
 declare(strict_types=1);
 define('FX_PORTAL', true);
 require __DIR__ . '/lib/web.php';

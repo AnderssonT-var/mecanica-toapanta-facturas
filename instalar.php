@@ -57,7 +57,7 @@ if (is_file(FX_CONFIG)) {
       $config = [
         'db' => $db,
         'llave_privada' => base64_encode($semilla),
-        'marca' => $v('marca', 'Facturador') ?: 'Facturador',
+        'marca' => $v('marca', 'Facmit') ?: 'Facmit',
         'instalado' => $ahora,
       ];
       $php = "<?php\n// Configuración del portal de licencias. NO compartas este archivo: contiene la llave privada de firma.\nif (!defined('FX_PORTAL')) { http_response_code(403); exit; }\nreturn " . var_export($config, true) . ";\n";
@@ -106,7 +106,7 @@ if (is_file(FX_CONFIG)) {
       <label>WhatsApp de soporte<input name="whatsapp" value="<?= h($v('whatsapp')) ?>" placeholder="+593 99 999 9999"></label>
       <label>Contraseña (mín. 10)<input type="password" name="clave" required minlength="10"></label>
       <label>Repetir contraseña<input type="password" name="clave2" required minlength="10"></label>
-      <label>Nombre del producto<input name="marca" value="<?= h($v('marca', 'Facturador')) ?>"></label>
+      <label>Nombre del producto<input name="marca" value="<?= h($v('marca', 'Facmit')) ?>"></label>
     </div>
     <button class="btn btn-dark btn-lg">Instalar</button>
   </form>

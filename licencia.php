@@ -30,7 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       case 'correo':
         $l = licencia_por_id($id);
         if (!$l || !filter_var($l['email'], FILTER_VALIDATE_EMAIL)) throw new ErrorLicencia('DATOS', 'La licencia no tiene un email válido.');
-        $marca = fx_config()['marca'] ?? 'Facturador';
+        $marca = fx_marca();
         $txt = "Hola " . $l['cliente'] . ",\n\nEsta es tu clave de licencia de " . $marca . ":\n\n    " . $l['clave'] . "\n\nPlan: " . FX_PLANES[$l['plan']]['label'] . "\nVence: " . fecha_ec($l['vence'])
           . "\n\nPara activarla, abre el programa e ingrésala en la pantalla de activación (necesitas internet solo en ese momento).\n\nSoporte: " . ajuste('whatsapp', '') . "\n";
         $host = preg_replace('/[^a-z0-9.-]/i', '', (string)($_SERVER['HTTP_HOST'] ?? 'localhost'));

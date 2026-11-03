@@ -284,7 +284,7 @@ function web_cabecera(array $ctx, string $titulo, string $activo, string $grupo 
   $iniciales = mb_strtoupper(mb_substr(preg_replace('/[^\p{L}\s]/u', '', $nombre), 0, 1) . mb_substr((string)(explode(' ', trim($nombre))[1] ?? ''), 0, 1));
   echo '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">';
   echo '<meta name="theme-color" content="#0F1B2D"><title>' . e($titulo) . ' · ' . e($nombre) . '</title><link rel="stylesheet" href="assets/app.css?v=' . FX_VERSION . '"><link rel="icon" href="assets/icono.svg"></head><body>';
-  echo '<div class="app"><aside class="lado"><a class="marca" href="./"><span class="logo">' . icono('M7 3h7l5 5v13H7zM14 3v5h5M10 13l2 2 4-4', 18) . '</span><span>Facturador<small>en la nube</small></span></a>';
+  echo '<div class="app"><aside class="lado"><a class="marca" href="./"><span class="logo">' . fx_logo(22) . '</span><span>' . e(fx_marca()) . '<small>en la nube</small></span></a>';
   echo '<div class="perfil-sel"><span class="avatar">' . e($iniciales ?: 'FX') . '</span><span class="perfil-txt">';
   if (count($ctx['perfiles']) > 1) {
     // Varias empresas en la licencia: el nombre es un selector.

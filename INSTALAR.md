@@ -19,7 +19,7 @@ Destino: `https://mecanicatoapantavelez.com/licencias/`
 4. **Borrar `instalar.php`** desde el Administrador de archivos (por seguridad; si alguien lo abre después solo verá "ya instalado", pero mejor quitarlo).
 5. **Probar la API** — abre `https://mecanicatoapantavelez.com/licencias/api.php?a=salud`. Debe responder `{"ok":true,...}`.
 6. **Crear la primera licencia** — entra a `/licencias/`, *Nueva licencia*: cliente, RUC, plan, vigencia, empresas y equipos. Copia la clave `FX-XXXX-XXXX-XXXX` o envíala por WhatsApp/correo.
-7. **Activar en el programa** — el cliente instala `Facturador-Setup-0.4.0.exe`, pega la clave y listo.
+7. **Activar en el programa** — el cliente instala `Facmit-Setup-0.4.0.exe`, pega la clave y listo.
 
 ## Uso diario
 

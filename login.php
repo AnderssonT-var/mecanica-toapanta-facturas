@@ -41,12 +41,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $error = 'Usuario o contraseña incorrectos.';
   }
 }
-$marca = fx_config()['marca'] ?? 'Facturador';
+$marca = fx_marca();
 ?><!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Ingresar · Licencias <?= e($marca) ?></title><link rel="stylesheet" href="assets/estilos.css?v=<?= FX_VERSION ?>"></head>
+<title>Ingresar · Licencias <?= e($marca) ?></title><link rel="icon" href="app/assets/icono.svg"><link rel="stylesheet" href="assets/estilos.css?v=<?= FX_VERSION ?>"></head>
 <body class="centro"><main class="caja angosta">
-<div class="marca-grande"><span class="logo">FX</span><div><h1>Licencias</h1><p class="muted"><?= e($marca) ?> · panel de administración</p></div></div>
+<div class="marca-grande"><span class="logo"><?= fx_logo(28) ?></span><div><h1>Licencias</h1><p class="muted"><?= e($marca) ?> · panel de administración</p></div></div>
 <?php if ($error): ?><div class="aviso t-r" role="alert"><?= e($error) ?></div><?php endif; ?>
 <form method="post" class="form">
   <?= campo_csrf() ?>

@@ -134,7 +134,7 @@ function encabezado(c, empresa, { logo, titulo, numero, sinClave }) {
     + leyendas + '</div></div>' + der + '</div>';
 }
 
-function documento(titulo, cuerpo, { programa = 'Facturador' } = {}) {
+function documento(titulo, cuerpo, { programa = 'Facmit' } = {}) {
   const ahora = new Date();
   const p = (n) => String(n).padStart(2, '0');
   const impreso = p(ahora.getDate()) + '/' + p(ahora.getMonth() + 1) + '/' + ahora.getFullYear() + ' ' + p(ahora.getHours()) + ':' + p(ahora.getMinutes());
