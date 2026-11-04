@@ -3,6 +3,10 @@ Options -Indexes
 DirectoryIndex index.php
 <IfModule mod_rewrite.c>
   RewriteEngine On
+  # La app web vive en facmit.com (las páginas del dominio anterior se envían allí).
+  RewriteCond %{HTTP_HOST} (^|\.)mecanicatoapantavelez\.com$ [NC]
+  RewriteCond %{REQUEST_METHOD} ^(GET|HEAD)$
+  RewriteRule ^(.*)$ https://facmit.com/licencias/app/$1 [R=302,L,QSA]
   RewriteRule ^(lib|vistas)(/|$) - [F,L]
 </IfModule>
 <IfModule mod_headers.c>
