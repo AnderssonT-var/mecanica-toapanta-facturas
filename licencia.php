@@ -97,7 +97,11 @@ $in = fn($k, $label, $extra = '') => '<label>' . $label . '<input name="' . $k .
         <p class="muted small">Siempre incluido (Básico): <?= e(FX_BASICO) ?>.</p>
         <input type="hidden" name="funciones[]" value="">
         <div class="fun-grupo"><span class="fun-tit">Profesional (las tres = plan Profesional)</span>
-        <?php foreach (FX_FUNCIONES as $k => $fx) if ($fx['grupo'] === 'pro'): ?><label class="fun"><input type="checkbox" name="funciones[]" value="<?= $k ?>"<?= in_array($k, $fsel, true) ? ' checked' : '' ?>><span><b><?= e($fx['label']) ?></b><small><?= e($fx['desc']) ?></small></span></label><?php endif; ?>
+        <?php foreach (FX_FUNCIONES as $k => $fx) if ($fx['grupo'] === 'pro' && $k !== 'inventario'): ?><label class="fun"><input type="checkbox" name="funciones[]" value="<?= $k ?>"<?= in_array($k, $fsel, true) ? ' checked' : '' ?>><span><b><?= e($fx['label']) ?></b><small><?= e($fx['desc']) ?></small></span></label><?php endif; ?>
+        <div class="fun-inv"><span class="fun-sub">Inventario</span>
+          <label class="fun"><input type="radio" name="funciones[]" value=""<?= in_array('inventario', $fsel, true) ? '' : ' checked' ?>><span><b>Inventario simple (incluido)</b><small>Catálogo de productos con código, nombre y precio. Sin control de stock.</small></span></label>
+          <label class="fun"><input type="radio" name="funciones[]" value="inventario"<?= in_array('inventario', $fsel, true) ? ' checked' : '' ?>><span><b><?= e(FX_FUNCIONES['inventario']['label']) ?></b><small><?= e(FX_FUNCIONES['inventario']['desc']) ?></small></span></label>
+        </div>
         </div>
         <div class="fun-grupo"><span class="fun-tit">Extras (Profesional + los dos extras = plan Completo)</span>
         <?php foreach (FX_FUNCIONES as $k => $fx) if ($fx['grupo'] === 'extra'): ?><label class="fun"><input type="checkbox" name="funciones[]" value="<?= $k ?>"<?= in_array($k, $fsel, true) ? ' checked' : '' ?>><span><b><?= e($fx['label']) ?></b><small><?= e($fx['desc']) ?></small></span></label><?php endif; ?>

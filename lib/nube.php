@@ -4,8 +4,8 @@
 declare(strict_types=1);
 if (!defined('FX_PORTAL')) { http_response_code(403); exit; }
 
-const NUBE_TABLAS = ['clientes', 'productos', 'comprobantes', 'catalogo', 'proformas', 'pedidos'];
-const NUBE_TABLAS_DESDE_PROGRAMA = ['clientes', 'productos', 'comprobantes', 'catalogo', 'proformas', 'pedidos'];
+const NUBE_TABLAS = ['clientes', 'productos', 'comprobantes', 'catalogo', 'proformas', 'pedidos', 'movimientos'];
+const NUBE_TABLAS_DESDE_PROGRAMA = ['clientes', 'productos', 'comprobantes', 'catalogo', 'proformas', 'pedidos', 'movimientos'];
 const NUBE_LOTE_PULL = 1000;
 const NUBE_RESPALDOS = 10;
 

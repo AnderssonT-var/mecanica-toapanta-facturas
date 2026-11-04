@@ -35,8 +35,8 @@ document.querySelectorAll('table').forEach((t) => {
   if (!caja) return;
   const PRO = ['documentos', 'retenciones', 'inventario'];
   const CORTOS = { documentos: 'Documentos', retenciones: 'Retenciones', inventario: 'Inventario', nube: 'Nube', movil: 'Móvil' };
-  const checks = () => [...caja.querySelectorAll('input[type=checkbox][name="funciones[]"]')];
-  const marcadas = () => checks().filter((c) => c.checked).map((c) => c.value);
+  const checks = () => [...caja.querySelectorAll('input[name="funciones[]"]:not([type=hidden])')];
+  const marcadas = () => checks().filter((c) => c.checked && c.value).map((c) => c.value);
   const precios = JSON.parse((document.getElementById('precio-sugerido') || {}).dataset.precios || '{}');
   function nombre(f) {
     const pro = PRO.every((x) => f.includes(x));
@@ -72,7 +72,7 @@ document.querySelectorAll('table').forEach((t) => {
     const b = e.target.closest('[data-preset]');
     if (!b) return;
     const set = b.dataset.preset ? b.dataset.preset.split(',') : [];
-    checks().forEach((c) => { c.checked = set.includes(c.value); });
+    checks().forEach((c) => { c.checked = c.type === 'radio' && !c.value ? !set.includes('inventario') : set.includes(c.value); });
     pintar();
   });
   pintar();

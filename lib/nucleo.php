@@ -5,7 +5,7 @@ declare(strict_types=1);
 if (!defined('FX_PORTAL')) { http_response_code(403); exit; }
 date_default_timezone_set('America/Guayaquil');
 
-const FX_VERSION = '1.2.0';
+const FX_VERSION = '1.3.0';
 const FX_MARCA = 'Facmit';
 
 // Nombre del producto. Los portales instalados antes del cambio de marca guardaron el nombre anterior en su
@@ -30,11 +30,11 @@ const FX_PLANES = [
 // Lo básico (facturar, clientes, productos, proformas, comprobantes, RIDE, autorizaciones, anulaciones, correo,
 // reportes de ventas e IVA, importar) va siempre. Estas se marcan en cada licencia y el programa solo muestra
 // lo marcado. El nombre del plan sale solo de lo que se marque.
-const FX_BASICO = 'Facturas, clientes, productos, proformas, comprobantes y RIDE, autorización SRI, anulaciones, envío por correo, reportes de ventas e IVA, importación desde Excel';
+const FX_BASICO = 'Facturas, clientes, inventario simple (código, nombre y precio), proformas, comprobantes y RIDE, autorización SRI, anulaciones, envío por correo, reportes de ventas e IVA, importación desde Excel';
 const FX_FUNCIONES = [
   'documentos'  => ['label' => 'Devoluciones, notas de débito y guías', 'desc' => 'Notas de crédito por devolución parcial, notas de débito, guías de remisión y transportistas', 'grupo' => 'pro'],
   'retenciones' => ['label' => 'Retenciones', 'desc' => 'Comprobantes de retención 2.0, proveedores y sustento tributario', 'grupo' => 'pro'],
-  'inventario'  => ['label' => 'Inventario', 'desc' => 'Stock por producto, fotos, código de barras, entradas y kardex', 'grupo' => 'pro'],
+  'inventario'  => ['label' => 'Inventario completo', 'desc' => 'Stock por producto, fotos, código de barras, ingresos de mercadería, ajustes y kardex', 'grupo' => 'pro'],
   'nube'        => ['label' => 'Nube y varios equipos', 'desc' => 'Respaldo en la nube y datos sincronizados entre computadoras', 'grupo' => 'extra'],
   'movil'       => ['label' => 'Facturar desde el celular', 'desc' => 'App web para facturar y consultar desde el teléfono (incluye la nube)', 'grupo' => 'extra'],
 ];
