@@ -13,7 +13,7 @@ function crear_esquema(PDO $pdo, string $driver): void {
       hash VARCHAR(255) NOT NULL, activo TINYINT NOT NULL DEFAULT 1, creado DATETIME NOT NULL, ultimo_acceso DATETIME NULL)$fin",
     "CREATE TABLE IF NOT EXISTS licencias (
       id $ai, clave VARCHAR(20) NOT NULL UNIQUE, cliente VARCHAR(200) NOT NULL, ruc CHAR(13) NOT NULL, rucs TEXT NULL,
-      email VARCHAR(160) NOT NULL DEFAULT '', telefono VARCHAR(40) NOT NULL DEFAULT '', plan VARCHAR(10) NOT NULL,
+      email VARCHAR(160) NOT NULL DEFAULT '', telefono VARCHAR(40) NOT NULL DEFAULT '', plan VARCHAR(10) NOT NULL, funciones TEXT NULL,
       inicio DATE NOT NULL, vence DATE NOT NULL, gracia INT NOT NULL DEFAULT 3, empresas INT NOT NULL DEFAULT 1,
       equipos_max INT NOT NULL DEFAULT 1, usuarios INT NOT NULL DEFAULT 1, puntos INT NOT NULL DEFAULT 1,
       precio DECIMAL(10,2) NOT NULL DEFAULT 0, periodo VARCHAR(12) NOT NULL DEFAULT 'MENSUAL',

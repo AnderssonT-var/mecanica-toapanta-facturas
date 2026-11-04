@@ -16,7 +16,6 @@ if ($buscar !== '') {
   $where[] = '(cliente LIKE ? OR ruc LIKE ? OR clave LIKE ? OR email LIKE ? OR rucs LIKE ?)';
   array_push($p, "%$buscar%", "%$buscar%", '%' . strtoupper($buscar) . '%', "%$buscar%", "%$buscar%");
 }
-if (isset(FX_PLANES[$plan])) { $where[] = 'plan = ?'; $p[] = $plan; }
 switch ($filtro) {
   case 'activas': $where[] = "estado = 'ACTIVA' AND vence >= ?"; $p[] = $hoy; break;
   case 'porvencer': $where[] = "estado = 'ACTIVA' AND vence BETWEEN ? AND ?"; array_push($p, $hoy, $en7); break;
@@ -27,6 +26,7 @@ $r = db()->prepare('SELECT l.*, (SELECT COUNT(*) FROM equipos q WHERE q.licencia
   FROM licencias l WHERE ' . implode(' AND ', $where) . ' ORDER BY l.vence ASC LIMIT 500');
 $r->execute($p);
 $filas = $r->fetchAll();
+if (in_array($plan, ['Básico', 'Profesional', 'Completo'], true)) $filas = array_values(array_filter($filas, fn($x) => categoria_plan(funciones_licencia($x)) === $plan));
 
 cabecera_html('Licencias', $admin, 'licencias');
 $opt = fn($v, $t, $act) => '<option value="' . e($v) . '"' . ($act === $v ? ' selected' : '') . '>' . e($t) . '</option>';
@@ -36,7 +36,7 @@ $opt = fn($v, $t, $act) => '<option value="' . e($v) . '"' . ($act === $v ? ' se
   <form class="filtros" method="get">
     <input name="q" value="<?= e($buscar) ?>" placeholder="Cliente, RUC, clave o email" aria-label="Buscar">
     <select name="f" aria-label="Estado"><?= $opt('todas', 'Todas', $filtro) . $opt('activas', 'Activas', $filtro) . $opt('porvencer', 'Por vencer (7 días)', $filtro) . $opt('vencidas', 'Vencidas', $filtro) . $opt('suspendidas', 'Suspendidas', $filtro) ?></select>
-    <select name="plan" aria-label="Plan"><option value="">Todos los planes</option><?php foreach (FX_PLANES as $k => $pl) echo $opt($k, $pl['label'], $plan); ?></select>
+    <select name="plan" aria-label="Plan"><option value="">Todos los planes</option><?php foreach (['Básico', 'Profesional', 'Completo'] as $k) echo $opt($k, $k, $plan); ?></select>
     <button class="btn">Filtrar</button>
   </form>
   <?php if (!$filas): ?><div class="empty">No hay licencias con esos filtros.</div><?php else: ?>
@@ -44,7 +44,7 @@ $opt = fn($v, $t, $act) => '<option value="' . e($v) . '"' . ($act === $v ? ' se
   <?php foreach ($filas as $l): $est = estado_licencia($l); ?>
     <tr class="click"><td class="mono"><a href="licencia.php?id=<?= (int)$l['id'] ?>"><?= e(codigo_licencia($l)) ?></a></td>
     <td><a href="licencia.php?id=<?= (int)$l['id'] ?>"><b><?= e($l['cliente']) ?></b></a><span class="sub mono"><?= e($l['ruc']) ?></span></td>
-    <td class="mono"><?= e($l['clave']) ?></td><td><?= e(FX_PLANES[$l['plan']]['label']) ?></td><td><?= fecha_ec($l['vence']) ?></td>
+    <td class="mono"><?= e($l['clave']) ?></td><td><?= e(plan_de($l)) ?></td><td><?= fecha_ec($l['vence']) ?></td>
     <td class="right"><?= (int)$l['equipos_activos'] ?> / <?= (int)$l['equipos_max'] ?></td><td><?= insignia($est) ?></td></tr>
   <?php endforeach; ?></tbody></table></div>
   <p class="muted small"><?= count($filas) ?> licencia(s)</p>

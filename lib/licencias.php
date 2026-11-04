@@ -19,7 +19,6 @@ function validar_datos_licencia(array $d, bool $nueva): array {
     'ruc' => preg_replace('/\D/', '', $t('ruc', 13)),
     'email' => $t('email', 160),
     'telefono' => $t('telefono', 40),
-    'plan' => strtoupper($t('plan', 10)),
     'inicio' => $t('inicio', 10),
     'vence' => $t('vence', 10),
     'gracia' => $n('gracia', 0, 30, 3),
@@ -42,7 +41,11 @@ function validar_datos_licencia(array $d, bool $nueva): array {
   if ($l['cliente'] === '') throw new ErrorLicencia('DATOS', 'Escribe el nombre o razón social del cliente.');
   if (!validar_ruc($l['ruc'])) throw new ErrorLicencia('DATOS', 'El RUC del cliente no es válido.');
   if ($l['email'] !== '' && !filter_var($l['email'], FILTER_VALIDATE_EMAIL)) throw new ErrorLicencia('DATOS', 'El email no es válido.');
-  if (!isset(FX_PLANES[$l['plan']])) throw new ErrorLicencia('DATOS', 'Elige un plan.');
+  // El formulario siempre envía "funciones" (aunque sea vacío = plan Básico). Quien llame sin ese campo
+  // (integraciones antiguas) sigue usando el plan LOCAL / WEB / FULL.
+  $f = array_key_exists('funciones', $d) ? (array)$d['funciones'] : funciones_licencia(['plan' => strtoupper((string)($d['plan'] ?? 'LOCAL'))]);
+  $l['funciones'] = json_encode(normalizar_funciones($f));
+  $l['plan'] = plan_legado(json_decode($l['funciones'], true));
   foreach (['inicio', 'vence'] as $k) {
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $l[$k]) || !checkdate((int)substr($l[$k], 5, 2), (int)substr($l[$k], 8, 2), (int)substr($l[$k], 0, 4))) {
       throw new ErrorLicencia('DATOS', 'La fecha de ' . $k . ' no es válida.');
@@ -62,12 +65,12 @@ function crear_licencia(array $datos): int {
     $r->execute([$clave]);
     if (!$r->fetchColumn()) break;
   }
-  $d->prepare('INSERT INTO licencias (clave, cliente, ruc, rucs, email, telefono, plan, inicio, vence, gracia, empresas, equipos_max, usuarios, puntos, precio, periodo, estado, notas, creado, actualizado)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    ->execute([$clave, $l['cliente'], $l['ruc'], $l['rucs'], $l['email'], $l['telefono'], $l['plan'], $l['inicio'], $l['vence'], $l['gracia'],
+  $d->prepare('INSERT INTO licencias (clave, cliente, ruc, rucs, email, telefono, plan, funciones, inicio, vence, gracia, empresas, equipos_max, usuarios, puntos, precio, periodo, estado, notas, creado, actualizado)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    ->execute([$clave, $l['cliente'], $l['ruc'], $l['rucs'], $l['email'], $l['telefono'], $l['plan'], $l['funciones'], $l['inicio'], $l['vence'], $l['gracia'],
       $l['empresas'], $l['equipos_max'], $l['usuarios'], $l['puntos'], $l['precio'], $l['periodo'], 'ACTIVA', $l['notas'], ahora(), ahora()]);
   $id = (int)$d->lastInsertId();
-  registrar_evento($id, 'CREADA', 'Plan ' . $l['plan'] . ' hasta ' . $l['vence']);
+  registrar_evento($id, 'CREADA', 'Plan ' . nombre_plan(json_decode($l['funciones'], true)) . ' hasta ' . $l['vence']);
   return $id;
 }
 
@@ -75,12 +78,14 @@ function actualizar_licencia(int $id, array $datos): void {
   $ant = licencia_por_id($id);
   if (!$ant) throw new ErrorLicencia('NO_EXISTE', 'La licencia no existe.');
   $l = validar_datos_licencia($datos, false);
-  db()->prepare('UPDATE licencias SET cliente = ?, ruc = ?, rucs = ?, email = ?, telefono = ?, plan = ?, inicio = ?, vence = ?, gracia = ?, empresas = ?,
+  db()->prepare('UPDATE licencias SET cliente = ?, ruc = ?, rucs = ?, email = ?, telefono = ?, plan = ?, funciones = ?, inicio = ?, vence = ?, gracia = ?, empresas = ?,
     equipos_max = ?, usuarios = ?, puntos = ?, precio = ?, periodo = ?, notas = ?, actualizado = ? WHERE id = ?')
-    ->execute([$l['cliente'], $l['ruc'], $l['rucs'], $l['email'], $l['telefono'], $l['plan'], $l['inicio'], $l['vence'], $l['gracia'], $l['empresas'],
+    ->execute([$l['cliente'], $l['ruc'], $l['rucs'], $l['email'], $l['telefono'], $l['plan'], $l['funciones'], $l['inicio'], $l['vence'], $l['gracia'], $l['empresas'],
       $l['equipos_max'], $l['usuarios'], $l['puntos'], $l['precio'], $l['periodo'], $l['notas'], ahora(), $id]);
   $cambios = [];
-  foreach (['plan', 'vence', 'ruc', 'equipos_max', 'empresas'] as $k) if ((string)$ant[$k] !== (string)$l[$k]) $cambios[] = $k . ': ' . $ant[$k] . ' → ' . $l[$k];
+  $pa = plan_de($ant); $pn = nombre_plan(json_decode($l['funciones'], true));
+  if ($pa !== $pn) $cambios[] = 'plan: ' . $pa . ' → ' . $pn;
+  foreach (['vence', 'ruc', 'equipos_max', 'empresas'] as $k) if ((string)$ant[$k] !== (string)$l[$k]) $cambios[] = $k . ': ' . $ant[$k] . ' → ' . $l[$k];
   registrar_evento($id, 'EDITADA', $cambios ? implode('; ', $cambios) : 'Datos actualizados');
 }
 

@@ -100,7 +100,7 @@ function web_contexto(): ?array {
   $bloqueo = '';
   if ($est['code'] === 'SUSP') $bloqueo = 'Tu licencia está suspendida' . ($l['motivo'] ? ': ' . $l['motivo'] : '') . '. Contacta a soporte.';
   elseif ($est['code'] === 'VENC') $bloqueo = 'Tu licencia venció el ' . fecha_ec($l['vence']) . '. Renueva para seguir usando la app web.';
-  elseif (!in_array($l['plan'], ['FULL', 'WEB'], true)) $bloqueo = 'Tu plan no incluye la app web.';
+  elseif (!tiene_funcion($l, 'movil')) $bloqueo = 'Tu plan no incluye facturar desde el celular. Pide agregar esta función a tu licencia.';
   return ['usuario' => $u, 'licencia' => $l, 'lic' => (int)$l['id'], 'perfil' => $perfil, 'perfiles' => $perfiles, 'estado' => $est, 'bloqueo' => $bloqueo,
     'empresa' => nube_perfil((int)$l['id'], $perfil) ?? ['ruc' => $perfil, 'razonSocial' => $l['cliente']]];
 }

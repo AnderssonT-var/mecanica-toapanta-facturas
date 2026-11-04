@@ -5,7 +5,7 @@ declare(strict_types=1);
 if (!defined('FX_PORTAL')) { http_response_code(403); exit; }
 date_default_timezone_set('America/Guayaquil');
 
-const FX_VERSION = '1.1.2';
+const FX_VERSION = '1.2.0';
 const FX_MARCA = 'Facmit';
 
 // Nombre del producto. Los portales instalados antes del cambio de marca guardaron el nombre anterior en su
@@ -19,11 +19,79 @@ function fx_marca(): string {
 function fx_logo(int $t = 20): string {
   return '<svg width="' . $t . '" height="' . $t . '" viewBox="8 8 48 48" fill="none" aria-hidden="true"><path d="M20 14v36M20 14h20M20 31h13" stroke="#0F1B2D" stroke-width="5.5" stroke-linecap="round"/><path d="M36 48l12-12M39 35.5h9.5V45" stroke="#0F1B2D" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 }
+// Códigos internos que viajan en la licencia (los programas antiguos solo conocen estos tres).
 const FX_PLANES = [
   'LOCAL' => ['label' => 'Local', 'desc' => 'Programa de escritorio con datos solo en el equipo'],
   'WEB'   => ['label' => 'Web',   'desc' => 'Solo navegador, datos en la nube'],
   'FULL'  => ['label' => 'Full',  'desc' => 'Escritorio + nube + web'],
 ];
+
+// ---------- Funciones que se venden por licencia ----------
+// Lo básico (facturar, clientes, productos, proformas, comprobantes, RIDE, autorizaciones, anulaciones, correo,
+// reportes de ventas e IVA, importar) va siempre. Estas se marcan en cada licencia y el programa solo muestra
+// lo marcado. El nombre del plan sale solo de lo que se marque.
+const FX_BASICO = 'Facturas, clientes, productos, proformas, comprobantes y RIDE, autorización SRI, anulaciones, envío por correo, reportes de ventas e IVA, importación desde Excel';
+const FX_FUNCIONES = [
+  'documentos'  => ['label' => 'Devoluciones, notas de débito y guías', 'desc' => 'Notas de crédito por devolución parcial, notas de débito, guías de remisión y transportistas', 'grupo' => 'pro'],
+  'retenciones' => ['label' => 'Retenciones', 'desc' => 'Comprobantes de retención 2.0, proveedores y sustento tributario', 'grupo' => 'pro'],
+  'inventario'  => ['label' => 'Inventario', 'desc' => 'Stock por producto, fotos, código de barras, entradas y kardex', 'grupo' => 'pro'],
+  'nube'        => ['label' => 'Nube y varios equipos', 'desc' => 'Respaldo en la nube y datos sincronizados entre computadoras', 'grupo' => 'extra'],
+  'movil'       => ['label' => 'Facturar desde el celular', 'desc' => 'App web para facturar y consultar desde el teléfono (incluye la nube)', 'grupo' => 'extra'],
+];
+const FX_PRO = ['documentos', 'retenciones', 'inventario'];
+
+// Funciones de una licencia. Las creadas antes de este cambio no las tienen guardadas: se deducen de su plan
+// para no quitarle nada a ningún cliente.
+function funciones_licencia(array $l): array {
+  $f = json_decode((string)($l['funciones'] ?? ''), true);
+  if (!is_array($f)) {
+    $f = match ($l['plan'] ?? '') { 'FULL' => array_keys(FX_FUNCIONES), 'WEB' => ['nube', 'movil'], default => FX_PRO };
+  }
+  return normalizar_funciones($f);
+}
+
+function normalizar_funciones(array $f): array {
+  $f = array_values(array_intersect(array_keys(FX_FUNCIONES), array_map('strval', $f)));
+  if (in_array('movil', $f, true) && !in_array('nube', $f, true)) $f[] = 'nube'; // el celular trabaja sobre la nube
+  return array_values(array_intersect(array_keys(FX_FUNCIONES), $f));
+}
+
+function tiene_funcion(array $l, string $f): bool {
+  return in_array($f, funciones_licencia($l), true);
+}
+
+// Básico, Profesional o Completo, más los extras que se le sumen.
+function nombre_plan(array $f): string {
+  $pro = !array_diff(FX_PRO, $f);
+  if ($pro && in_array('nube', $f, true) && in_array('movil', $f, true)) return 'Completo';
+  $base = $pro ? 'Profesional' : 'Básico';
+  $extras = array_diff($f, $pro ? FX_PRO : []);
+  $cortos = ['documentos' => 'Documentos', 'retenciones' => 'Retenciones', 'inventario' => 'Inventario', 'nube' => 'Nube', 'movil' => 'Móvil'];
+  if (in_array('movil', $extras, true)) $extras = array_diff($extras, ['nube']);
+  return $base . ($extras ? ' + ' . implode(' + ', array_map(fn($x) => $cortos[$x], $extras)) : '');
+}
+
+function categoria_plan(array $f): string {
+  $n = nombre_plan($f);
+  return str_starts_with($n, 'Completo') ? 'Completo' : (str_starts_with($n, 'Profesional') ? 'Profesional' : 'Básico');
+}
+
+// Código que viaja en la licencia para los programas antiguos (que solo entienden LOCAL/WEB/FULL).
+function plan_legado(array $f): string {
+  return in_array('nube', $f, true) ? 'FULL' : 'LOCAL';
+}
+
+function plan_de(array $l): string { return nombre_plan(funciones_licencia($l)); }
+
+// Precio sugerido por periodo mensual según los precios de referencia de Ajustes.
+function precio_sugerido(array $f): float {
+  $p = fn($k) => (float)ajuste('precio_' . $k, '0');
+  $cat = categoria_plan($f);
+  if ($cat === 'Completo') return $p('completo');
+  $total = $cat === 'Profesional' ? $p('profesional') : $p('basico');
+  foreach (array_diff($f, $cat === 'Profesional' ? FX_PRO : []) as $x) if (!($x === 'nube' && in_array('movil', $f, true))) $total += $p('extra_' . $x);
+  return round($total, 2);
+}
 
 function fx_config(): array {
   static $cfg = null;
@@ -51,6 +119,9 @@ function db(): PDO {
       PDO::ATTR_EMULATE_PREPARES => false,
     ]);
     if ($c['driver'] !== 'sqlite') $pdo->exec("SET time_zone = '-05:00'");
+    // Portales instalados antes de las funciones por licencia: se agrega la columna una sola vez.
+    try { $pdo->query('SELECT funciones FROM licencias LIMIT 0'); }
+    catch (PDOException $ex) { try { $pdo->exec('ALTER TABLE licencias ADD COLUMN funciones TEXT NULL'); } catch (PDOException $ex2) { /* sin tabla aún (instalación) */ } }
   }
   return $pdo;
 }
@@ -204,6 +275,8 @@ function payload_licencia(array $l, string $equipo): array {
     'rucs' => array_values(array_map('strval', $rucs)),
     'cliente' => $l['cliente'],
     'plan' => $l['plan'],
+    'funciones' => funciones_licencia($l),
+    'planNombre' => plan_de($l),
     'inicio' => $l['inicio'],
     'vence' => $l['vence'],
     'gracia' => (int)$l['gracia'],

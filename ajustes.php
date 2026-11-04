@@ -13,6 +13,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       fijar_ajuste('equipos_defecto', (string)max(1, min(100, (int)$_POST['equipos_defecto'])));
       fijar_ajuste('gracia_defecto', (string)max(0, min(30, (int)$_POST['gracia_defecto'])));
       aviso('Ajustes guardados.');
+    } elseif ($accion === 'precios') {
+      foreach (array_merge(['basico', 'profesional', 'completo'], array_map(fn($k) => 'extra_' . $k, array_keys(FX_FUNCIONES))) as $k) {
+        fijar_ajuste('precio_' . $k, (string)round(max(0, (float)str_replace(',', '.', (string)($_POST[$k] ?? 0))), 2));
+      }
+      aviso('Precios de referencia guardados.');
     } elseif ($accion === 'soporte') {
       $email = trim((string)($_POST['soporte_email'] ?? ''));
       if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) throw new RuntimeException('El correo de soporte no es válido.');
@@ -78,6 +83,19 @@ cabecera_html('Ajustes', $admin, 'ajustes');
           <label>Equipos por defecto en licencias nuevas<input type="number" name="equipos_defecto" min="1" max="100" value="<?= e(ajuste('equipos_defecto', '1')) ?>"></label>
         </div>
         <button class="btn btn-dark">Guardar</button></form>
+    </section>
+    <section class="card"><h2>Planes y precios de referencia (por mes, USD)</h2>
+      <p class="muted">Al crear o editar una licencia, el portal suma estos valores según las funciones marcadas y te sugiere el precio. Puedes cobrar otro valor en cada licencia.</p>
+      <form method="post" class="form"><?= campo_csrf() ?><input type="hidden" name="accion" value="precios">
+        <div class="g2">
+          <label>Básico<input type="number" step="0.01" min="0" name="basico" value="<?= e(ajuste('precio_basico', '0')) ?>"></label>
+          <label>Profesional<input type="number" step="0.01" min="0" name="profesional" value="<?= e(ajuste('precio_profesional', '0')) ?>"></label>
+          <label>Completo<input type="number" step="0.01" min="0" name="completo" value="<?= e(ajuste('precio_completo', '0')) ?>"></label>
+          <span></span>
+          <?php foreach (FX_FUNCIONES as $k => $fx): ?><label>Extra · <?= e($fx['label']) ?><input type="number" step="0.01" min="0" name="extra_<?= $k ?>" value="<?= e(ajuste('precio_extra_' . $k, '0')) ?>"></label><?php endforeach; ?>
+        </div>
+        <span class="muted small">Los extras se suman al Básico (o al Profesional, para Nube y Celular). "Facturar desde el celular" ya incluye la nube.</span>
+        <button class="btn btn-dark">Guardar precios</button></form>
     </section>
     <section class="card"><h2>Soporte (se muestra en el programa)</h2>
       <p class="muted">Aparece en el botón "Desarrollado por…" y en la pantalla de activación de cada programa instalado.</p>

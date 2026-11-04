@@ -6,7 +6,7 @@ require __DIR__ . '/lib/licencias.php';
 $admin = exigir_admin();
 $desde = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['desde'] ?? '')) ? $_GET['desde'] : substr(hoy(), 0, 8) . '01';
 $hasta = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['hasta'] ?? '')) ? $_GET['hasta'] : hoy();
-$r = db()->prepare('SELECT p.*, l.cliente, l.ruc, l.plan FROM pagos p JOIN licencias l ON l.id = p.licencia_id WHERE p.fecha BETWEEN ? AND ? ORDER BY p.fecha DESC, p.id DESC');
+$r = db()->prepare('SELECT p.*, l.cliente, l.ruc, l.plan, l.funciones FROM pagos p JOIN licencias l ON l.id = p.licencia_id WHERE p.fecha BETWEEN ? AND ? ORDER BY p.fecha DESC, p.id DESC');
 $r->execute([$desde, $hasta]);
 $filas = $r->fetchAll();
 $total = array_sum(array_map(fn($x) => (float)$x['monto'], $filas));
@@ -17,7 +17,7 @@ if (($_GET['exportar'] ?? '') === 'csv') {
   $o = fopen('php://output', 'w');
   fwrite($o, "\xEF\xBB\xBF");
   fputcsv($o, ['Fecha', 'Cliente', 'RUC', 'Plan', 'Meses', 'Monto', 'Método', 'Referencia', 'Vence nuevo']);
-  foreach ($filas as $x) fputcsv($o, [$x['fecha'], $x['cliente'], $x['ruc'], $x['plan'], $x['meses'], number_format((float)$x['monto'], 2, '.', ''), $x['metodo'], $x['referencia'], $x['vence_nuevo']]);
+  foreach ($filas as $x) fputcsv($o, [$x['fecha'], $x['cliente'], $x['ruc'], plan_de($x), $x['meses'], number_format((float)$x['monto'], 2, '.', ''), $x['metodo'], $x['referencia'], $x['vence_nuevo']]);
   exit;
 }
 
@@ -35,7 +35,7 @@ cabecera_html('Pagos', $admin, 'pagos');
   <div class="tabla"><table><thead><tr><th>Fecha</th><th>Cliente</th><th>Plan</th><th class="right">Meses</th><th>Método</th><th>Referencia</th><th>Nuevo vencimiento</th><th class="right">Monto</th></tr></thead><tbody>
   <?php foreach ($filas as $x): ?>
     <tr><td><?= fecha_ec($x['fecha']) ?></td><td><a href="licencia.php?id=<?= (int)$x['licencia_id'] ?>"><b><?= e($x['cliente']) ?></b></a><span class="sub mono"><?= e($x['ruc']) ?></span></td>
-    <td><?= e(FX_PLANES[$x['plan']]['label'] ?? $x['plan']) ?></td><td class="right"><?= (int)$x['meses'] ?></td><td><?= e($x['metodo']) ?></td><td><?= e($x['referencia']) ?></td><td><?= fecha_ec($x['vence_nuevo']) ?></td><td class="right mono">$<?= number_format((float)$x['monto'], 2) ?></td></tr>
+    <td><?= e(plan_de($x)) ?></td><td class="right"><?= (int)$x['meses'] ?></td><td><?= e($x['metodo']) ?></td><td><?= e($x['referencia']) ?></td><td><?= fecha_ec($x['vence_nuevo']) ?></td><td class="right mono">$<?= number_format((float)$x['monto'], 2) ?></td></tr>
   <?php endforeach; ?></tbody><tfoot><tr><td colspan="7"><b>Total</b></td><td class="right mono"><b>$<?= number_format($total, 2) ?></b></td></tr></tfoot></table></div>
   <?php endif; ?>
 </section>

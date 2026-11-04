@@ -31,7 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $l = licencia_por_id($id);
         if (!$l || !filter_var($l['email'], FILTER_VALIDATE_EMAIL)) throw new ErrorLicencia('DATOS', 'La licencia no tiene un email válido.');
         $marca = fx_marca();
-        $txt = "Hola " . $l['cliente'] . ",\n\nEsta es tu clave de licencia de " . $marca . ":\n\n    " . $l['clave'] . "\n\nPlan: " . FX_PLANES[$l['plan']]['label'] . "\nVence: " . fecha_ec($l['vence'])
+        $txt = "Hola " . $l['cliente'] . ",\n\nEsta es tu clave de licencia de " . $marca . ":\n\n    " . $l['clave'] . "\n\nPlan: " . plan_de($l) . "\nVence: " . fecha_ec($l['vence'])
           . "\n\nPara activarla, abre el programa e ingrésala en la pantalla de activación (necesitas internet solo en ese momento).\n\nSoporte: " . ajuste('whatsapp', '') . "\n";
         $host = preg_replace('/[^a-z0-9.-]/i', '', (string)($_SERVER['HTTP_HOST'] ?? 'localhost'));
         $ok = @mail($l['email'], '=?UTF-8?B?' . base64_encode('Tu licencia de ' . $marca) . '?=', $txt,
@@ -59,7 +59,7 @@ $l = $id ? licencia_por_id($id) : null;
 if ($id && !$l) { http_response_code(404); cabecera_html('No encontrada', $admin, 'licencias'); echo '<div class="empty">La licencia no existe.</div>'; pie_html(); exit; }
 $hoy = hoy();
 $v = $form ?? ($l ?: [
-  'cliente' => '', 'ruc' => '', 'rucs' => '[]', 'email' => '', 'telefono' => '', 'plan' => 'LOCAL', 'inicio' => $hoy, 'vence' => sumar_meses($hoy, 1),
+  'cliente' => '', 'ruc' => '', 'rucs' => '[]', 'email' => '', 'telefono' => '', 'plan' => 'LOCAL', 'funciones' => '[]', 'inicio' => $hoy, 'vence' => sumar_meses($hoy, 1),
   'gracia' => ajuste('gracia_defecto', '3'), 'empresas' => 1, 'equipos_max' => ajuste('equipos_defecto', '1'), 'usuarios' => 1, 'puntos' => 1, 'precio' => '0', 'periodo' => 'MENSUAL', 'notas' => '',
 ]);
 $rucsTxt = $form ? (string)($form['rucs'] ?? '') : implode(', ', json_decode((string)$v['rucs'], true) ?: []);
@@ -82,7 +82,6 @@ $in = fn($k, $label, $extra = '') => '<label>' . $label . '<input name="' . $k .
       <label class="span2">RUC adicionales (otros perfiles permitidos, separados por coma)<input name="rucs" class="mono" value="<?= e($rucsTxt) ?>"></label>
       <?= $in('email', 'Email', 'type="email"') ?>
       <?= $in('telefono', 'Teléfono / WhatsApp') ?>
-      <label>Plan<select name="plan"><?php foreach (FX_PLANES as $k => $p): ?><option value="<?= $k ?>"<?= $v['plan'] === $k ? ' selected' : '' ?>><?= e($p['label'] . ' · ' . $p['desc']) ?></option><?php endforeach; ?></select></label>
       <label>Periodo de cobro<select name="periodo"><?php foreach (['MENSUAL', 'TRIMESTRAL', 'SEMESTRAL', 'ANUAL'] as $p): ?><option<?= $v['periodo'] === $p ? ' selected' : '' ?>><?= $p ?></option><?php endforeach; ?></select></label>
       <?= $in('inicio', 'Inicio', 'type="date" required') ?>
       <?= $in('vence', 'Vence', 'type="date" required') ?>
@@ -92,6 +91,20 @@ $in = fn($k, $label, $extra = '') => '<label>' . $label . '<input name="' . $k .
       <?= $in('empresas', 'Empresas (RUC) permitidas', 'type="number" min="1" max="50"') ?>
       <?= $in('usuarios', 'Usuarios', 'type="number" min="1" max="200"') ?>
       <?= $in('puntos', 'Puntos de emisión', 'type="number" min="1" max="100"') ?>
+      <?php $fsel = $form ? normalizar_funciones((array)($form['funciones'] ?? [])) : funciones_licencia($v); ?>
+      <fieldset class="span2 funciones" id="funciones">
+        <legend>Plan: <b id="plan-nombre"><?= e(nombre_plan($fsel)) ?></b></legend>
+        <p class="muted small">Siempre incluido (Básico): <?= e(FX_BASICO) ?>.</p>
+        <input type="hidden" name="funciones[]" value="">
+        <div class="fun-grupo"><span class="fun-tit">Profesional (las tres = plan Profesional)</span>
+        <?php foreach (FX_FUNCIONES as $k => $fx) if ($fx['grupo'] === 'pro'): ?><label class="fun"><input type="checkbox" name="funciones[]" value="<?= $k ?>"<?= in_array($k, $fsel, true) ? ' checked' : '' ?>><span><b><?= e($fx['label']) ?></b><small><?= e($fx['desc']) ?></small></span></label><?php endif; ?>
+        </div>
+        <div class="fun-grupo"><span class="fun-tit">Extras (Profesional + los dos extras = plan Completo)</span>
+        <?php foreach (FX_FUNCIONES as $k => $fx) if ($fx['grupo'] === 'extra'): ?><label class="fun"><input type="checkbox" name="funciones[]" value="<?= $k ?>"<?= in_array($k, $fsel, true) ? ' checked' : '' ?>><span><b><?= e($fx['label']) ?></b><small><?= e($fx['desc']) ?></small></span></label><?php endif; ?>
+        </div>
+        <div class="row"><span class="muted small">Atajos:</span><button type="button" class="btn btn-sm" data-preset="">Básico</button><button type="button" class="btn btn-sm" data-preset="documentos,retenciones,inventario">Profesional</button><button type="button" class="btn btn-sm" data-preset="documentos,retenciones,inventario,nube,movil">Completo</button></div>
+        <div class="precio-sug" id="precio-sugerido" data-precios="<?= e(json_encode(['basico' => (float)ajuste('precio_basico', '0'), 'profesional' => (float)ajuste('precio_profesional', '0'), 'completo' => (float)ajuste('precio_completo', '0'), 'extra' => array_combine(array_keys(FX_FUNCIONES), array_map(fn($k) => (float)ajuste('precio_extra_' . $k, '0'), array_keys(FX_FUNCIONES)))])) ?>"></div>
+      </fieldset>
       <label class="span2">Notas internas<textarea name="notas" rows="3"><?= e($v['notas'] ?? '') ?></textarea></label>
     </div>
     <div class="row"><button class="btn btn-dark"><?= $l ? 'Guardar cambios' : 'Crear licencia' ?></button><a class="btn btn-ghost" href="licencias.php">Cancelar</a></div>
@@ -102,7 +115,7 @@ $in = fn($k, $label, $extra = '') => '<label>' . $label . '<input name="' . $k .
   $pagos = db()->prepare('SELECT * FROM pagos WHERE licencia_id = ? ORDER BY fecha DESC, id DESC'); $pagos->execute([$id]); $pagos = $pagos->fetchAll();
   $evs = db()->prepare('SELECT * FROM eventos WHERE licencia_id = ? ORDER BY id DESC LIMIT 30'); $evs->execute([$id]); $evs = $evs->fetchAll();
   $wa = preg_replace('/\D/', '', (string)$l['telefono']);
-  $msgWa = rawurlencode('Hola, tu clave de licencia es ' . $l['clave'] . ' (plan ' . FX_PLANES[$l['plan']]['label'] . ', vence ' . fecha_ec($l['vence']) . '). Ingrésala en el programa para activarlo.');
+  $msgWa = rawurlencode('Hola, tu clave de licencia es ' . $l['clave'] . ' (plan ' . plan_de($l) . ', vence ' . fecha_ec($l['vence']) . '). Ingrésala en el programa para activarlo.');
 ?>
 <div class="col-1 pila">
   <section class="card dark">
@@ -163,7 +176,7 @@ $in = fn($k, $label, $extra = '') => '<label>' . $label . '<input name="' . $k .
     <td class="right"><?php if ((int)$q['activo']): ?><form method="post"><?= campo_csrf() ?><input type="hidden" name="accion" value="liberar"><input type="hidden" name="equipo" value="<?= (int)$q['id'] ?>"><button class="btn btn-sm" data-confirmar="¿Liberar este equipo? Dejará de poder facturar.">Liberar</button></form><?php endif; ?></td></tr>
   <?php endforeach; ?></tbody></table><?php endif; ?>
 </section>
-<?php if (in_array($l['plan'], ['FULL', 'WEB'], true)): $resNube = nube_resumen_licencia($id); $usuWeb = nube_usuarios_licencia($id); ?>
+<?php if (tiene_funcion($l, 'nube')): $resNube = nube_resumen_licencia($id); $usuWeb = nube_usuarios_licencia($id); ?>
 <section class="card">
   <div class="card-head"><h2>Nube y app web</h2><a class="link" href="app/" target="_blank" rel="noopener">Abrir app web</a></div>
   <?php if (!$resNube): ?><div class="empty">El programa del cliente todavía no sincroniza con la nube.</div><?php else: ?>

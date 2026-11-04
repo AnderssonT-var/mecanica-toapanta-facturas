@@ -18,7 +18,8 @@ $suspendidas = (int)$q("SELECT COUNT(*) FROM licencias WHERE estado = 'SUSPENDID
 $equipos = (int)$q('SELECT COUNT(*) FROM equipos WHERE activo = 1')->fetchColumn();
 $ingresosMes = (float)$q('SELECT COALESCE(SUM(monto), 0) FROM pagos WHERE fecha >= ?', [$mesIni])->fetchColumn();
 $mrr = (float)$q("SELECT COALESCE(SUM(CASE periodo WHEN 'ANUAL' THEN precio / 12 WHEN 'SEMESTRAL' THEN precio / 6 WHEN 'TRIMESTRAL' THEN precio / 3 ELSE precio END), 0) FROM licencias WHERE estado = 'ACTIVA' AND vence >= ?", [$hoy])->fetchColumn();
-$porPlan = $q("SELECT plan, COUNT(*) n FROM licencias WHERE estado = 'ACTIVA' AND vence >= ? GROUP BY plan", [$hoy])->fetchAll();
+$porPlan = ['Básico' => 0, 'Profesional' => 0, 'Completo' => 0];
+foreach ($q("SELECT plan, funciones FROM licencias WHERE estado = 'ACTIVA' AND vence >= ?", [$hoy])->fetchAll() as $x) $porPlan[categoria_plan(funciones_licencia($x))]++;
 $proximas = $q("SELECT * FROM licencias WHERE estado = 'ACTIVA' AND vence <= ? ORDER BY vence LIMIT 12", [$en7])->fetchAll();
 $actividad = $q('SELECT e.*, l.cliente FROM eventos e LEFT JOIN licencias l ON l.id = e.licencia_id ORDER BY e.id DESC LIMIT 12')->fetchAll();
 
@@ -38,14 +39,14 @@ cabecera_html('Panel', $admin, 'panel');
     <?php if (!$proximas): ?><div class="empty">Nada pendiente. Todas las licencias están al día.</div><?php else: ?>
     <table><thead><tr><th>Cliente</th><th>Plan</th><th>Vence</th><th>Estado</th><th></th></tr></thead><tbody>
     <?php foreach ($proximas as $l): $est = estado_licencia($l); ?>
-      <tr><td><b><?= e($l['cliente']) ?></b><span class="sub mono"><?= e($l['ruc']) ?></span></td><td><?= e(FX_PLANES[$l['plan']]['label']) ?></td>
+      <tr><td><b><?= e($l['cliente']) ?></b><span class="sub mono"><?= e($l['ruc']) ?></span></td><td><?= e(plan_de($l)) ?></td>
       <td><?= fecha_ec($l['vence']) ?></td><td><?= insignia($est) ?></td><td class="right"><a class="btn btn-sm" href="licencia.php?id=<?= (int)$l['id'] ?>#renovar">Renovar</a></td></tr>
     <?php endforeach; ?></tbody></table><?php endif; ?>
   </section>
   <section class="card col-1">
     <h2>Por plan</h2>
-    <?php foreach (FX_PLANES as $k => $p): $n = 0; foreach ($porPlan as $x) if ($x['plan'] === $k) $n = (int)$x['n']; ?>
-      <div class="kv"><span><?= e($p['label']) ?></span><b><?= $n ?></b></div>
+    <?php foreach ($porPlan as $k => $n): ?>
+      <div class="kv"><span><?= e($k) ?></span><b><?= $n ?></b></div>
     <?php endforeach; ?>
     <h2 class="sep">Actividad reciente</h2>
     <?php foreach ($actividad as $ev): ?>

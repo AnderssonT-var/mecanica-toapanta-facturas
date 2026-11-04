@@ -144,3 +144,16 @@ label, .g2 > * { min-width: 0; }
   table.resp tfoot tr { display: flex; justify-content: space-between; padding-top: 10px; border-top: 2px solid var(--ink); }
   table.resp tfoot td { display: block; width: auto; padding: 0; border: 0; }
 }
+
+/* Funciones de la licencia */
+fieldset.funciones { border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; margin: 0; }
+fieldset.funciones legend { padding: 0 6px; font-weight: 700; }
+fieldset.funciones legend b { background: var(--accent); color: var(--navy); padding: 3px 10px; border-radius: 99px; }
+.fun-grupo { display: flex; flex-direction: column; gap: 8px; }
+.fun-tit { font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted, #4A5260); }
+label.fun { display: flex !important; flex-direction: row !important; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; cursor: pointer; font-weight: 500; }
+label.fun input { width: 18px; height: 18px; margin-top: 2px; flex-shrink: 0; }
+label.fun span { display: flex; flex-direction: column; gap: 2px; }
+label.fun small { color: var(--muted, #4A5260); font-weight: 400; font-size: 12.5px; }
+label.fun:has(input:checked) { border-color: var(--navy); background: #F7FBEA; }
+.precio-sug { font-size: 14px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }

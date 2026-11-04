@@ -73,7 +73,7 @@ function nube_licencia_vigente(int $id, string $perfil): array {
   $est = estado_licencia($l);
   if ($est['code'] === 'SUSP') throw new ErrorNube(403, 'Tu licencia está suspendida' . ($l['motivo'] ? ': ' . $l['motivo'] : '') . '. Contacta a soporte.');
   if ($est['code'] === 'VENC') throw new ErrorNube(403, 'Tu licencia está vencida. Renueva para seguir usando la nube.');
-  if (!in_array($l['plan'], ['FULL', 'WEB'], true)) throw new ErrorNube(403, 'Tu plan no incluye la nube. Cambia al plan Full.');
+  if (!tiene_funcion($l, 'nube')) throw new ErrorNube(403, 'Tu plan no incluye la nube. Pide agregar «Nube y varios equipos» a tu licencia.');
   if (!nube_perfil_permitido($l, $perfil)) throw new ErrorNube(403, 'Este RUC no está incluido en tu licencia.');
   return $l;
 }
