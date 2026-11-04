@@ -24,7 +24,7 @@ $sync = $emp['_ultima_sync'] ?? null;
 web_cabecera($ctx, 'Nueva factura', 'facturar');
 echo web_titulo('Ventas', 'Nueva factura');
 if (!$sync || time() - strtotime($sync) > 1800) {
-  echo '<div class="aviso t-a">Tu programa no está conectado ' . ($sync ? 'desde ' . e(web_hace($sync)) : 'todavía') . '. Puedes preparar la factura: quedará en cola y se emitirá en cuanto abras el programa en tu computadora.</div>';
+  echo '<div class="aviso t-n">Tu computadora no está conectada ' . ($sync ? 'desde ' . e(web_hace($sync)) : 'todavía') . '. No pasa nada: la factura se emite aquí con su número, RIDE y XML, y se autoriza en el SRI en cuanto enciendas el programa.</div>';
 }
 ?>
 <form id="facturar" class="facturar" method="post" action="./?v=facturar">

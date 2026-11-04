@@ -1,6 +1,6 @@
 # Portal de licencias · instalación en Hostinger
 
-Destino: `https://mecanicatoapantavelez.com/licencias/`
+Destino: `https://facmit.com/licencias/`
 (Revisa la ortografía exacta de tu dominio. Si es otro, el programa permite cambiar la dirección en la pantalla de activación → *Opciones avanzadas*, o se cambia `LICENCIAS_URL` en `desktop/src/config.js` antes de compilar.)
 
 ## Requisitos
@@ -12,12 +12,12 @@ Destino: `https://mecanicatoapantavelez.com/licencias/`
 
 1. **Crear la base de datos** — hPanel → Bases de datos → Administración. Crea una base (ej. `licencias`) y un usuario con contraseña segura. Anota los tres datos completos: `u123456789_licencias`, `u123456789_admin` y la contraseña.
 2. **Subir los archivos** — hPanel → Administrador de archivos → `public_html`. Crea la carpeta `licencias` y sube dentro **todo el contenido** del zip (incluido `.htaccess`). Debe quedar `public_html/licencias/api.php`, `public_html/licencias/lib/…`, etc.
-3. **Instalar** — abre `https://mecanicatoapantavelez.com/licencias/instalar.php`.
+3. **Instalar** — abre `https://facmit.com/licencias/instalar.php`.
    - Servidor: `localhost` · nombre de la base, usuario y contraseña del paso 1.
    - Crea tu usuario administrador (contraseña de 10 caracteres o más) y tu WhatsApp de soporte.
    - Al terminar, el instalador genera la llave de firma, guarda `config.php` (protegido) y muestra la llave pública. Esa llave pública debe estar en `desktop/src/license-public.pem` del programa (instalación actual: `MCowBQYDK2VwAyEA7GadtoMBFQL6wYX5MiATEx9W6pADfO9f1SRyjmtcWjc=`).
 4. **Borrar `instalar.php`** desde el Administrador de archivos (por seguridad; si alguien lo abre después solo verá "ya instalado", pero mejor quitarlo).
-5. **Probar la API** — abre `https://mecanicatoapantavelez.com/licencias/api.php?a=salud`. Debe responder `{"ok":true,...}`.
+5. **Probar la API** — abre `https://facmit.com/licencias/api.php?a=salud`. Debe responder `{"ok":true,...}`.
 6. **Crear la primera licencia** — entra a `/licencias/`, *Nueva licencia*: cliente, RUC, plan, vigencia, empresas y equipos. Copia la clave `FX-XXXX-XXXX-XXXX` o envíala por WhatsApp/correo.
 7. **Activar en el programa** — el cliente instala `Facmit-Setup-0.4.0.exe`, pega la clave y listo.
 

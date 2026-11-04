@@ -6,7 +6,8 @@
 //   PUT  api/backup                    sube el respaldo completo (.db) del perfil
 //   GET  api/backup/latest             descarga el último respaldo
 //   POST api/series/reservar {series}  aparta los puntos de emisión (001-001) para este equipo
-//   POST api/pedidos/tomar {id}        reserva una factura hecha en la web para emitirla en este equipo
+//   POST api/pedidos/tomar {id}        (versión anterior) reserva un pedido de factura hecho en la web
+//   POST api/web/tomar {id}            reserva una factura emitida en la web para firmarla y enviarla desde este equipo
 //   GET  api/usuarios · POST api/usuarios · DELETE api/usuarios?id=N   usuarios de la app web
 // Autenticación: Authorization: Bearer <licencia FX1>, X-Ruc: <RUC del perfil>.
 declare(strict_types=1);
@@ -64,6 +65,13 @@ try {
     $p = nube_cambiar_pedido($lic, $perfil, (string)($in['id'] ?? ''), 'PENDIENTE', 'EN PROCESO', ['equipo' => $a['equipo'], 'tomado' => gmdate('Y-m-d\TH:i:s\Z')]);
     if (!$p) throw new ErrorNube(409, 'Otro equipo ya tomó esta factura o fue cancelada.');
     salir(200, ['ok' => true, 'pedido' => $p]);
+  }
+  if ($ruta === 'web/tomar' && $metodo === 'POST') {
+    $in = cuerpo_json(4096);
+    if ($a['equipo'] === '') throw new ErrorNube(400, 'La licencia no identifica al equipo.');
+    $c = nube_tomar_factura_web($lic, $perfil, (string)($in['id'] ?? ''), $a['equipo']);
+    if (!$c) throw new ErrorNube(409, 'Otro equipo ya está firmando esta factura.');
+    salir(200, ['ok' => true, 'comprobante' => $c]);
   }
   if ($ruta === 'backup' && $metodo === 'PUT') {
     $tmp = tempnam(sys_get_temp_dir(), 'fxr');

@@ -4,6 +4,7 @@ declare(strict_types=1);
 if (!defined('FX_PORTAL')) { http_response_code(403); exit; }
 require_once dirname(__DIR__, 2) . '/lib/nucleo.php';
 require_once dirname(__DIR__, 2) . '/lib/nube.php';
+require_once __DIR__ . '/emision.php';
 
 const WEB_DOCS = ['01' => 'Factura', '03' => 'Liquidación de compra', '04' => 'Nota de crédito', '05' => 'Nota de débito', '06' => 'Guía de remisión', '07' => 'Retención'];
 const WEB_ESTADOS = [

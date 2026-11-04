@@ -253,6 +253,37 @@ function nube_cambiar_pedido(int $lic, string $perfil, string $id, string $de, s
   }
 }
 
+// El programa reserva una factura emitida en la web para firmarla (bloqueo de fila: solo un equipo la procesa).
+function nube_tomar_factura_web(int $lic, string $perfil, string $id, string $equipo): ?array {
+  $d = db();
+  $mysql = fx_config()['db']['driver'] !== 'sqlite';
+  $d->beginTransaction();
+  try {
+    $q = $d->prepare("SELECT datos FROM nube_registros WHERE licencia_id = ? AND perfil = ? AND tabla = 'comprobantes' AND id = ?" . ($mysql ? ' FOR UPDATE' : ''));
+    $q->execute([$lic, $perfil, $id]);
+    $json = $q->fetchColumn();
+    $c = $json === false ? null : json_decode($json, true);
+    $data = is_array($c['data'] ?? null) ? $c['data'] : (json_decode((string)($c['data'] ?? ''), true) ?: []);
+    if (!$c || ($data['origen'] ?? '') !== 'WEB') { $d->rollBack(); return null; }
+    $dueno = (string)($data['adoptadoPor'] ?? '');
+    if ($dueno !== '' && $dueno !== $equipo) { $d->rollBack(); return null; }
+    if ($dueno === '') {
+      $data['adoptadoPor'] = $equipo;
+      $data['adoptado'] = gmdate('Y-m-d\TH:i:s\Z');
+      $c['data'] = $data;
+      $t = microtime(true);
+      $c['updated_at'] = gmdate('Y-m-d\TH:i:s', (int)$t) . sprintf('.%03dZ', (int)(($t - floor($t)) * 1000));
+      nube_guardar($lic, $perfil, 'comprobantes', $c);
+    }
+    $d->commit();
+    $c['data'] = $data;
+    return $c;
+  } catch (Throwable $e) {
+    $d->rollBack();
+    throw $e;
+  }
+}
+
 // ---------- Puntos de emisión por equipo ----------
 // Cada establecimiento-punto (001-001) de un RUC pertenece a un solo equipo activo de la licencia: así dos computadoras
 // nunca generan el mismo número de comprobante, aunque trabajen sin internet. Si el dueño libera el equipo en el portal,
@@ -273,8 +304,8 @@ function nube_reservar_series(int $lic, string $perfil, string $equipo, array $s
       $q = $d->prepare('SELECT s.equipo, s.nombre, e.activo FROM nube_series s LEFT JOIN equipos e ON e.licencia_id = s.licencia_id AND e.equipo = s.equipo WHERE s.licencia_id = ? AND s.perfil = ? AND s.serie = ?' . ($mysql ? ' FOR UPDATE' : ''));
       $q->execute([$lic, $perfil, $serie]);
       $f = $q->fetch();
-      if ($f && $f['equipo'] !== $equipo && (int)$f['activo'] === 1) {
-        $res[$serie] = ['propia' => false, 'equipo' => $f['nombre'] ?: 'otro equipo'];
+      if ($f && $f['equipo'] !== $equipo && ($f['equipo'] === 'WEB' || (int)$f['activo'] === 1)) {
+        $res[$serie] = ['propia' => false, 'equipo' => $f['nombre'] ?: 'otro equipo', 'web' => $f['equipo'] === 'WEB'];
         continue;
       }
       if ($f) $d->prepare('UPDATE nube_series SET equipo = ?, nombre = ?, ultimo_uso = ?' . ($f['equipo'] !== $equipo ? ', desde = ?' : '') . ' WHERE licencia_id = ? AND perfil = ? AND serie = ?')
@@ -294,7 +325,7 @@ function nube_reservar_series(int $lic, string $perfil, string $equipo, array $s
 function nube_punto_libre(int $lic, string $perfil, string $equipo, array $series): string {
   $estab = '001';
   foreach ($series as $s) if (preg_match('/^(\d{3})-\d{3}$/', (string)$s, $m)) { $estab = $m[1]; break; }
-  $q = db()->prepare('SELECT s.serie FROM nube_series s JOIN equipos e ON e.licencia_id = s.licencia_id AND e.equipo = s.equipo AND e.activo = 1 WHERE s.licencia_id = ? AND s.perfil = ? AND s.equipo <> ?');
+  $q = db()->prepare("SELECT s.serie FROM nube_series s LEFT JOIN equipos e ON e.licencia_id = s.licencia_id AND e.equipo = s.equipo WHERE s.licencia_id = ? AND s.perfil = ? AND s.equipo <> ? AND (e.activo = 1 OR s.equipo = 'WEB')");
   $q->execute([$lic, $perfil, $equipo]);
   $ocupadas = array_flip($q->fetchAll(PDO::FETCH_COLUMN));
   for ($i = 1; $i < 1000; $i++) { $s = $estab . '-' . str_pad((string)$i, 3, '0', STR_PAD_LEFT); if (!isset($ocupadas[$s])) return $s; }
@@ -303,7 +334,7 @@ function nube_punto_libre(int $lic, string $perfil, string $equipo, array $serie
 
 function nube_series_licencia(int $lic): array {
   nube_esquema();
-  $q = db()->prepare('SELECT s.perfil, s.serie, s.nombre, s.ultimo_uso, e.activo FROM nube_series s LEFT JOIN equipos e ON e.licencia_id = s.licencia_id AND e.equipo = s.equipo WHERE s.licencia_id = ? ORDER BY s.perfil, s.serie');
+  $q = db()->prepare("SELECT s.perfil, s.serie, s.nombre, s.ultimo_uso, CASE WHEN s.equipo = 'WEB' THEN 1 ELSE e.activo END AS activo FROM nube_series s LEFT JOIN equipos e ON e.licencia_id = s.licencia_id AND e.equipo = s.equipo WHERE s.licencia_id = ? ORDER BY s.perfil, s.serie");
   $q->execute([$lic]);
   return $q->fetchAll();
 }

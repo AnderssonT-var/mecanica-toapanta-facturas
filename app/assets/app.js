@@ -197,7 +197,7 @@
     $('#resumen').innerHTML = '<h2>Resumen</h2>' + lineas + '<div class="total-grande"><span>Total</span><b class="mono">' + dinero(t.total) + '</b></div>'
       + (err && (st.items.length || leerCliente().identificacion) ? '<div class="aviso t-r pequeno">' + esc(err) + '</div>' : '')
       + '<button class="btn btn-primario btn-lg ancho-completo" type="submit"' + (err ? ' disabled' : '') + '>Emitir factura</button>'
-      + '<p class="muted pequeno">Tu programa la firmará y la enviará al SRI. Verás el resultado en unos segundos si está abierto.</p>';
+      + '<p class="muted pequeno">Al emitir obtienes el número, el RIDE y el XML al instante. Tu programa la firma y la autoriza en el SRI (si la computadora está apagada, lo hace al encenderla).</p>';
     $('#total-movil').textContent = dinero(t.total);
     $('#enviar-movil').disabled = !!err;
     const fp = $('#forma-pago');

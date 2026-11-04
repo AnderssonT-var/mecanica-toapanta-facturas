@@ -8,12 +8,21 @@ $tot = $d['totales'] ?? [];
 $items = $d['items'] ?? [];
 $mensajes = web_json($c['mensajes'] ?? []);
 $autorizado = ($c['estado'] ?? '') === 'AUTORIZADO';
+$esWeb = ($d['origen'] ?? '') === 'WEB';
+$porFirmar = $esWeb && in_array($c['estado'] ?? '', ['GENERADO', 'FIRMADO', 'PENDIENTE', 'RECIBIDA', 'EN PROCESO'], true);
+$sync = $ctx['empresa']['_ultima_sync'] ?? null;
+$pcActiva = $sync && time() - strtotime($sync) < 900;
 $tipo = WEB_DOCS[$c['cod_doc']] ?? 'Comprobante';
 web_cabecera($ctx, $tipo . ' ' . $c['numero'], 'comprobantes');
 $wa = 'https://wa.me/?text=' . rawurlencode($tipo . ' ' . $c['numero'] . ' de ' . ($ctx['empresa']['razonSocial'] ?? '') . ' por ' . dinero($c['total']) . '. Clave de acceso: ' . $c['clave_acceso']);
-echo web_titulo($tipo, $c['numero'], '<a class="btn" href="./?v=ride&id=' . e(urlencode($c['id'])) . '" target="_blank" rel="noopener">Ver RIDE</a><a class="btn" href="./?v=xml&id=' . e(urlencode($c['id'])) . '">Descargar XML</a><a class="btn btn-icono-txt" href="' . e($wa) . '" target="_blank" rel="noopener">WhatsApp</a>');
+echo web_titulo($tipo, $c['numero'], '<a class="btn" href="./?v=ride&id=' . e(urlencode($c['id'])) . '" target="_blank" rel="noopener">Ver RIDE</a><a class="btn" href="./?v=xml&id=' . e(urlencode($c['id'])) . '">' . ($autorizado ? 'Descargar XML' : 'XML (sin firmar)') . '</a><a class="btn btn-icono-txt" href="' . e($wa) . '" target="_blank" rel="noopener">WhatsApp</a>');
 ?>
-<div class="columnas">
+<?php if ($porFirmar): ?>
+<div class="aviso <?= $pcActiva ? 't-b' : 't-a' ?>" role="status"><?= $pcActiva
+  ? 'Factura emitida en la web. Tu programa la está firmando y enviando al SRI; esta página se actualiza sola.'
+  : 'Factura emitida en la web con su número, RIDE y XML. Tu computadora está apagada o sin internet' . ($sync ? ' (último contacto ' . e(web_hace($sync)) . ')' : '') . ': se firmará y se autorizará en el SRI en cuanto enciendas el programa.' ?></div>
+<?php endif; ?>
+<div class="columnas"<?= $porFirmar ? ' data-recargar="15"' : '' ?>>
   <section class="tarjeta col-ancha">
     <div class="tarjeta-cab"><h2><?= e($cli['nombre'] ?? '') ?></h2><?= web_estado($c) ?></div>
     <div class="datos-grid">
@@ -48,7 +57,7 @@ echo web_titulo($tipo, $c['numero'], '<a class="btn" href="./?v=ride&id=' . e(ur
       <div class="kv col"><span>Número de autorización</span><b class="mono partir"><?= e($c['numero_autorizacion'] ?: $c['clave_acceso']) ?></b></div>
       <div class="kv"><span>Autorizado</span><b><?= e(web_fecha($c['fecha_autorizacion'] ?? '')) ?></b></div>
     <?php else: ?>
-      <p class="muted pequeno">Tu programa se encarga de enviarlo y consultar la autorización. Si fue devuelto o no autorizado, corrígelo desde el programa.</p>
+      <p class="muted pequeno"><?= $esWeb ? 'Hecha en la web por ' . e($d['emitidoPor'] ?? '') . '. ' : '' ?>Tu programa se encarga de firmarla, enviarla y consultar la autorización. Si fue devuelta o no autorizada, corrígela desde el programa.</p>
     <?php endif; ?>
     <?php if ($mensajes): ?><div class="mensajes"><?php foreach ($mensajes as $m): ?><div class="aviso t-<?= $autorizado ? 'a' : 'r' ?> pequeno"><?= e(is_array($m) ? trim(($m['identificador'] ?? '') . ' ' . ($m['mensaje'] ?? '') . ' ' . ($m['informacionAdicional'] ?? '')) : (string)$m) ?></div><?php endforeach; ?></div><?php endif; ?>
     <?php if (!empty($c['anulado'])): ?><div class="aviso t-r pequeno">Anulada<?= !empty($c['anulacion']) ? ': ' . e(is_string($c['anulacion']) ? $c['anulacion'] : '') : '' ?></div><?php endif; ?>

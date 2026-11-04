@@ -1,5 +1,5 @@
 <?php
-// Crea un pedido de factura en la nube. El programa de escritorio lo toma, lo firma, lo envía al SRI y devuelve el resultado.
+// Emite una factura desde la web (ver lib/emision.php). Valida los datos que llegan del formulario.
 if (!defined('FX_PORTAL')) exit;
 web_exigir($ctx, 'facturar');
 $in = json_decode((string)($_POST['pedido'] ?? ''), true);
@@ -38,14 +38,10 @@ foreach ((array)($in['items'] ?? []) as $it) {
 }
 if (!$items) throw new WebError('Agrega al menos un producto con cantidad.');
 if (count($items) > 200) throw new WebError('Máximo 200 líneas por factura.');
-$tot = web_totales($items, $tarifas);
-if ($tot['importeTotal'] <= 0) throw new WebError('El total debe ser mayor a cero.');
-if ($cli['tipo'] === 'CF' && $tot['importeTotal'] > 50) throw new WebError('Las ventas a consumidor final no pueden pasar de $50. Identifica al cliente.');
 $forma = array_key_exists((string)($in['formaPago'] ?? ''), WEB_FORMAS_PAGO) ? (string)$in['formaPago'] : '20';
-$p = web_guardar($ctx, 'pedidos', [
-  'tipo' => 'FACTURA', 'estado' => 'PENDIENTE', 'creado' => web_ahora_iso(), 'usuario' => $ctx['usuario']['usuario'], 'usuarioNombre' => $ctx['usuario']['nombre'],
-  'cliente' => $cli, 'items' => $items, 'formaPago' => $forma, 'diasCredito' => max(0, (int)($in['diasCredito'] ?? 0)),
-  'observacion' => mb_substr(trim((string)($in['observacion'] ?? '')), 0, 300), 'total' => $tot['importeTotal'], 'mensaje' => '', 'comprobanteId' => '', 'numero' => '',
-]);
-registrar_evento($ctx['lic'], 'FACTURA_WEB', $cli['nombre'] . ' · ' . dinero($tot['importeTotal']) . ' · ' . $ctx['usuario']['usuario']);
-web_ir('v=pedido&id=' . urlencode($p['id']));
+$dias = min(3650, max(0, (int)($in['diasCredito'] ?? 0)));
+// La factura se emite aquí mismo en la nube: número, clave de acceso, XML y RIDE quedan listos aunque la
+// computadora esté apagada. El programa la firma y la envía al SRI en cuanto se enciende.
+$c = emi_emitir_factura($ctx, $cli, $items, $forma, $dias, mb_substr(trim((string)($in['observacion'] ?? '')), 0, 300));
+web_aviso('Factura ' . $c['numero'] . ' emitida. El RIDE y el XML ya están listos.');
+web_ir('v=comprobante&id=' . urlencode($c['id']));

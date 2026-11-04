@@ -4,6 +4,13 @@ DirectoryIndex index.php
 
 <IfModule mod_rewrite.c>
   RewriteEngine On
+  # El portal vive en facmit.com. En el dominio anterior siguen funcionando api.php y nube/ (programas ya
+  # instalados); las páginas y las descargas de actualizaciones se envían al dominio nuevo.
+  RewriteCond %{HTTP_HOST} (^|\.)mecanicatoapantavelez\.com$ [NC]
+  RewriteCond %{REQUEST_METHOD} ^(GET|HEAD)$
+  RewriteCond %{REQUEST_URI} !/api\.php$
+  RewriteCond %{REQUEST_URI} !/nube/
+  RewriteRule ^(.*)$ https://facmit.com/licencias/$1 [R=302,L,QSA]
   RewriteCond %{HTTPS} !=on
   RewriteCond %{HTTP:X-Forwarded-Proto} !https
   RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]

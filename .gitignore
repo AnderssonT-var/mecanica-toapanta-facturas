@@ -1,7 +1,0 @@
-config.php
-llave-incluida.php
-nube/datos/*
-!nube/datos/.htaccess
-actualizaciones/*.exe
-actualizaciones/*.blockmap
-actualizaciones/latest.yml
