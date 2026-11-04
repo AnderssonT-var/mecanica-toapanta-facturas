@@ -4,8 +4,8 @@
 declare(strict_types=1);
 if (!defined('FX_PORTAL')) { http_response_code(403); exit; }
 
-const NUBE_TABLAS = ['clientes', 'productos', 'comprobantes', 'catalogo', 'proformas', 'pedidos', 'movimientos'];
-const NUBE_TABLAS_DESDE_PROGRAMA = ['clientes', 'productos', 'comprobantes', 'catalogo', 'proformas', 'pedidos', 'movimientos'];
+const NUBE_TABLAS = ['clientes', 'productos', 'comprobantes', 'catalogo', 'proformas', 'pedidos', 'movimientos', 'compras', 'abonos', 'cajas', 'caja_movimientos', 'bodegas'];
+const NUBE_TABLAS_DESDE_PROGRAMA = ['clientes', 'productos', 'comprobantes', 'catalogo', 'proformas', 'pedidos', 'movimientos', 'compras', 'abonos', 'cajas', 'caja_movimientos', 'bodegas'];
 const NUBE_LOTE_PULL = 1000;
 const NUBE_RESPALDOS = 10;
 
@@ -135,6 +135,12 @@ function nube_indices(string $tabla, array $r): array {
       return [$fecha($r['fecha'] ?? ''), 'PR', (string)($r['numero'] ?? ''), (string)($r['estado'] ?? ''), (float)((is_string($r['totales'] ?? null) ? json_decode($r['totales'], true) : ($r['totales'] ?? []))['importeTotal'] ?? 0),
         $txt($r['numero'] ?? '', $c['nombre'] ?? '', $c['identificacion'] ?? '')];
     case 'pedidos': return [$fecha($r['creado'] ?? ''), 'PED', '', (string)($r['estado'] ?? ''), (float)($r['total'] ?? 0), $txt($r['cliente']['nombre'] ?? '', $r['cliente']['identificacion'] ?? '')];
+    case 'compras': return [$fecha($r['fecha'] ?? ''), (string)($r['cod_doc'] ?? ''), mb_substr((string)($r['numero'] ?? ''), 0, 20), (string)($r['estado'] ?? ''), (float)($r['total'] ?? 0),
+      $txt($r['numero'] ?? '', $r['proveedor_nombre'] ?? '', $r['proveedor_id'] ?? '')];
+    case 'abonos': return [$fecha($r['fecha'] ?? ''), mb_substr((string)($r['tipo'] ?? ''), 0, 20), '', '', (float)($r['valor'] ?? 0), $txt($r['cliente_id'] ?? '', $r['referencia'] ?? '')];
+    case 'cajas': return [$fecha($r['apertura'] ?? ''), 'CAJA', '', (string)($r['estado'] ?? ''), (float)($r['esperado'] ?? 0), $txt($r['nombre'] ?? '', $r['usuario'] ?? '')];
+    case 'caja_movimientos': return [$fecha($r['fecha'] ?? ''), mb_substr((string)($r['tipo'] ?? ''), 0, 20), '', '', (float)($r['valor'] ?? 0), $txt($r['motivo'] ?? '')];
+    case 'bodegas': return [null, 'BOD', mb_substr((string)($r['codigo'] ?? ''), 0, 20), '', 0, $txt($r['codigo'] ?? '', $r['nombre'] ?? '')];
     default: return [null, (string)($r['tipo'] ?? ''), '', '', 0, $txt($r['clave'] ?? '')];
   }
 }

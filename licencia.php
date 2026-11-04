@@ -96,7 +96,7 @@ $in = fn($k, $label, $extra = '') => '<label>' . $label . '<input name="' . $k .
         <legend>Plan: <b id="plan-nombre"><?= e(nombre_plan($fsel)) ?></b></legend>
         <p class="muted small">Siempre incluido (Básico): <?= e(FX_BASICO) ?>.</p>
         <input type="hidden" name="funciones[]" value="">
-        <div class="fun-grupo"><span class="fun-tit">Profesional (las tres = plan Profesional)</span>
+        <div class="fun-grupo"><span class="fun-tit">Profesional (todas = plan Profesional)</span>
         <?php foreach (FX_FUNCIONES as $k => $fx) if ($fx['grupo'] === 'pro' && $k !== 'inventario'): ?><label class="fun"><input type="checkbox" name="funciones[]" value="<?= $k ?>"<?= in_array($k, $fsel, true) ? ' checked' : '' ?>><span><b><?= e($fx['label']) ?></b><small><?= e($fx['desc']) ?></small></span></label><?php endif; ?>
         <div class="fun-inv"><span class="fun-sub">Inventario</span>
           <label class="fun"><input type="radio" name="funciones[]" value=""<?= in_array('inventario', $fsel, true) ? '' : ' checked' ?>><span><b>Inventario simple (incluido)</b><small>Catálogo de productos con código, nombre y precio. Sin control de stock.</small></span></label>
@@ -106,7 +106,7 @@ $in = fn($k, $label, $extra = '') => '<label>' . $label . '<input name="' . $k .
         <div class="fun-grupo"><span class="fun-tit">Extras (Profesional + los dos extras = plan Completo)</span>
         <?php foreach (FX_FUNCIONES as $k => $fx) if ($fx['grupo'] === 'extra'): ?><label class="fun"><input type="checkbox" name="funciones[]" value="<?= $k ?>"<?= in_array($k, $fsel, true) ? ' checked' : '' ?>><span><b><?= e($fx['label']) ?></b><small><?= e($fx['desc']) ?></small></span></label><?php endif; ?>
         </div>
-        <div class="row"><span class="muted small">Atajos:</span><button type="button" class="btn btn-sm" data-preset="">Básico</button><button type="button" class="btn btn-sm" data-preset="documentos,retenciones,inventario">Profesional</button><button type="button" class="btn btn-sm" data-preset="documentos,retenciones,inventario,nube,movil">Completo</button></div>
+        <div class="row"><span class="muted small">Atajos:</span><button type="button" class="btn btn-sm" data-preset="">Básico</button><button type="button" class="btn btn-sm" data-preset="documentos,retenciones,inventario,compras,cartera,pos">Profesional</button><button type="button" class="btn btn-sm" data-preset="documentos,retenciones,inventario,compras,cartera,pos,nube,movil">Completo</button></div>
         <div class="precio-sug" id="precio-sugerido" data-precios="<?= e(json_encode(['basico' => (float)ajuste('precio_basico', '0'), 'profesional' => (float)ajuste('precio_profesional', '0'), 'completo' => (float)ajuste('precio_completo', '0'), 'extra' => array_combine(array_keys(FX_FUNCIONES), array_map(fn($k) => (float)ajuste('precio_extra_' . $k, '0'), array_keys(FX_FUNCIONES)))])) ?>"></div>
       </fieldset>
       <label class="span2">Notas internas<textarea name="notas" rows="3"><?= e($v['notas'] ?? '') ?></textarea></label>

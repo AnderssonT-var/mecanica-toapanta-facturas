@@ -5,7 +5,7 @@ declare(strict_types=1);
 if (!defined('FX_PORTAL')) { http_response_code(403); exit; }
 date_default_timezone_set('America/Guayaquil');
 
-const FX_VERSION = '1.3.0';
+const FX_VERSION = '1.4.0';
 const FX_MARCA = 'Facmit';
 
 // Nombre del producto. Los portales instalados antes del cambio de marca guardaron el nombre anterior en su
@@ -30,15 +30,20 @@ const FX_PLANES = [
 // Lo básico (facturar, clientes, productos, proformas, comprobantes, RIDE, autorizaciones, anulaciones, correo,
 // reportes de ventas e IVA, importar) va siempre. Estas se marcan en cada licencia y el programa solo muestra
 // lo marcado. El nombre del plan sale solo de lo que se marque.
-const FX_BASICO = 'Facturas, clientes, inventario simple (código, nombre y precio), proformas, comprobantes y RIDE, autorización SRI, anulaciones, envío por correo, reportes de ventas e IVA, importación desde Excel';
+const FX_BASICO = 'Facturas, clientes, inventario simple (código, nombre y precio), proformas, comprobantes y RIDE, autorización SRI, anulaciones, envío por correo, reportes de ventas e IVA, ATS, importación desde Excel';
 const FX_FUNCIONES = [
   'documentos'  => ['label' => 'Devoluciones, notas de débito y guías', 'desc' => 'Notas de crédito por devolución parcial, notas de débito, guías de remisión y transportistas', 'grupo' => 'pro'],
   'retenciones' => ['label' => 'Retenciones', 'desc' => 'Comprobantes de retención 2.0, proveedores y sustento tributario', 'grupo' => 'pro'],
-  'inventario'  => ['label' => 'Inventario completo', 'desc' => 'Stock por producto, fotos, código de barras, ingresos de mercadería, ajustes y kardex', 'grupo' => 'pro'],
+  'inventario'  => ['label' => 'Inventario completo', 'desc' => 'Stock por producto y por bodega, fotos, código de barras, ingresos, transferencias, ajustes y kardex', 'grupo' => 'pro'],
+  'compras'     => ['label' => 'Compras y liquidaciones', 'desc' => 'Registro de compras desde el XML o el SRI, liquidaciones de compra y libro de compras', 'grupo' => 'pro'],
+  'cartera'     => ['label' => 'Cuentas por cobrar', 'desc' => 'Ventas a crédito, abonos, retenciones recibidas, cartera vencida y estados de cuenta', 'grupo' => 'pro'],
+  'pos'         => ['label' => 'Punto de venta y caja', 'desc' => 'Venta rápida con lector, apertura y cierre de caja con arqueo y tickets de 58/80 mm', 'grupo' => 'pro'],
   'nube'        => ['label' => 'Nube y varios equipos', 'desc' => 'Respaldo en la nube y datos sincronizados entre computadoras', 'grupo' => 'extra'],
   'movil'       => ['label' => 'Facturar desde el celular', 'desc' => 'App web para facturar y consultar desde el teléfono (incluye la nube)', 'grupo' => 'extra'],
 ];
-const FX_PRO = ['documentos', 'retenciones', 'inventario'];
+const FX_PRO = ['documentos', 'retenciones', 'inventario', 'compras', 'cartera', 'pos'];
+// Versión de las funciones: los programas tratan las licencias sin ella como emitidas antes de compras/cobros/caja.
+const FX_FUNCIONES_VERSION = 2;
 
 // Funciones de una licencia. Las creadas antes de este cambio no las tienen guardadas: se deducen de su plan
 // para no quitarle nada a ningún cliente.
@@ -62,11 +67,12 @@ function tiene_funcion(array $l, string $f): bool {
 
 // Básico, Profesional o Completo, más los extras que se le sumen.
 function nombre_plan(array $f): string {
+  $f = array_values(array_intersect(array_keys(FX_FUNCIONES), $f));
   $pro = !array_diff(FX_PRO, $f);
   if ($pro && in_array('nube', $f, true) && in_array('movil', $f, true)) return 'Completo';
   $base = $pro ? 'Profesional' : 'Básico';
   $extras = array_diff($f, $pro ? FX_PRO : []);
-  $cortos = ['documentos' => 'Documentos', 'retenciones' => 'Retenciones', 'inventario' => 'Inventario', 'nube' => 'Nube', 'movil' => 'Móvil'];
+  $cortos = ['documentos' => 'Documentos', 'retenciones' => 'Retenciones', 'inventario' => 'Inventario', 'compras' => 'Compras', 'cartera' => 'Cobros', 'pos' => 'Punto de venta', 'nube' => 'Nube', 'movil' => 'Móvil'];
   if (in_array('movil', $extras, true)) $extras = array_diff($extras, ['nube']);
   return $base . ($extras ? ' + ' . implode(' + ', array_map(fn($x) => $cortos[$x], $extras)) : '');
 }
@@ -122,8 +128,25 @@ function db(): PDO {
     // Portales instalados antes de las funciones por licencia: se agrega la columna una sola vez.
     try { $pdo->query('SELECT funciones FROM licencias LIMIT 0'); }
     catch (PDOException $ex) { try { $pdo->exec('ALTER TABLE licencias ADD COLUMN funciones TEXT NULL'); } catch (PDOException $ex2) { /* sin tabla aún (instalación) */ } }
+    migrar_funciones_v2($pdo);
   }
   return $pdo;
+}
+
+// Licencias Profesional creadas antes de compras, cobros y punto de venta: reciben esas tres funciones una sola vez.
+function migrar_funciones_v2(PDO $pdo): void {
+  try {
+    $r = $pdo->query("SELECT v FROM ajustes WHERE k = 'funciones_v2'");
+    if ($r && $r->fetchColumn() !== false) return;
+    $filas = $pdo->query('SELECT id, funciones FROM licencias WHERE funciones IS NOT NULL')->fetchAll(PDO::FETCH_ASSOC);
+    $up = $pdo->prepare('UPDATE licencias SET funciones = ? WHERE id = ?');
+    foreach ($filas as $f) {
+      $lista = json_decode((string)$f['funciones'], true);
+      if (!is_array($lista) || array_diff(['documentos', 'retenciones', 'inventario'], $lista) || array_intersect(['compras', 'cartera', 'pos'], $lista)) continue;
+      $up->execute([json_encode(array_values(array_intersect(array_keys(FX_FUNCIONES), array_merge($lista, ['compras', 'cartera', 'pos'])))), $f['id']]);
+    }
+    $pdo->prepare('INSERT INTO ajustes (k, v) VALUES (?, ?)')->execute(['funciones_v2', date('Y-m-d H:i:s')]);
+  } catch (Throwable $e) { /* tablas aún sin crear (instalación): se intenta en la próxima conexión */ }
 }
 
 function ahora(): string {
@@ -277,6 +300,7 @@ function payload_licencia(array $l, string $equipo): array {
     'plan' => $l['plan'],
     'funciones' => funciones_licencia($l),
     'planNombre' => plan_de($l),
+    'fv' => FX_FUNCIONES_VERSION,
     'inicio' => $l['inicio'],
     'vence' => $l['vence'],
     'gracia' => (int)$l['gracia'],

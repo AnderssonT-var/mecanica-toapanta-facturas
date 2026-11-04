@@ -33,10 +33,11 @@ document.querySelectorAll('table').forEach((t) => {
 (() => {
   const caja = document.getElementById('funciones');
   if (!caja) return;
-  const PRO = ['documentos', 'retenciones', 'inventario'];
-  const CORTOS = { documentos: 'Documentos', retenciones: 'Retenciones', inventario: 'Inventario', nube: 'Nube', movil: 'Móvil' };
+  const PRO = ['documentos', 'retenciones', 'inventario', 'compras', 'cartera', 'pos'];
+  const ORDEN = ['documentos', 'retenciones', 'inventario', 'compras', 'cartera', 'pos', 'nube', 'movil'];
+  const CORTOS = { documentos: 'Documentos', retenciones: 'Retenciones', inventario: 'Inventario', compras: 'Compras', cartera: 'Cobros', pos: 'Punto de venta', nube: 'Nube', movil: 'Móvil' };
   const checks = () => [...caja.querySelectorAll('input[name="funciones[]"]:not([type=hidden])')];
-  const marcadas = () => checks().filter((c) => c.checked && c.value).map((c) => c.value);
+  const marcadas = () => ORDEN.filter((k) => checks().some((c) => c.checked && c.value === k));
   const precios = JSON.parse((document.getElementById('precio-sugerido') || {}).dataset.precios || '{}');
   function nombre(f) {
     const pro = PRO.every((x) => f.includes(x));

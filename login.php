@@ -54,4 +54,5 @@ $marca = fx_marca();
   <label>Contraseña<input type="password" name="clave" autocomplete="current-password" required></label>
   <button class="btn btn-dark btn-lg">Ingresar</button>
 </form>
+<p class="legal-links muted"><a href="legal.php?doc=terminos">Términos de uso</a> · <a href="legal.php?doc=privacidad">Política de privacidad</a></p>
 </main></body></html>

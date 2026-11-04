@@ -166,6 +166,7 @@ function validar_equipo(array $eq): array {
     'nombre' => mb_substr(trim((string)($eq['nombre'] ?? '')), 0, 120),
     'so' => mb_substr(trim((string)($eq['so'] ?? '')), 0, 80),
     'version' => mb_substr(trim((string)($eq['version'] ?? '')), 0, 20),
+    'terminos' => mb_substr(trim((string)($eq['terminos'] ?? '')), 0, 60),
   ];
 }
 
@@ -192,6 +193,7 @@ function api_activar(string $clave, array $equipo): array {
       ->execute([$l['id'], $eq['id'], $eq['nombre'], $eq['so'], $eq['version'], ip_cliente(), ahora(), ahora()]);
   }
   registrar_evento((int)$l['id'], 'ACTIVACION', ($eq['nombre'] ?: 'Equipo') . ' · v' . $eq['version']);
+  if ($eq['terminos'] !== '') registrar_evento((int)$l['id'], 'TERMINOS', 'Términos de uso y política de privacidad aceptados (' . $eq['terminos'] . ') en ' . ($eq['nombre'] ?: 'el equipo'));
   return respuesta_token($l, $eq['id']);
 }
 

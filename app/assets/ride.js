@@ -71,7 +71,7 @@ const LEYENDA_RIMPE = {
 };
 
 
-const NOMBRES = { '01': 'FACTURA', '04': 'NOTA DE CRÉDITO', '05': 'NOTA DE DÉBITO', '06': 'GUÍA DE REMISIÓN', '07': 'COMPROBANTE DE RETENCIÓN' };
+const NOMBRES = { '01': 'FACTURA', '03': 'LIQUIDACIÓN DE COMPRA DE BIENES Y PRESTACIÓN DE SERVICIOS', '04': 'NOTA DE CRÉDITO', '05': 'NOTA DE DÉBITO', '06': 'GUÍA DE REMISIÓN', '07': 'COMPROBANTE DE RETENCIÓN' };
 const FORMAS = { '01': 'SIN UTILIZACIÓN DEL SISTEMA FINANCIERO', '16': 'TARJETA DE DÉBITO', '19': 'TARJETA DE CRÉDITO', '20': 'OTROS CON UTILIZACIÓN DEL SISTEMA FINANCIERO' };
 
 const ESTILOS = '@page{size:A4;margin:11mm}*{box-sizing:border-box}body{margin:0;font:9.2pt Arial,Helvetica,"Liberation Sans",sans-serif;color:#000}'
@@ -262,6 +262,56 @@ function rideRetencion(c, empresa, { logo = '', programa } = {}) {
   return documento('RIDE ' + c.numero, cuerpo, { programa });
 }
 
+function rideLiquidacion(c, empresa, { logo = '', programa } = {}) {
+  const d = c.data;
+  const prov = '<div class="box cli"><div><span class="k">Razón Social / Nombres y Apellidos del proveedor:</span> ' + esc(c.cliente_nombre) + '</div>'
+    + '<div><span class="k">Identificación:</span> <span class="mono">' + esc(c.cliente_identificacion) + '</span></div>'
+    + '<div><span class="k">Fecha Emisión:</span> ' + fechaEc(c.fecha) + '</div>'
+    + '<div><span class="k">Teléfono:</span> ' + esc((d.cliente || {}).telefono || '') + '</div>'
+    + ((d.cliente || {}).direccion ? '<div class="full"><span class="k">Dirección:</span> ' + esc(d.cliente.direccion) + '</div>' : '') + '</div>';
+  const cuerpo = encabezado(c, empresa, { logo, titulo: 'LIQUIDACIÓN DE COMPRA DE BIENES Y PRESTACIÓN DE SERVICIOS', numero: c.numero }) + prov
+    + detalleHtml(d.totales.lineas, empresa)
+    + '<div class="bot"><div>' + infoAdicionalHtml(d.camposAdicionales) + pagosHtml(d.formaPago, d.totales.importeTotal, d.diasCredito) + '</div>' + totalesHtml(d.totales) + '</div>';
+  return documento('RIDE ' + c.numero, cuerpo, { programa });
+}
+
+// Ticket de punto de venta (rollo de 58 u 80 mm). Lleva los datos que exige el RIDE: emisor, número, clave de
+// acceso / autorización, comprador, detalle, impuestos y total, más el cobro (recibido y cambio).
+function rideTicket(c, empresa, { ancho = 80, programa = 'Facmit' } = {}) {
+  const d = c.data;
+  const t = d.totales;
+  const mm = Number(ancho) === 58 ? 58 : 80;
+  const autorizado = c.estado === 'AUTORIZADO';
+  const fila = (k, v, b) => '<tr' + (b ? ' class="b"' : '') + '><td>' + k + '</td><td class="n">' + v + '</td></tr>';
+  const gravadas = t.impuestos.filter((i) => Number(i.tarifa) > 0);
+  const pos = d.pos || {};
+  const css = '@page{size:' + mm + 'mm auto;margin:0}*{box-sizing:border-box}body{margin:0;padding:3mm ' + (mm === 58 ? 2 : 4) + 'mm;width:' + mm + 'mm;font:' + (mm === 58 ? 7.6 : 8.6) + 'pt "Courier New",monospace;color:#000}'
+    + '.c{text-align:center}.b{font-weight:bold}.n{text-align:right;white-space:nowrap}hr{border:0;border-top:1px dashed #000;margin:4px 0}table{width:100%;border-collapse:collapse}td{vertical-align:top;padding:1px 0}'
+    + '.clave{word-break:break-all;font-size:' + (mm === 58 ? 6.4 : 7.2) + 'pt}.tot td{font-size:' + (mm === 58 ? 8.4 : 9.6) + 'pt}';
+  const items = t.lineas.map((l) => '<tr><td colspan="2">' + esc(l.descripcion) + '</td></tr><tr><td>' + num(l.cantidad, Number(l.cantidad) % 1 ? 2 : 0) + ' x ' + num(l.precioUnitario) + (l.descuento ? ' -' + num(l.descuento) : '') + '</td><td class="n">' + num(l.base) + '</td></tr>').join('');
+  const html = '<div class="c b">' + esc(empresa.nombreComercial || empresa.razonSocial) + '</div>' + (empresa.nombreComercial ? '<div class="c">' + esc(empresa.razonSocial) + '</div>' : '')
+    + '<div class="c">RUC ' + esc(empresa.ruc) + '</div><div class="c">' + esc(empresa.dirEstablecimiento || empresa.dirMatriz) + '</div>'
+    + (LEYENDA_RIMPE[empresa.regimen] ? '<div class="c">' + esc(LEYENDA_RIMPE[empresa.regimen]) + '</div>' : '')
+    + '<div class="c">OBLIGADO A LLEVAR CONTABILIDAD: ' + (empresa.obligadoContabilidad === 'SI' ? 'SI' : 'NO') + '</div><hr>'
+    + '<div class="c b">FACTURA ' + esc(c.numero) + '</div><div>Fecha: ' + fechaEc(c.fecha) + '</div>'
+    + '<div>Ambiente: ' + (c.clave_acceso[23] === '2' ? 'PRODUCCIÓN' : 'PRUEBAS') + ' · Emisión: NORMAL</div>'
+    + '<div>' + (autorizado ? 'Autorización:' : 'Clave de acceso:') + '</div><div class="clave">' + esc(autorizado ? c.numero_autorizacion : c.clave_acceso) + '</div>'
+    + (autorizado ? '<div>Fecha aut.: ' + esc(fechaHoraAutorizacion(c.fecha_autorizacion)) + '</div>' : '<div>Estado: PENDIENTE DE AUTORIZACIÓN</div>') + '<hr>'
+    + '<div>Cliente: ' + esc(c.cliente_nombre) + '</div><div>CI/RUC: ' + esc(c.cliente_identificacion) + '</div>'
+    + ((d.cliente || {}).direccion ? '<div>Dir: ' + esc(d.cliente.direccion) + '</div>' : '') + '<hr>'
+    + '<table>' + items + '</table><hr><table class="tot">'
+    + [...new Set(gravadas.map((i) => Number(i.tarifa)))].map((p) => fila('Subtotal ' + p + '%', num(gravadas.filter((i) => Number(i.tarifa) === p).reduce((a, i) => a + i.base, 0)))).join('')
+    + ((t.porTarifa || {})['0'] ? fila('Subtotal 0%', num(t.porTarifa['0'])) : '') + ((t.porTarifa || {})['6'] ? fila('No objeto IVA', num(t.porTarifa['6'])) : '') + ((t.porTarifa || {})['7'] ? fila('Exento IVA', num(t.porTarifa['7'])) : '')
+    + (t.totalDescuento ? fila('Descuento', num(t.totalDescuento)) : '')
+    + [...new Set(gravadas.map((i) => Number(i.tarifa)))].map((p) => fila('IVA ' + p + '%', num(gravadas.filter((i) => Number(i.tarifa) === p).reduce((a, i) => a + i.valor, 0)))).join('')
+    + fila('TOTAL', num(t.importeTotal), true) + '</table><hr><table>'
+    + fila('Pago', esc(pos.formaNombre || FORMAS[d.formaPago] || d.formaPago))
+    + (pos.recibido ? fila('Recibido', num(pos.recibido)) + fila('Cambio', num(pos.cambio)) : '') + '</table><hr>'
+    + '<div class="c">Consulte su comprobante electrónico en www.sri.gob.ec' + ((d.cliente || {}).email ? ' o en su correo' : '') + '</div>'
+    + '<div class="c">' + esc(programa) + '</div>';
+  return '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Ticket ' + esc(c.numero) + '</title><style>' + css + '</style></head><body>' + html + '</body></html>';
+}
+
 function rideProforma(p, empresa, { logo = '', programa } = {}) {
   const cli = p.cliente || {};
   const fake = { data: { cliente: cli }, cliente_nombre: cli.nombre, cliente_identificacion: cli.identificacion, fecha: p.fecha };
@@ -275,12 +325,12 @@ function rideProforma(p, empresa, { logo = '', programa } = {}) {
 }
 
 function ride(c, empresa, opciones) {
-  const fn = { '01': rideFactura, '04': rideNotaCredito, '05': rideNotaDebito, '06': rideGuia, '07': rideRetencion }[c.cod_doc];
+  const fn = { '01': rideFactura, '03': rideLiquidacion, '04': rideNotaCredito, '05': rideNotaDebito, '06': rideGuia, '07': rideRetencion }[c.cod_doc];
   if (!fn) throw new Error('Tipo de comprobante sin RIDE.');
   return fn(c, empresa, opciones);
 }
 
-module.exports = { ride, rideFactura, rideNotaCredito, rideNotaDebito, rideGuia, rideRetencion, rideProforma, codigosCode128, barrasSvg, C128, NOMBRES };
+module.exports = { ride, rideTicket, rideLiquidacion, rideFactura, rideNotaCredito, rideNotaDebito, rideGuia, rideRetencion, rideProforma, codigosCode128, barrasSvg, C128, NOMBRES };
 
 window.FXRIDE = module.exports;
 })();
