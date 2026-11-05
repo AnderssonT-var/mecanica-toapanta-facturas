@@ -74,22 +74,34 @@ const LEYENDA_RIMPE = {
 const NOMBRES = { '01': 'FACTURA', '03': 'LIQUIDACIÓN DE COMPRA DE BIENES Y PRESTACIÓN DE SERVICIOS', '04': 'NOTA DE CRÉDITO', '05': 'NOTA DE DÉBITO', '06': 'GUÍA DE REMISIÓN', '07': 'COMPROBANTE DE RETENCIÓN' };
 const FORMAS = { '01': 'SIN UTILIZACIÓN DEL SISTEMA FINANCIERO', '16': 'TARJETA DE DÉBITO', '19': 'TARJETA DE CRÉDITO', '20': 'OTROS CON UTILIZACIÓN DEL SISTEMA FINANCIERO' };
 
-const ESTILOS = '@page{size:A4;margin:11mm}*{box-sizing:border-box}body{margin:0;font:9.2pt Arial,Helvetica,"Liberation Sans",sans-serif;color:#000}'
-  + '.top{display:grid;grid-template-columns:1fr 1fr;gap:10px}.box{border:1px solid #000;border-radius:8px;padding:8px 10px}'
-  + '.logo{height:105px;display:flex;align-items:center;justify-content:center;margin-bottom:8px}.logo img{max-height:105px;max-width:100%;object-fit:contain}'
-  + '.logo .sin{font:bold 15pt Arial;color:#888;border:1px dashed #aaa;border-radius:8px;padding:28px 20px}'
-  + '.em b{font-size:10.5pt}.em div{margin-top:3px}.k{font-weight:bold}'
-  + '.der{display:flex;flex-direction:column;gap:4px}.der .ruc{font-size:12pt;font-weight:bold}.der .tipo{font-size:13.5pt;font-weight:bold;letter-spacing:.5px}'
-  + '.mono{font-family:"Courier New",monospace}.clave{font-size:7.4pt;letter-spacing:-.2px;word-break:break-all;text-align:center;font-family:"Courier New",monospace}'
-  + '.cli{margin-top:9px;display:grid;grid-template-columns:1.6fr 1fr;gap:3px 16px}.full{grid-column:1/-1}'
-  + 'table{border-collapse:collapse;width:100%}.det{margin-top:9px}.det th,.det td{border:1px solid #000;padding:3px 5px;vertical-align:top}'
-  + '.det th{background:#eee;font-size:8.2pt}.n{text-align:right;white-space:nowrap}.c{text-align:center}'
-  + '.bot{margin-top:9px;display:grid;grid-template-columns:1.25fr 1fr;gap:12px;align-items:start}'
-  + '.adi th,.adi td{padding:2px 6px;text-align:left;vertical-align:top}.adi th{width:34%}'
-  + '.tot td{border:1px solid #000;padding:3px 6px}.tot tr:last-child td{font-weight:bold;font-size:10.2pt}'
-  + '.pag{margin-top:9px}.pag th,.pag td{border:1px solid #000;padding:3px 6px}.pag th{background:#eee}'
-  + '.dest{margin-top:9px;border:1px solid #000;border-radius:8px;padding:8px 10px}.dest .cli{margin-top:0}'
-  + '.pie{margin-top:12px;font-size:7.3pt;color:#444;display:flex;justify-content:space-between;border-top:1px solid #999;padding-top:4px}';
+// Formato del RIDE: el clásico de los sistemas contables de Ecuador (logo a la izquierda, recuadro del SRI a la
+// derecha, comprador, detalle con columnas IVA/ICE, información adicional y forma de pago a la izquierda y
+// totales a la derecha).
+const ESTILOS = '@page{size:A4;margin:10mm 11mm}*{box-sizing:border-box}body{margin:0;font:8.6pt Arial,Helvetica,"Liberation Sans",sans-serif;color:#000}'
+  + '.top{display:grid;grid-template-columns:1fr 1fr;gap:4px;align-items:stretch}.izq{display:flex;flex-direction:column;gap:4px}'
+  + '.box{border:1px solid #000;border-radius:7px;padding:7px 9px}'
+  + '.logo{height:158px;display:flex;align-items:flex-start;justify-content:center;overflow:hidden}.logo img{width:100%;height:100%;object-fit:contain;object-position:top center}'
+  + '.logo .sin{align-self:center;font:bold 14pt Arial;color:#999;border:1px dashed #bbb;border-radius:7px;padding:26px 20px}'
+  + '.em{flex:1;display:flex;flex-direction:column;gap:7px}.em .rs{font-size:10.3pt;font-weight:bold}.em .fila{display:grid;grid-template-columns:80px 1fr;gap:6px}.em .esp{margin-top:6px}'
+  + '.k{font-weight:bold}.der{display:flex;flex-direction:column;justify-content:space-between;gap:6px;padding:9px 10px}'
+  + '.der .lin{display:flex;gap:10px;align-items:baseline}.der .ruc b{font-size:12.5pt;letter-spacing:.6px}.der .tipo{font-size:14.5pt;font-weight:bold;letter-spacing:5px}'
+  + '.der .nro b{font-size:12.5pt;letter-spacing:.6px}.der .estado{color:#000;font-weight:bold}'
+  + '.mono{font-family:"Courier New",monospace}.clave{font-size:7.6pt;letter-spacing:-.1px;word-break:break-all}'
+  + '.barras svg{width:100%;height:42px}'
+  + '.comp{margin-top:4px;border:1px solid #000;padding:5px 8px;display:grid;grid-template-columns:98px 1fr auto;gap:4px 8px;align-items:baseline}'
+  + '.comp .l{font-size:8.2pt}.comp .l2{font-size:7.2pt;line-height:1.05}.comp .ancho{grid-column:2/-1}'
+  + '.cli{margin-top:4px;display:grid;grid-template-columns:1.6fr 1fr;gap:3px 16px}.full{grid-column:1/-1}'
+  + 'table{border-collapse:collapse;width:100%}.det{margin-top:4px}.det th,.det td{border:1px solid #000;padding:2px 4px;vertical-align:top}'
+  + '.det th{font-weight:normal;font-size:8.2pt;text-align:center;vertical-align:middle}.det .flag{width:13px;padding:2px 1px;text-align:center;font-size:7.6pt;line-height:1.05}'
+  + '.n{text-align:right;white-space:nowrap}.c{text-align:center}'
+  + '.bot{display:grid;grid-template-columns:1.85fr 1fr;align-items:start}'
+  + '.adi{border:1px solid #000;border-radius:7px;padding:5px 8px;min-height:205px;margin-top:4px}.adi .tit{font-weight:bold;margin-bottom:6px}'
+  + '.adi .fila{display:grid;grid-template-columns:86px 1fr;gap:6px;margin:0 0 9px}'
+  + '.tot{margin-top:0}.tot td{border:1px solid #000;padding:1px 3px}'
+  + '.pag{margin-top:2px}.pag th,.pag td{border:1px solid #000;padding:2px 4px;font-weight:normal}.pag th{text-align:center}'
+  + '.dest{margin-top:6px;border:1px solid #000;border-radius:7px;padding:7px 9px}.dest .cli{margin-top:0}'
+  + '.pie{margin-top:18px;font-size:8pt;display:flex;justify-content:space-between;border-top:1px solid #000;padding-top:3px}'
+  + '@media print{.pie{position:fixed;left:0;right:0;bottom:0;margin:0;background:#fff}}';
 
 const RECHAZADOS = ['INVALIDO', 'DEVUELTA', 'NO AUTORIZADO'];
 
@@ -104,95 +116,98 @@ function textoEstado(c, autorizado, rechazado) {
 function encabezado(c, empresa, { logo, titulo, numero, sinClave }) {
   const autorizado = c && c.estado === 'AUTORIZADO';
   const rechazado = c && RECHAZADOS.includes(c.estado);
-  const ambiente = c && c.clave_acceso ? (c.clave_acceso[23] === '2' ? 'PRODUCCIÓN' : 'PRUEBAS') : (empresa.ambiente === '2' ? 'PRODUCCIÓN' : 'PRUEBAS');
-  const tel = [empresa.telefono1, empresa.telefono2].filter(Boolean).join(' / ');
-  const leyendas = [
-    empresa.contribuyenteEspecial ? 'Contribuyente Especial Nro: ' + esc(empresa.contribuyenteEspecial) : '',
-    'OBLIGADO A LLEVAR CONTABILIDAD: ' + (empresa.obligadoContabilidad === 'SI' ? 'SI' : 'NO'),
-    empresa.agenteRetencion ? 'Agente de Retención Resolución No. ' + esc(empresa.agenteRetencion) : '',
-    LEYENDA_RIMPE[empresa.regimen] ? '<b>' + esc(LEYENDA_RIMPE[empresa.regimen]) + '</b>' : '<b>RÉGIMEN GENERAL</b>'
-  ].filter(Boolean).map((x) => '<div>' + x + '</div>').join('');
-  let der = '<div class="box der"><div class="ruc">R.U.C.: ' + esc(empresa.ruc) + '</div><div class="tipo">' + esc(titulo) + '</div>'
-    + '<div><span class="k">No.</span> <span class="mono">' + esc(numero) + '</span></div>';
+  const ambiente = c && c.clave_acceso ? (c.clave_acceso[23] === '2' ? 'Producción' : 'Pruebas') : (empresa.ambiente === '2' ? 'Producción' : 'Pruebas');
+  const tel = [empresa.telefono1, empresa.telefono2].filter(Boolean).join(' - ');
+  const titEsp = titulo.length <= 12 ? titulo.split('').join(' ').replace(/ {3}/g, '  ') : titulo;
+  let der = '<div class="box der"><div class="lin ruc"><span>RUC:</span><b>' + esc(empresa.ruc) + '</b></div>'
+    + '<div class="tipo"' + (titulo.length > 12 ? ' style="letter-spacing:1px;font-size:12pt"' : '') + '>' + esc(titEsp) + '</div>'
+    + '<div class="lin nro"><span>Nro.:</span><b>' + esc(numero) + '</b></div>';
   if (!sinClave) {
     // Esquema offline del SRI: el número de autorización es la misma clave de acceso; mientras llega la respuesta se imprime la clave.
     const numAut = autorizado ? c.numero_autorizacion : rechazado ? 'NO AUTORIZADO POR EL SRI' : c.clave_acceso;
     const fecAut = autorizado ? fechaHoraAutorizacion(c.fecha_autorizacion) : rechazado ? '—' : 'PENDIENTE DE AUTORIZACIÓN';
-    der += '<div class="k">NÚMERO DE AUTORIZACIÓN</div><div class="clave">' + esc(numAut) + '</div>'
-      + '<div><span class="k">FECHA Y HORA DE AUTORIZACIÓN:</span> ' + esc(fecAut) + '</div>'
-      + '<div><span class="k">ESTADO:</span> <b class="estado">' + esc(textoEstado(c, autorizado, rechazado)) + '</b></div>'
-      + '<div><span class="k">AMBIENTE:</span> ' + ambiente + '</div><div><span class="k">EMISIÓN:</span> NORMAL</div>'
-      + '<div class="k">CLAVE DE ACCESO</div>' + barrasSvg(c.clave_acceso) + '<div class="clave">' + esc(c.clave_acceso) + '</div>';
+    der += '<div><div>NÚMERO DE AUTORIZACIÓN:</div><div class="clave">' + esc(numAut) + '</div></div>'
+      + '<div>Fecha y Hora de autorización: ' + esc(fecAut) + '</div>'
+      + (autorizado && !c.anulado ? '' : '<div>Estado: <span class="estado">' + esc(textoEstado(c, autorizado, rechazado)) + '</span></div>')
+      + '<div>Ambiente: ' + ambiente + '</div><div>EMISIÓN: Normal</div>'
+      + '<div><div>CLAVE DE ACCESO:</div><div class="barras">' + barrasSvg(c.clave_acceso) + '</div><div class="clave">' + esc(c.clave_acceso) + '</div></div>';
   }
   der += '</div>';
-  return '<div class="top"><div><div class="logo">' + (logo ? '<img src="' + logo + '" alt="">' : '<span class="sin">NO TIENE LOGO</span>') + '</div>'
-    + '<div class="box em"><b>' + esc(empresa.razonSocial) + '</b>' + (empresa.nombreComercial ? '<div>' + esc(empresa.nombreComercial) + '</div>' : '')
-    + '<div><span class="k">Dir. Matriz:</span> ' + esc(empresa.dirMatriz) + '</div>'
-    + (empresa.dirEstablecimiento ? '<div><span class="k">Dir. Sucursal:</span> ' + esc(empresa.dirEstablecimiento) + '</div>' : '')
-    + (tel ? '<div><span class="k">Teléfono(s):</span> ' + esc(tel) + '</div>' : '')
-    + (empresa.email ? '<div><span class="k">Email:</span> ' + esc(empresa.email) + '</div>' : '')
+  const leyendas = [
+    empresa.contribuyenteEspecial ? '<div>Contribuyente Especial Nro: ' + esc(empresa.contribuyenteEspecial) + '</div>' : '',
+    '<div class="esp">OBLIGADO A LLEVAR CONTABILIDAD: ' + (empresa.obligadoContabilidad === 'SI' ? 'SI' : 'NO') + '</div>',
+    empresa.agenteRetencion ? '<div>Agente de Retención Resolución No. ' + esc(empresa.agenteRetencion) + '</div>' : '',
+    '<div class="esp k">' + esc(LEYENDA_RIMPE[empresa.regimen] || 'REGIMEN GENERAL') + '</div>'
+  ].join('');
+  return '<div class="top"><div class="izq"><div class="logo">' + (logo ? '<img src="' + logo + '" alt="">' : '<span class="sin">NO TIENE LOGO</span>') + '</div>'
+    + '<div class="box em"><div class="rs">' + esc(empresa.razonSocial) + '</div>' + (empresa.nombreComercial && empresa.nombreComercial !== empresa.razonSocial ? '<div>' + esc(empresa.nombreComercial) + '</div>' : '')
+    + '<div class="fila"><span>Dir. Matriz:</span><span>' + esc(empresa.dirMatriz) + '</span></div>'
+    + '<div class="fila"><span>Dir. Sucursal:</span><span>' + esc(empresa.dirEstablecimiento && empresa.dirEstablecimiento !== empresa.dirMatriz ? empresa.dirEstablecimiento : '') + '</span></div>'
+    + '<div class="esp">Teléfono(s): ' + esc(tel) + '</div><div>Email: ' + esc(empresa.email || '') + '</div>'
     + leyendas + '</div></div>' + der + '</div>';
 }
 
 function documento(titulo, cuerpo, { programa = 'Facmit' } = {}) {
   const ahora = new Date();
   const p = (n) => String(n).padStart(2, '0');
-  const impreso = p(ahora.getDate()) + '/' + p(ahora.getMonth() + 1) + '/' + ahora.getFullYear() + ' ' + p(ahora.getHours()) + ':' + p(ahora.getMinutes());
+  const impreso = p(ahora.getDate()) + '/' + p(ahora.getMonth() + 1) + '/' + ahora.getFullYear() + '&nbsp;&nbsp; ' + p(ahora.getHours()) + ':' + p(ahora.getMinutes()) + ':' + p(ahora.getSeconds());
   return '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>' + esc(titulo) + '</title><style>' + ESTILOS + '</style></head><body>'
-    + cuerpo + '<div class="pie"><span>' + esc(programa) + ' · Documento generado electrónicamente. Verifique su validez en www.sri.gob.ec</span><span>Impreso: ' + impreso + '</span></div></body></html>';
+    + cuerpo + '<div class="pie"><span>' + esc(programa) + '</span><span>Fecha / Hora de impresión: ' + impreso + '</span></div></body></html>';
 }
 
 function infoAdicionalHtml(campos) {
-  const filas = (campos || []).filter((x) => String(x.valor || '').trim()).map((x) => '<tr><th>' + esc(x.nombre) + '</th><td>' + esc(x.valor) + '</td></tr>').join('');
-  return '<div class="box"><div class="k" style="margin-bottom:4px">Información Adicional</div><table class="adi">' + filas + '</table></div>';
+  const filas = (campos || []).filter((x) => String(x.valor || '').trim()).map((x) => '<div class="fila"><span>' + esc(x.nombre) + ':</span><span>' + esc(x.valor) + '</span></div>').join('');
+  return '<div class="adi"><div class="tit">Información adicional:</div>' + filas + '</div>';
 }
 
 function totalesHtml(t, extra = []) {
   const pt = t.porTarifa || {};
-  const ivaDe = (cod) => (t.impuestos.find((i) => i.codigoPorcentaje === cod) || {}).valor || 0;
   const fila = (k, v) => '<tr><td>' + k + '</td><td class="n">' + num(v) + '</td></tr>';
   const gravadas = t.impuestos.filter((i) => Number(i.tarifa) > 0);
   const pcts = [...new Set(gravadas.map((i) => Number(i.tarifa)))];
   if (!pcts.includes(15)) pcts.unshift(15);
   if (!pcts.includes(5)) pcts.push(5);
+  pcts.sort((a, b) => b - a);
   const baseDe = (pct) => gravadas.filter((i) => Number(i.tarifa) === pct).reduce((a, i) => a + i.base, 0);
   const ivaPct = (pct) => gravadas.filter((i) => Number(i.tarifa) === pct).reduce((a, i) => a + i.valor, 0);
   return '<table class="tot"><tbody>'
     + pcts.map((p) => fila('SUBTOTAL ' + p + '%', baseDe(p))).join('')
-    + fila('SUBTOTAL 0%', pt['0']) + fila('SUBTOTAL NO OBJETO DE IVA', pt['6']) + fila('SUBTOTAL EXENTO DE IVA', pt['7'])
-    + fila('SUBTOTAL SIN IMPUESTOS', t.totalSinImpuestos) + fila('TOTAL DESCUENTO', t.totalDescuento) + fila('ICE', 0)
-    + pcts.map((p) => fila('IVA ' + p + '%', ivaPct(p))).join('') + extra.map(([k, v]) => fila(k, v)).join('')
+    + fila('SUBTOTAL 0%', pt['0']) + fila('SUBTOTAL No Objeto de IVA', pt['6']) + fila('SUBTOTAL Exento de IVA', pt['7'])
+    + fila('SUBTOTAL SIN IMPUESTOS', t.totalSinImpuestos) + fila('TOTAL Descuento', t.totalDescuento) + fila('ICE', 0)
+    + pcts.map((p) => fila('IVA ' + p + '%', ivaPct(p))).join('') + fila('IRBPNR', 0) + extra.map(([k, v]) => fila(k, v)).join('')
     + fila('VALOR TOTAL', t.importeTotal) + '</tbody></table>';
-  void ivaDe;
 }
 
 function detalleHtml(lineas, empresa) {
   const dp = Number(empresa.decimalesPrecio) || 2;
   const dc = Number(empresa.decimalesCantidad) || 2;
-  return '<table class="det"><thead><tr><th style="width:11%">Cod. Principal</th><th style="width:9%">Cod. Auxiliar</th><th style="width:8%">Cant.</th><th>Descripción</th><th style="width:11%">Precio Unitario</th><th style="width:9%">Descuento</th><th style="width:11%">Precio Total</th></tr></thead><tbody>'
-    + lineas.map((l) => '<tr><td class="mono">' + esc(l.codigo || '') + '</td><td class="mono">' + esc(l.codigoAux || '') + '</td><td class="n">' + num(l.cantidad, dc) + '</td><td>' + esc(l.descripcion) + '</td>'
-      + '<td class="n">' + num(l.precioUnitario, dp) + '</td><td class="n">' + num(l.descuento) + '</td><td class="n">' + num(l.base) + '</td></tr>').join('')
+  const vertical = (t) => t.split('').join('<br>');
+  return '<table class="det"><thead><tr><th style="width:7%">Código Principal</th><th style="width:7%">Código Auxiliar</th><th style="width:11%">Cantidad</th><th>Descripción</th>'
+    + '<th style="width:11%">Precio Unitario</th><th class="flag">' + vertical('IVA') + '</th><th class="flag">' + vertical('ICE') + '</th><th style="width:9%">Descuento</th><th style="width:11%">Precio Total</th></tr></thead><tbody>'
+    + lineas.map((l) => '<tr><td>' + esc(l.codigo || '') + '</td><td>' + esc(l.codigoAux || '') + '</td><td class="n">' + num(l.cantidad, dc) + '</td><td>' + esc(l.descripcion) + '</td>'
+      + '<td class="n">' + num(l.precioUnitario, dp) + '</td><td class="flag">' + (Number(l.pct) > 0 || Number(l.iva) > 0 ? 'S' : 'N') + '</td><td class="flag">N</td>'
+      + '<td class="n">' + (Number(l.descuento) ? num(l.descuento) : '') + '</td><td class="n">' + num(l.base) + '</td></tr>').join('')
     + '</tbody></table>';
 }
 
 function compradorHtml(c, extra = '') {
   const cli = c.data.cliente || {};
-  return '<div class="box cli"><div><span class="k">Razón Social / Nombres y Apellidos:</span> ' + esc(c.cliente_nombre) + '</div>'
-    + '<div><span class="k">Identificación:</span> <span class="mono">' + esc(c.cliente_identificacion) + '</span></div>'
-    + '<div><span class="k">Fecha Emisión:</span> ' + fechaEc(c.fecha) + '</div>'
-    + '<div><span class="k">Teléfono:</span> ' + esc(cli.telefono || '') + '</div>'
-    + (cli.direccion ? '<div class="full"><span class="k">Dirección:</span> ' + esc(cli.direccion) + '</div>' : '') + extra + '</div>';
+  return '<div class="comp"><span class="l2">Razón Social/<br>Nombres y Apellidos:</span><span class="ancho">' + esc(c.cliente_nombre) + '</span>'
+    + '<span class="l">Identificación:</span><span>' + esc(c.cliente_identificacion) + (cli.telefono ? '<span style="margin-left:60px">Teléfonos:&nbsp; ' + esc(cli.telefono) + '</span>' : '') + '</span><span></span>'
+    + '<span class="l">Fecha Emisión:</span><span class="ancho k">' + fechaEc(c.fecha) + '</span>'
+    + (cli.direccion ? '<span class="l">Dirección:</span><span class="ancho">' + esc(cli.direccion) + '</span>' : '')
+    + (extra ? '<div class="full cli" style="margin-top:0">' + extra + '</div>' : '') + '</div>';
 }
 
 function pagosHtml(formaPago, total, plazo) {
-  return '<table class="pag"><thead><tr><th>Forma de pago</th><th style="width:20%">Valor</th><th style="width:14%">Plazo</th><th style="width:14%">Tiempo</th></tr></thead><tbody><tr><td>'
-    + esc(formaPago) + ' - ' + esc(FORMAS[formaPago] || '') + '</td><td class="n">' + num(total) + '</td><td class="n">' + (Number(plazo) || 0) + '</td><td>' + (Number(plazo) ? 'DÍAS' : '') + '</td></tr></tbody></table>';
+  return '<table class="pag"><thead><tr><th>FORMA DE PAGO</th><th style="width:15%">VALOR</th><th style="width:10%">TIEMPO</th><th style="width:7%">PLAZO</th></tr></thead><tbody><tr><td>'
+    + esc(FORMAS[formaPago] || formaPago) + '</td><td class="n">' + num(total) + '</td><td class="c">' + (Number(plazo) ? 'días' : '') + '</td><td class="c">' + (Number(plazo) || '') + '</td></tr></tbody></table>';
 }
 
 function rideFactura(c, empresa, { logo = '', programa } = {}) {
   const d = c.data;
   const cuerpo = encabezado(c, empresa, { logo, titulo: 'FACTURA', numero: c.numero })
-    + compradorHtml(c, '<div><span class="k">Guía de Remisión:</span> ' + esc(d.guiaRemision || '') + '</div>')
+    + compradorHtml(c, d.guiaRemision ? '<div><span class="k">Guía de Remisión:</span> ' + esc(d.guiaRemision) + '</div>' : '')
     + detalleHtml(d.totales.lineas, empresa)
     + '<div class="bot"><div>' + infoAdicionalHtml(d.camposAdicionales) + pagosHtml(d.formaPago, d.totales.importeTotal, d.diasCredito) + '</div>'
     + totalesHtml(d.totales, [['PROPINA', 0]]) + '</div>';
