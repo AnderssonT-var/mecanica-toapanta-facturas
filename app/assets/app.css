@@ -177,7 +177,7 @@ a.doc:hover, a.fila-item:hover { background: var(--soft); }
 .rap.on { border-color: var(--navy); background: #F7FBEA; }
 .rap-n { min-width: 20px; height: 20px; border-radius: 10px; background: var(--navy); color: var(--accent); font-size: 11px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; padding: 0 5px; }
 .lineas { display: flex; flex-direction: column; gap: 8px; }
-.linea { display: grid; grid-template-columns: minmax(0, 1fr) 128px 108px 98px 92px 34px; gap: 8px; align-items: center; padding: 10px; border: 1px solid var(--border); border-radius: 14px; }
+.linea { display: grid; grid-template-columns: minmax(0, 1fr) 128px 108px 84px 98px 92px 34px; gap: 8px; align-items: center; padding: 10px; border: 1px solid var(--border); border-radius: 14px; }
 .linea.nueva { animation: nueva .9s ease-out; }
 @keyframes nueva { from { box-shadow: 0 0 0 3px var(--accent); } to { box-shadow: 0 0 0 0 transparent; } }
 .l-desc { display: flex; flex-direction: column; min-width: 0; }
@@ -187,6 +187,8 @@ a.doc:hover, a.fila-item:hover { background: var(--soft); }
 .l-cant { display: grid; grid-template-columns: 34px 1fr 34px; gap: 4px; }
 .l-cant button, .l-quitar { min-height: 38px; border: 1px solid var(--border2); background: var(--soft); border-radius: 10px; font-size: 18px; font-weight: 700; cursor: pointer; }
 .l-cant input { min-height: 38px; text-align: center; padding: 0 4px; }
+.l-coniva { min-height: 34px; border: 1px solid var(--border2); background: #fff; border-radius: 10px; font: 600 12px/1.1 inherit; color: inherit; cursor: pointer; padding: 0 6px; }
+.l-coniva:hover { border-color: var(--navy); }
 .l-precio { position: relative; flex-direction: row; align-items: center; font-weight: 500; }
 .l-precio span { position: absolute; left: 10px; color: var(--muted); font-size: 13px; }
 .l-precio input { min-height: 38px; padding-left: 22px; }
@@ -256,8 +258,8 @@ a.doc:hover, a.fila-item:hover { background: var(--soft); }
   .tabbar a.destacado svg { background: var(--accent); color: var(--navy); border-radius: 12px; padding: 5px; width: 34px; height: 34px; margin-top: -6px; }
   .doc-der .badge { font-size: 10px; padding: 2px 7px; }
   .ti-cab, .ti-fila { grid-template-columns: minmax(0, 1fr) 40px 70px 80px; font-size: 13px; }
-  .linea { grid-template-columns: 1fr 1fr; grid-template-areas: 'd d' 'c p' 'i s'; position: relative; padding-right: 40px; }
-  .l-desc { grid-area: d; } .l-cant { grid-area: c; } .l-precio { grid-area: p; } .l-iva { grid-area: i; } .l-sub { grid-area: s; align-self: center; font-size: 16px; }
+  .linea { grid-template-columns: 1fr 1fr; grid-template-areas: 'd d' 'c p' 'i v' 's s'; position: relative; padding-right: 40px; }
+  .l-desc { grid-area: d; } .l-cant { grid-area: c; } .l-precio { grid-area: p; } .l-iva { grid-area: i; } .l-coniva, .l-coniva-vacio { grid-area: v; } .l-sub { grid-area: s; align-self: center; font-size: 16px; }
   .l-quitar { position: absolute; top: 8px; right: 6px; }
   .facturar .col-angosta .ancho-completo { display: none; }
   .barra-total { display: flex; position: fixed; left: 0; right: 0; bottom: calc(var(--tab) + env(safe-area-inset-bottom)); z-index: 25; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 14px; background: #fff; border-top: 1px solid var(--border2); box-shadow: 0 -8px 24px rgba(15, 27, 45, .08); }
@@ -271,3 +273,7 @@ a.doc:hover, a.fila-item:hover { background: var(--soft); }
 @media print {
   .lado, .tabbar, .ride-barra { display: none !important; }
 }
+
+/* Facturar por WhatsApp */
+.codigo-wa { font-size: 26px; font-weight: 700; letter-spacing: .08em; background: var(--soft, #EEF0EA); border-radius: 12px; padding: 14px 18px; display: inline-block; margin: 4px 0 10px; }
+.ejemplo-wa { background: #0F1B2D; color: #E7ECF3; border-radius: 12px; padding: 14px 16px; font: 13px/1.6 'JetBrains Mono', monospace; white-space: pre-wrap; margin: 8px 0 12px; }

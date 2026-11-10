@@ -19,7 +19,8 @@ if ($actual !== null && $puedeEditar): ?>
     <label>Código auxiliar<input name="codigo_aux" class="mono" maxlength="25" value="<?= e($actual['codigo_aux'] ?? '') ?>"></label>
     <label class="ancho">Descripción<input name="descripcion" required maxlength="300" value="<?= e($actual['descripcion'] ?? '') ?>"></label>
     <label>Precio sin IVA<input name="precio" type="number" min="0" step="0.000001" required value="<?= e((string)($actual['precio'] ?? '')) ?>" inputmode="decimal"></label>
-    <label>IVA<select name="tarifa"><?php foreach ($tarifas as $k => $t) echo '<option value="' . e((string)$k) . '"' . ((string)($actual['tarifa'] ?? '4') === (string)$k ? ' selected' : '') . '>' . e($t['label']) . '</option>'; ?></select></label>
+    <label>IVA<select name="tarifa"><?php foreach ($tarifas as $k => $t) echo '<option value="' . e((string)$k) . '" data-pct="' . e((string)($t['pct'] ?? 0)) . '"' . ((string)($actual['tarifa'] ?? '4') === (string)$k ? ' selected' : '') . '>' . e($t['label']) . '</option>'; ?></select></label>
+    <label class="ancho">Precio final con IVA (opcional)<input id="pvp" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Precio de venta al público"><small class="muted" id="pvp-nota">Escribe el precio de venta al público y se calcula el precio sin IVA.</small></label>
     <label class="ancho">Línea o categoría<input name="linea" maxlength="60" value="<?= e($actual['linea'] ?? '') ?>"></label>
     <div class="fila ancho"><button class="btn btn-primario">Guardar</button><?php if (isset($actual['id'])): ?><button class="btn btn-peligro" name="accion" value="eliminar" data-confirmar="¿Eliminar este producto?">Eliminar</button><?php endif; ?></div>
   </form>

@@ -5,6 +5,7 @@ if (!defined('FX_PORTAL')) { http_response_code(403); exit; }
 require_once dirname(__DIR__, 2) . '/lib/nucleo.php';
 require_once dirname(__DIR__, 2) . '/lib/nube.php';
 require_once __DIR__ . '/emision.php';
+require_once __DIR__ . '/whatsapp.php';
 
 const WEB_DOCS = ['01' => 'Factura', '03' => 'Liquidación de compra', '04' => 'Nota de crédito', '05' => 'Nota de débito', '06' => 'Guía de remisión', '07' => 'Retención'];
 const WEB_ESTADOS = [
@@ -87,16 +88,23 @@ function web_salir(): void {
 function web_contexto(): ?array {
   web_sesion();
   if (empty($_SESSION['uid'])) return null;
+  $ctx = web_contexto_usuario((int)$_SESSION['uid'], (string)($_SESSION['perfil'] ?? ''));
+  if (!$ctx) { web_salir(); return null; }
+  $_SESSION['perfil'] = $ctx['perfil'];
+  return $ctx;
+}
+
+// Contexto de un usuario sin sesión (lo usa también WhatsApp). null si el usuario o la licencia no existen.
+function web_contexto_usuario(int $uid, string $perfilPreferido = ''): ?array {
   nube_esquema();
   $r = db()->prepare('SELECT * FROM nube_usuarios WHERE id = ? AND activo = 1');
-  $r->execute([(int)$_SESSION['uid']]);
+  $r->execute([$uid]);
   $u = $r->fetch();
-  if (!$u) { web_salir(); return null; }
+  if (!$u) return null;
   $l = licencia_por_id((int)$u['licencia_id']);
-  if (!$l) { web_salir(); return null; }
+  if (!$l) return null;
   $perfiles = nube_perfiles_licencia($l);
-  $perfil = in_array($_SESSION['perfil'] ?? '', $perfiles, true) ? $_SESSION['perfil'] : web_perfil_por_defecto((int)$l['id'], $perfiles);
-  $_SESSION['perfil'] = $perfil;
+  $perfil = in_array($perfilPreferido, $perfiles, true) ? $perfilPreferido : web_perfil_por_defecto((int)$l['id'], $perfiles);
   $est = estado_licencia($l);
   $bloqueo = '';
   if ($est['code'] === 'SUSP') $bloqueo = 'Tu licencia está suspendida' . ($l['motivo'] ? ': ' . $l['motivo'] : '') . '. Contacta a soporte.';
@@ -269,6 +277,7 @@ const ICO = [
   'productos' => 'M3 7l9-4 9 4-9 4-9-4zM3 7v10l9 4 9-4V7M12 11v10',
   'pedidos' => 'M12 8v4l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z',
   'salir' => 'M15 17l5-5-5-5M20 12H9M12 21H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h7',
+  'whatsapp' => 'M4 20l1.4-4.2A8 8 0 1 1 8.3 18.7L4 20zM9 9.5c0 3 2.5 5.5 5.5 5.5l1-1.5-2-1-1 1a4 4 0 0 1-2-2l1-1-1-2z',
   'buscar' => 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM21 21l-4.3-4.3',
 ];
 
@@ -280,6 +289,7 @@ function web_cabecera(array $ctx, string $titulo, string $activo, string $grupo 
   $emp = $ctx['empresa'];
   $nombre = $emp['nombreComercial'] ?? '' ?: ($emp['razonSocial'] ?? $ctx['licencia']['cliente']);
   $menu = [['inicio', 'Inicio'], ['facturar', 'Facturar'], ['comprobantes', 'Comprobantes'], ['clientes', 'Clientes'], ['productos', 'Productos']];
+  if (wa_activo() && web_puede($ctx, 'facturar')) $menu[] = ['whatsapp', 'WhatsApp'];
   if (!web_puede($ctx, 'facturar')) $menu = array_values(array_filter($menu, fn($m) => $m[0] !== 'facturar'));
   $item = fn($m) => '<a href="./?v=' . $m[0] . '" class="' . ($activo === $m[0] ? 'on' : '') . '">' . icono(ICO[$m[0]]) . '<span>' . e($m[1]) . '</span></a>';
   $iniciales = mb_strtoupper(mb_substr(preg_replace('/[^\p{L}\s]/u', '', $nombre), 0, 1) . mb_substr((string)(explode(' ', trim($nombre))[1] ?? ''), 0, 1));

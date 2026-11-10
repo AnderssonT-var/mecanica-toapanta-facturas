@@ -18,6 +18,47 @@
   const rec = $('[data-recargar]');
   if (rec) setTimeout(() => { if (!document.hidden) location.reload(); else document.addEventListener('visibilitychange', () => location.reload(), { once: true }); }, Number(rec.dataset.recargar) * 1000);
 
+  // Extraer el IVA de un precio final: precio unitario sin IVA (6 decimales, como el XML) que cierra en ese total.
+  // Igual que FX.extraerIva del programa de escritorio.
+  function extraerIva(precioFinal, pct, cantidad) {
+    const r6 = (n) => Math.round(((Number(n) || 0) + Number.EPSILON) * 1e6) / 1e6;
+    const q = Number(cantidad) > 0 ? Number(cantidad) : 1;
+    const r = (Number(pct) || 0) / 100;
+    const objetivo = r2((Number(precioFinal) || 0) * q);
+    if (!(objetivo > 0)) return { unit: 0, base: 0, iva: 0, total: 0, exacto: true };
+    if (!r) return { unit: r6(objetivo / q), base: objetivo, iva: 0, total: objetivo, exacto: true };
+    const c0 = Math.round(objetivo / (1 + r) * 100);
+    let mejor = null;
+    for (const d of [0, -1, 1, -2, 2, -3, 3]) {
+      const base = (c0 + d) / 100;
+      if (base <= 0) continue;
+      const unit = r6(base / q);
+      const b = r2(r6(q) * unit);
+      const iva = r2(b * r);
+      const total = r2(b + iva);
+      const dif = Math.abs(total - objetivo);
+      if (!mejor || dif < mejor.dif - 1e-9) mejor = { unit, base: b, iva, total, dif };
+      if (dif < 0.0001) break;
+    }
+    return { unit: mejor.unit, base: mejor.base, iva: mejor.iva, total: mejor.total, exacto: mejor.dif < 0.0001 };
+  }
+
+  // Ficha de producto: precio final con IVA ⇄ precio sin IVA.
+  const fPvp = $('#pvp');
+  if (fPvp) {
+    const fPre = $('[name=precio]'), fTar = $('[name=tarifa]'), nota = $('#pvp-nota');
+    const pct = () => Number((fTar.selectedOptions[0] || {}).dataset.pct || 0);
+    const desdePrecio = () => { const b = r2(fPre.value); fPvp.value = Number(fPre.value) > 0 ? r2(b + r2(b * pct() / 100)).toFixed(2) : ''; };
+    fPvp.addEventListener('input', () => {
+      const x = extraerIva(fPvp.value, pct(), 1);
+      fPre.value = Number(fPvp.value) > 0 ? String(x.unit) : '';
+      nota.textContent = Number(fPvp.value) > 0 ? 'Sin IVA: ' + x.unit + ' · IVA: ' + x.iva.toFixed(2) + (x.exacto ? '' : ' · por el redondeo del SRI la factura saldrá con ' + x.total.toFixed(2)) : 'Escribe el precio de venta al público y se calcula el precio sin IVA.';
+    });
+    fPre.addEventListener('input', desdePrecio);
+    fTar.addEventListener('change', desdePrecio);
+    desdePrecio();
+  }
+
   // ---------- Formulario de factura ----------
   const form = $('#facturar');
   if (!form) return;
@@ -144,6 +185,7 @@
         + '<div class="l-desc"><input data-i="' + i + '" data-k="descripcion" value="' + esc(it.descripcion) + '" placeholder="Descripción" aria-label="Descripción"><small class="mono">' + esc(it.codigo || 'Línea libre') + '</small></div>'
         + '<div class="l-cant"><button type="button" data-menos="' + i + '" aria-label="Menos">−</button><input data-i="' + i + '" data-k="cantidad" type="number" min="0" step="any" inputmode="decimal" value="' + esc(it.cantidad) + '" aria-label="Cantidad"><button type="button" data-mas="' + i + '" aria-label="Más">+</button></div>'
         + '<label class="l-precio' + (Number(it.precioUnitario) > 0 ? '' : ' falta') + '"><span>$</span><input data-i="' + i + '" data-k="precioUnitario" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" value="' + esc(it.precioUnitario) + '" aria-label="Precio sin IVA"></label>'
+        + (T[it.tarifa] && T[it.tarifa].pct > 0 ? '<button type="button" class="l-coniva" data-coniva="' + i + '" title="El precio que escribiste ya incluye IVA">Incluye IVA</button>' : '<span class="l-coniva-vacio"></span>')
         + '<select data-i="' + i + '" data-k="tarifa" class="l-iva" aria-label="IVA">' + ordenT.map((k) => '<option value="' + esc(k) + '"' + (k === it.tarifa ? ' selected' : '') + '>' + esc(/^iva/i.test(T[k].label) ? T[k].label : 'IVA ' + T[k].label) + '</option>').join('') + '</select>'
         + '<b class="l-sub mono" id="sub-' + i + '">' + dinero(subtotal(it)) + '</b>'
         + '<button type="button" class="l-quitar" data-quitar="' + i + '" aria-label="Quitar">×</button></div>').join('');
@@ -166,6 +208,17 @@
   $('#lineas').addEventListener('change', (e) => { if (e.target.dataset.k === 'tarifa') pintarLineas(); });
   $('#lineas').addEventListener('click', (e) => {
     const t = e.target;
+    if (t.dataset.coniva !== undefined) {
+      const it = st.items[Number(t.dataset.coniva)];
+      const final = Number(it.precioUnitario) || 0;
+      if (!(final > 0)) { const inp = $('[data-i="' + t.dataset.coniva + '"][data-k="precioUnitario"]'); if (inp) inp.focus(); return; }
+      const x = extraerIva(final, (T[it.tarifa] || { pct: 0 }).pct, it.cantidad);
+      it.precioUnitario = String(x.unit);
+      pintarLineas();
+      const s2 = $('#sub-' + t.dataset.coniva);
+      if (s2) s2.title = 'Total de la línea con IVA: ' + dinero(x.total);
+      return;
+    }
     if (t.dataset.mas !== undefined) { const it = st.items[Number(t.dataset.mas)]; it.cantidad = String((Number(it.cantidad) || 0) + 1); pintarLineas(); }
     if (t.dataset.menos !== undefined) { const i = Number(t.dataset.menos); const n = (Number(st.items[i].cantidad) || 0) - 1; if (n <= 0) st.items.splice(i, 1); else st.items[i].cantidad = String(n); pintarLineas(); }
     if (t.dataset.quitar !== undefined) { st.items.splice(Number(t.dataset.quitar), 1); pintarLineas(); }

@@ -34,6 +34,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       fijar_ajuste('soporte_web', mb_substr($web, 0, 160));
       fijar_ajuste('soporte_horario', mb_substr(trim((string)($_POST['soporte_horario'] ?? '')), 0, 120));
       aviso('Datos de soporte guardados. Los programas los reciben en su próxima verificación de licencia.');
+    } elseif ($accion === 'whatsapp') {
+      $num = preg_replace('/\D/', '', (string)($_POST['wa_numero'] ?? ''));
+      $phone = preg_replace('/\D/', '', (string)($_POST['wa_phone_id'] ?? ''));
+      if ($num !== '' && !preg_match('/^\d{10,15}$/', $num)) throw new RuntimeException('El número de WhatsApp debe ir con código de país, por ejemplo 593991234567.');
+      fijar_ajuste('wa_numero', $num);
+      fijar_ajuste('wa_phone_id', $phone);
+      // Los secretos solo se cambian si se escribe uno nuevo (nunca se muestran).
+      if (trim((string)($_POST['wa_token'] ?? '')) !== '') fijar_ajuste('wa_token', trim((string)$_POST['wa_token']));
+      if (trim((string)($_POST['wa_app_secret'] ?? '')) !== '') fijar_ajuste('wa_app_secret', trim((string)$_POST['wa_app_secret']));
+      if (ajuste('wa_verify', '') === '' || !empty($_POST['wa_nuevo_verify'])) fijar_ajuste('wa_verify', bin2hex(random_bytes(16)));
+      registrar_evento(null, 'WA_AJUSTES', 'Ajustes de WhatsApp actualizados por ' . $admin['usuario']);
+      aviso('Ajustes de WhatsApp guardados.');
     } elseif ($accion === 'clave') {
       $r = db()->prepare('SELECT hash FROM admins WHERE id = ?');
       $r->execute([$admin['id']]);
@@ -110,6 +122,25 @@ cabecera_html('Ajustes', $admin, 'ajustes');
           <label>Horario de atención<input name="soporte_horario" maxlength="120" value="<?= e(ajuste('soporte_horario', '')) ?>" placeholder="Lun a Vie 08:00 a 18:00"></label>
         </div>
         <button class="btn btn-dark">Guardar soporte</button></form>
+    </section>
+    <section class="card"><h2>Facturar por WhatsApp (API de WhatsApp Business)</h2>
+      <p class="muted">Tus clientes registran su número en la app web › WhatsApp y facturan escribiendo a este número. Se configura con una app de Meta (WhatsApp Cloud API).</p>
+      <form method="post" class="form"><?= campo_csrf() ?><input type="hidden" name="accion" value="whatsapp">
+        <div class="g2">
+          <label>Número de WhatsApp de Facmit (con código de país)<input name="wa_numero" maxlength="20" value="<?= e(ajuste('wa_numero', '')) ?>" placeholder="593991234567"></label>
+          <label>Phone number ID (Meta)<input name="wa_phone_id" maxlength="30" value="<?= e(ajuste('wa_phone_id', '')) ?>" class="mono"></label>
+          <label>Token de acceso permanente <?= ajuste('wa_token', '') !== '' ? '<span class="badge t-g">guardado</span>' : '' ?><input type="password" name="wa_token" autocomplete="off" placeholder="<?= ajuste('wa_token', '') !== '' ? 'Déjalo vacío para mantener el actual' : 'EAAG…' ?>"></label>
+          <label>Clave secreta de la app (App secret) <?= ajuste('wa_app_secret', '') !== '' ? '<span class="badge t-g">guardada</span>' : '' ?><input type="password" name="wa_app_secret" autocomplete="off" placeholder="<?= ajuste('wa_app_secret', '') !== '' ? 'Déjalo vacío para mantener la actual' : '' ?>"></label>
+        </div>
+        <?php if (ajuste('wa_verify', '') !== ''): ?>
+        <div class="g2">
+          <label>URL de devolución de llamada (Callback URL)<input readonly class="mono" value="https://facmit.com/licencias/whatsapp.php"></label>
+          <label>Token de verificación (Verify token)<input readonly class="mono" value="<?= e(ajuste('wa_verify', '')) ?>"></label>
+        </div>
+        <span class="muted small">En Meta › WhatsApp › Configuración pega estos dos datos y suscribe el campo <b>messages</b>.</span>
+        <?php endif; ?>
+        <div class="row"><button class="btn btn-dark">Guardar WhatsApp</button><?php if (ajuste('wa_verify', '') !== ''): ?><label class="small"><input type="checkbox" name="wa_nuevo_verify" value="1"> Generar un token de verificación nuevo</label><?php endif; ?></div>
+      </form>
     </section>
     <section class="card"><h2>Administradores</h2>
       <table><thead><tr><th>Usuario</th><th>Nombre</th><th>Último acceso</th><th>Estado</th><th></th></tr></thead><tbody>

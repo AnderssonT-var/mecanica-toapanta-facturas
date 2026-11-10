@@ -154,6 +154,66 @@ function emi_factura_xml(array $e, string $fechaIso, int $secuencial, string $cl
   return implode("\n", $L);
 }
 
+// ---------- Validación de cliente e ítems (formulario web y WhatsApp) ----------
+function emi_validar_cliente(array $c): array {
+  $tipo = (string)($c['tipo'] ?? '');
+  if ($tipo === 'CF') return ['tipo' => 'CF', 'identificacion' => '9999999999999', 'nombre' => 'CONSUMIDOR FINAL', 'direccion' => '', 'telefono' => '', 'email' => ''];
+  if (!in_array($tipo, ['CEDULA', 'RUC', 'PASAPORTE'], true)) throw new WebError('Elige el tipo de identificación del cliente.');
+  $id = $tipo === 'PASAPORTE' ? strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string)($c['identificacion'] ?? ''))) : preg_replace('/\D/', '', (string)($c['identificacion'] ?? ''));
+  if ($tipo === 'CEDULA' && !validar_cedula($id)) throw new WebError('La cédula del cliente no es válida.');
+  if ($tipo === 'RUC' && !validar_ruc($id)) throw new WebError('El RUC del cliente no es válido.');
+  if ($tipo === 'PASAPORTE' && strlen($id) < 3) throw new WebError('La identificación del cliente no es válida.');
+  $nombre = mb_strtoupper(trim((string)($c['nombre'] ?? '')));
+  if ($nombre === '') throw new WebError('Falta el nombre del cliente.');
+  $email = trim((string)($c['email'] ?? ''));
+  if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) throw new WebError('El correo del cliente no es válido.');
+  return ['tipo' => $tipo, 'identificacion' => $id, 'nombre' => mb_substr($nombre, 0, 300), 'direccion' => mb_substr(trim((string)($c['direccion'] ?? '')), 0, 300),
+    'telefono' => mb_substr(trim((string)($c['telefono'] ?? '')), 0, 40), 'email' => mb_substr($email, 0, 160)];
+}
+
+function emi_validar_items(array $lista, array $tarifas): array {
+  $items = [];
+  foreach ($lista as $it) {
+    if (!is_array($it)) continue;
+    $desc = trim((string)($it['descripcion'] ?? ''));
+    $cant = (float)($it['cantidad'] ?? 0);
+    $precio = (float)($it['precioUnitario'] ?? 0);
+    $descPct = min(100, max(0, (float)($it['descuentoPct'] ?? 0)));
+    $tar = (string)($it['tarifa'] ?? '');
+    if ($desc === '' || $cant <= 0) continue;
+    if ($precio < 0) throw new WebError('Hay un precio negativo en "' . $desc . '".');
+    if (!isset($tarifas[$tar])) throw new WebError('La tarifa de IVA de "' . $desc . '" no está habilitada.');
+    $items[] = ['codigo' => mb_substr(trim((string)($it['codigo'] ?? '')), 0, 25), 'codigoAux' => mb_substr(trim((string)($it['codigoAux'] ?? '')), 0, 25), 'descripcion' => mb_substr($desc, 0, 300),
+      'cantidad' => $cant, 'precioUnitario' => $precio, 'descuentoPct' => $descPct, 'tarifa' => $tar];
+  }
+  if (!$items) throw new WebError('Agrega al menos un producto con cantidad.');
+  if (count($items) > 200) throw new WebError('Máximo 200 líneas por factura.');
+  return $items;
+}
+
+// Extraer el IVA de un precio final (igual que FX.extraerIva del programa): precio unitario sin IVA, 6 decimales.
+function emi_extraer_iva(float $precioFinal, float $pct, float $cantidad = 1): array {
+  $q = $cantidad > 0 ? $cantidad : 1;
+  $r = $pct / 100;
+  $objetivo = emi_r2($precioFinal * $q);
+  if ($objetivo <= 0) return ['unit' => 0.0, 'base' => 0.0, 'iva' => 0.0, 'total' => 0.0, 'exacto' => true];
+  if ($r == 0) return ['unit' => emi_r6($objetivo / $q), 'base' => $objetivo, 'iva' => 0.0, 'total' => $objetivo, 'exacto' => true];
+  $c0 = (int)round($objetivo / (1 + $r) * 100);
+  $mejor = null;
+  foreach ([0, -1, 1, -2, 2, -3, 3] as $d) {
+    $base = ($c0 + $d) / 100;
+    if ($base <= 0) continue;
+    $unit = emi_r6($base / $q);
+    $b = emi_r2(emi_r6($q) * $unit);
+    $iva = emi_r2($b * $r);
+    $total = emi_r2($b + $iva);
+    $dif = abs($total - $objetivo);
+    if (!$mejor || $dif < $mejor['dif'] - 1e-9) $mejor = ['unit' => $unit, 'base' => $b, 'iva' => $iva, 'total' => $total, 'dif' => $dif];
+    if ($dif < 0.0001) break;
+  }
+  return ['unit' => $mejor['unit'], 'base' => $mejor['base'], 'iva' => $mejor['iva'], 'total' => $mejor['total'], 'exacto' => $mejor['dif'] < 0.0001];
+}
+
 // ---------- Punto de emisión de la web ----------
 // La web tiene su propio establecimiento-punto (por ejemplo 001-002), apartado en nube_series como si fuera un equipo
 // más. Ningún programa puede usarlo, así los números de la web nunca chocan con los de las computadoras.
@@ -240,7 +300,7 @@ function emi_frenar(array $ctx): void {
 }
 
 // Emite la factura en la nube. $cli e $items ya vienen validados por facturar_guardar.php.
-function emi_emitir_factura(array $ctx, array $cli, array $items, string $formaPago, int $diasCredito, string $observacion): array {
+function emi_emitir_factura(array $ctx, array $cli, array $items, string $formaPago, int $diasCredito, string $observacion, string $canal = 'Web'): array {
   emi_esquema(); // antes de la transacción: en MySQL un CREATE TABLE confirma la transacción abierta
   emi_frenar($ctx);
   $e = emi_empresa($ctx);
@@ -257,7 +317,7 @@ function emi_emitir_factura(array $ctx, array $cli, array $items, string $formaP
     ['nombre' => 'Vendedor', 'valor' => ''], ['nombre' => 'Proforma', 'valor' => ''], ['nombre' => 'Observación', 'valor' => $observacion],
   ];
   if (!empty($e['proveedor']['nombre']) && !empty($e['proveedor']['valor'])) $campos[] = ['nombre' => (string)$e['proveedor']['nombre'], 'valor' => (string)$e['proveedor']['valor']];
-  $quien = 'Web · ' . (($ctx['usuario']['nombre'] ?? '') ?: $ctx['usuario']['usuario']);
+  $quien = $canal . ' · ' . (($ctx['usuario']['nombre'] ?? '') ?: $ctx['usuario']['usuario']);
   $d = db();
   $d->beginTransaction();
   try {
@@ -273,7 +333,7 @@ function emi_emitir_factura(array $ctx, array $cli, array $items, string $formaP
       'data' => [
         'cliente' => $cli, 'items' => $tot['lineas'], 'totales' => $tot, 'formaPago' => $formaPago, 'diasCredito' => $diasCredito, 'observacion' => $observacion,
         'guiaRemision' => '', 'camposAdicionales' => $campos, 'vendedor' => '', 'vendedorNombre' => '', 'proformaId' => '', 'emitidoPor' => $quien,
-        'origen' => 'WEB', 'usuarioWeb' => $ctx['usuario']['usuario'], 'adoptadoPor' => '',
+        'origen' => 'WEB', 'canal' => $canal, 'usuarioWeb' => $ctx['usuario']['usuario'], 'adoptadoPor' => '',
       ],
     ];
     nube_guardar($ctx['lic'], $ctx['perfil'], 'comprobantes', $c);

@@ -23,6 +23,17 @@ try {
     exit;
   }
 
+  // RIDE con enlace firmado (el que envía WhatsApp): se abre sin iniciar sesión y vence a los 30 días.
+  if ($v === 'ride_publico') {
+    $lic = (int)($_GET['l'] ?? 0); $perfil = preg_replace('/\D/', '', (string)($_GET['p'] ?? '')); $idDoc = (string)($_GET['id'] ?? '');
+    if (!wa_enlace_valido($lic, $perfil, $idDoc, (int)($_GET['e'] ?? 0), (string)($_GET['t'] ?? ''))) { http_response_code(403); exit('Este enlace no es válido o ya venció.'); }
+    $ctx = ['lic' => $lic, 'perfil' => $perfil, 'empresa' => nube_perfil($lic, $perfil) ?? ['ruc' => $perfil]];
+    $publico = true;
+    $_GET['id'] = $idDoc;
+    require __DIR__ . '/vistas/ride.php';
+    exit;
+  }
+
   $ctx = web_contexto();
   if (!$ctx) web_ir('v=login');
 
@@ -39,6 +50,17 @@ try {
         case 'productos': require __DIR__ . '/vistas/productos_guardar.php'; exit;
         case 'facturar': require __DIR__ . '/vistas/facturar_guardar.php'; exit;
         case 'pedido_cancelar': require __DIR__ . '/vistas/pedido_cancelar.php'; exit;
+        case 'whatsapp':
+          web_exigir($ctx, 'facturar');
+          if (($_POST['accion'] ?? '') === 'quitar') {
+            wa_esquema();
+            db()->prepare('DELETE FROM nube_wa_numeros WHERE usuario_id = ?')->execute([$ctx['usuario']['id']]);
+            web_aviso('Número quitado. Ya no puede facturar por WhatsApp.');
+          } else {
+            wa_registrar($ctx, (string)($_POST['telefono'] ?? ''));
+            web_aviso('Número registrado. Envía el código desde ese WhatsApp para confirmarlo.');
+          }
+          web_ir('v=whatsapp');
       }
       throw new WebError('Acción no válida.');
     } catch (WebError $ex) {
@@ -53,7 +75,7 @@ try {
   if ($v === 'ride') { require __DIR__ . '/vistas/ride.php'; exit; }
   if ($v === 'buscar') { require __DIR__ . '/vistas/buscar.php'; exit; }
 
-  $vistas = ['inicio', 'comprobantes', 'comprobante', 'clientes', 'productos', 'facturar', 'pedido'];
+  $vistas = ['inicio', 'comprobantes', 'comprobante', 'clientes', 'productos', 'facturar', 'pedido', 'whatsapp'];
   if (!in_array($v, $vistas, true)) $v = 'inicio';
   require __DIR__ . '/vistas/' . $v . '.php';
 } catch (WebError $ex) {
