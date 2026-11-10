@@ -4,8 +4,8 @@
 declare(strict_types=1);
 if (!defined('FX_PORTAL')) { http_response_code(403); exit; }
 
-const NUBE_TABLAS = ['clientes', 'productos', 'comprobantes', 'catalogo', 'proformas', 'pedidos', 'movimientos', 'compras', 'abonos', 'cajas', 'caja_movimientos', 'bodegas'];
-const NUBE_TABLAS_DESDE_PROGRAMA = ['clientes', 'productos', 'comprobantes', 'catalogo', 'proformas', 'pedidos', 'movimientos', 'compras', 'abonos', 'cajas', 'caja_movimientos', 'bodegas'];
+const NUBE_TABLAS = ['clientes', 'productos', 'comprobantes', 'catalogo', 'proformas', 'pedidos', 'movimientos', 'compras', 'abonos', 'cajas', 'caja_movimientos', 'bodegas', 'pagos'];
+const NUBE_TABLAS_DESDE_PROGRAMA = ['clientes', 'productos', 'comprobantes', 'catalogo', 'proformas', 'pedidos', 'movimientos', 'compras', 'abonos', 'cajas', 'caja_movimientos', 'bodegas', 'pagos'];
 const NUBE_LOTE_PULL = 1000;
 const NUBE_RESPALDOS = 10;
 
@@ -140,6 +140,7 @@ function nube_indices(string $tabla, array $r): array {
     case 'abonos': return [$fecha($r['fecha'] ?? ''), mb_substr((string)($r['tipo'] ?? ''), 0, 20), '', '', (float)($r['valor'] ?? 0), $txt($r['cliente_id'] ?? '', $r['referencia'] ?? '')];
     case 'cajas': return [$fecha($r['apertura'] ?? ''), 'CAJA', '', (string)($r['estado'] ?? ''), (float)($r['esperado'] ?? 0), $txt($r['nombre'] ?? '', $r['usuario'] ?? '')];
     case 'caja_movimientos': return [$fecha($r['fecha'] ?? ''), mb_substr((string)($r['tipo'] ?? ''), 0, 20), '', '', (float)($r['valor'] ?? 0), $txt($r['motivo'] ?? '')];
+    case 'pagos': return [$fecha($r['fecha'] ?? ''), mb_substr((string)($r['forma'] ?? ''), 0, 20), '', '', (float)($r['valor'] ?? 0), $txt($r['proveedor_id'] ?? '', $r['referencia'] ?? '')];
     case 'bodegas': return [null, 'BOD', mb_substr((string)($r['codigo'] ?? ''), 0, 20), '', 0, $txt($r['codigo'] ?? '', $r['nombre'] ?? '')];
     default: return [null, (string)($r['tipo'] ?? ''), '', '', 0, $txt($r['clave'] ?? '')];
   }

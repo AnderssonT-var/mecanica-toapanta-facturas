@@ -204,11 +204,34 @@ function pagosHtml(formaPago, total, plazo) {
     + esc(FORMAS[formaPago] || formaPago) + '</td><td class="n">' + num(total) + '</td><td class="c">' + (Number(plazo) ? 'días' : '') + '</td><td class="c">' + (Number(plazo) || '') + '</td></tr></tbody></table>';
 }
 
+// Comercio exterior: Incoterm, puertos, países y gastos internacionales.
+function exportacionHtml(e) {
+  if (!e) return '';
+  const f = (k, v) => '<div><span class="k">' + k + ':</span> ' + esc(v) + '</div>';
+  return '<div class="box cli" style="margin-top:4px"><div class="full"><b>EXPORTACIÓN</b></div>'
+    + f('Incoterm', e.incoterm + ' · ' + e.lugar) + f('Incoterm del total', e.incotermTotal || e.incoterm)
+    + f('Puerto de embarque', e.puertoEmbarque) + f('Puerto de destino', e.puertoDestino)
+    + f('País de origen / destino / adquisición', e.paisOrigen + ' / ' + e.paisDestino + ' / ' + e.paisAdquisicion)
+    + f('Flete · Seguro', num(e.flete) + ' · ' + num(e.seguro)) + f('Gastos aduaneros · Otros transporte', num(e.gastosAduaneros) + ' · ' + num(e.gastosTransporte)) + '</div>';
+}
+
+// Comprobantes reembolsados (factura o liquidación de compra por reembolso de gastos).
+function reembolsosHtml(r) {
+  if (!r || !(r.docs || []).length) return '';
+  const DOCS = sri.DOCS_REEMBOLSO || {};
+  return '<table class="det" style="margin-top:4px"><thead><tr><th colspan="7" style="text-align:left">COMPROBANTES REEMBOLSADOS</th></tr><tr><th>Proveedor</th><th style="width:12%">Identificación</th><th style="width:14%">Comprobante</th><th style="width:9%">Fecha</th><th style="width:11%">Base</th><th style="width:9%">IVA</th><th style="width:11%">Total</th></tr></thead><tbody>'
+    + r.docs.map((d) => '<tr><td>' + esc(d.proveedor.nombre) + '</td><td>' + esc(d.proveedor.identificacion) + '</td><td>' + esc((DOCS[d.codDoc] || d.codDoc) + ' ' + d.numero) + '</td><td>' + fechaEc(d.fecha)
+      + '</td><td class="n">' + num(d.impuestos.reduce((a, i) => a + i.base, 0)) + '</td><td class="n">' + num(d.impuestos.reduce((a, i) => a + i.valor, 0)) + '</td><td class="n">' + num(d.total) + '</td></tr>').join('')
+    + '<tr><td colspan="4" style="text-align:right"><b>TOTAL REEMBOLSOS</b></td><td class="n"><b>' + num(r.totalBase) + '</b></td><td class="n"><b>' + num(r.totalImpuesto) + '</b></td><td class="n"><b>' + num(r.totalComprobantes) + '</b></td></tr></tbody></table>';
+}
+
 function rideFactura(c, empresa, { logo = '', programa } = {}) {
   const d = c.data;
-  const cuerpo = encabezado(c, empresa, { logo, titulo: 'FACTURA', numero: c.numero })
+  const cuerpo = encabezado(c, empresa, { logo, titulo: d.reembolso ? 'FACTURA · REEMBOLSO DE GASTOS' : 'FACTURA', numero: c.numero })
     + compradorHtml(c, d.guiaRemision ? '<div><span class="k">Guía de Remisión:</span> ' + esc(d.guiaRemision) + '</div>' : '')
+    + exportacionHtml(d.exportacion)
     + detalleHtml(d.totales.lineas, empresa)
+    + reembolsosHtml(d.reembolso)
     + '<div class="bot"><div>' + infoAdicionalHtml(d.camposAdicionales) + pagosHtml(d.formaPago, d.totales.importeTotal, d.diasCredito) + '</div>'
     + totalesHtml(d.totales, [['PROPINA', 0]]) + '</div>';
   return documento('RIDE ' + c.numero, cuerpo, { programa });
@@ -286,6 +309,7 @@ function rideLiquidacion(c, empresa, { logo = '', programa } = {}) {
     + ((d.cliente || {}).direccion ? '<div class="full"><span class="k">Dirección:</span> ' + esc(d.cliente.direccion) + '</div>' : '') + '</div>';
   const cuerpo = encabezado(c, empresa, { logo, titulo: 'LIQUIDACIÓN DE COMPRA DE BIENES Y PRESTACIÓN DE SERVICIOS', numero: c.numero }) + prov
     + detalleHtml(d.totales.lineas, empresa)
+    + reembolsosHtml(d.reembolso)
     + '<div class="bot"><div>' + infoAdicionalHtml(d.camposAdicionales) + pagosHtml(d.formaPago, d.totales.importeTotal, d.diasCredito) + '</div>' + totalesHtml(d.totales) + '</div>';
   return documento('RIDE ' + c.numero, cuerpo, { programa });
 }
