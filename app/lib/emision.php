@@ -63,9 +63,29 @@ function emi_clave(string $fechaIso, string $codDoc, string $ruc, string $ambien
 }
 
 // ---------- XML de factura (copia de sri.construirFacturaXml, versión 1.1.0) ----------
+// Antierror de caracteres (idéntico a limpiar() de desktop/src/sri.js): el SRI solo acepta texto Latin-1.
+// Emojis, comillas tipográficas, espacios invisibles o letras de otros alfabetos se cambian o se quitan.
+const EMI_TIPOGRAFICOS = [
+  "\u{201C}" => '"', "\u{201D}" => '"', "\u{201E}" => '"', "\u{201F}" => '"', "\u{2033}" => '"',
+  "\u{2018}" => "'", "\u{2019}" => "'", "\u{201A}" => "'", "\u{201B}" => "'", "\u{2032}" => "'", "\u{2039}" => "'", "\u{203A}" => "'",
+  "\u{2010}" => '-', "\u{2011}" => '-', "\u{2012}" => '-', "\u{2013}" => '-', "\u{2014}" => '-', "\u{2015}" => '-', "\u{2212}" => '-',
+  "\u{2026}" => '...', "\u{2022}" => '-', "\u{20AC}" => 'EUR', "\u{2122}" => 'TM', "\u{00A0}" => ' ', "\u{00AD}" => '',
+  "\u{0141}" => 'L', "\u{0142}" => 'l', "\u{0110}" => 'D', "\u{0111}" => 'd', "\u{0152}" => 'OE', "\u{0153}" => 'oe'
+];
+const EMI_NO_VALIDO = '/[^\x{0020}-\x{007E}\x{00A1}-\x{00AC}\x{00AE}-\x{00FF}]/u';
+function emi_caracter_sri(string $ch): string {
+  if (isset(EMI_TIPOGRAFICOS[$ch])) return EMI_TIPOGRAFICOS[$ch];
+  if (preg_match('/^[\x{0009}-\x{000D}\x{0085}\x{1680}\x{2000}-\x{200A}\x{2028}\x{2029}\x{202F}\x{205F}\x{3000}]$/u', $ch)) return ' ';
+  $d = class_exists('Normalizer') ? (string)Normalizer::normalize($ch, Normalizer::FORM_D) : $ch;
+  return (string)preg_replace(EMI_NO_VALIDO, '', $d);
+}
+function emi_solo_validos($s): string {
+  $s = mb_scrub((string)($s ?? ''), 'UTF-8');
+  if (class_exists('Normalizer')) $s = (string)Normalizer::normalize($s, Normalizer::FORM_C);
+  return (string)preg_replace_callback(EMI_NO_VALIDO, fn($m) => emi_caracter_sri($m[0]), $s);
+}
 function emi_limpiar($s): string {
-  $s = preg_replace('/[\x{0000}-\x{0008}\x{000B}\x{000C}\x{000E}-\x{001F}]/u', '', (string)($s ?? ''));
-  return trim(preg_replace('/\r\n?|\n|\t/', ' ', (string)$s));
+  return trim((string)preg_replace('/ {2,}/', ' ', emi_solo_validos($s)));
 }
 function emi_esc($s): string { return str_replace(['&', '<', '>'], ['&amp;', '&lt;', '&gt;'], emi_limpiar($s)); }
 function emi_esc_attr($s): string { return str_replace(['&', '<', '"'], ['&amp;', '&lt;', '&quot;'], emi_limpiar($s)); }
@@ -80,7 +100,7 @@ function emi_factura_xml(array $e, string $fechaIso, int $secuencial, string $cl
   $tag('ambiente', $e['ambiente']);
   $tag('tipoEmision', '1');
   $tag('razonSocial', $e['razonSocial']);
-  if (!empty($e['nombreComercial'])) $tag('nombreComercial', $e['nombreComercial']);
+  if (emi_limpiar($e['nombreComercial'] ?? '') !== '') $tag('nombreComercial', $e['nombreComercial']);
   $tag('ruc', $e['ruc']);
   $tag('claveAcceso', $clave);
   $tag('codDoc', '01');
@@ -88,18 +108,18 @@ function emi_factura_xml(array $e, string $fechaIso, int $secuencial, string $cl
   $tag('ptoEmi', $e['ptoEmi']);
   $tag('secuencial', str_pad((string)$secuencial, 9, '0', STR_PAD_LEFT));
   $tag('dirMatriz', $e['dirMatriz']);
-  if (!empty($e['agenteRetencion'])) $tag('agenteRetencion', $e['agenteRetencion']);
+  if (emi_limpiar($e['agenteRetencion'] ?? '') !== '') $tag('agenteRetencion', $e['agenteRetencion']);
   if (isset(EMI_RIMPE[$e['regimen'] ?? ''])) $tag('contribuyenteRimpe', EMI_RIMPE[$e['regimen']]);
   $L[] = '  </infoTributaria>';
   $L[] = '  <infoFactura>';
   $tag('fechaEmision', $d . '/' . $m . '/' . $y);
   $tag('dirEstablecimiento', ($e['dirEstablecimiento'] ?? '') ?: $e['dirMatriz']);
-  if (!empty($e['contribuyenteEspecial'])) $tag('contribuyenteEspecial', $e['contribuyenteEspecial']);
+  if (emi_limpiar($e['contribuyenteEspecial'] ?? '') !== '') $tag('contribuyenteEspecial', $e['contribuyenteEspecial']);
   $tag('obligadoContabilidad', ($e['obligadoContabilidad'] ?? '') === 'SI' ? 'SI' : 'NO');
   $tag('tipoIdentificacionComprador', EMI_TIPO_ID[$cli['tipo']]);
   $tag('razonSocialComprador', $cli['nombre']);
   $tag('identificacionComprador', $cli['identificacion']);
-  if ($cli['direccion'] !== '') $tag('direccionComprador', $cli['direccion']);
+  if (emi_limpiar($cli['direccion']) !== '') $tag('direccionComprador', $cli['direccion']);
   $tag('totalSinImpuestos', emi_f2($tot['totalSinImpuestos']));
   $tag('totalDescuento', emi_f2($tot['totalDescuento']));
   $L[] = '    <totalConImpuestos>';
@@ -144,10 +164,10 @@ function emi_factura_xml(array $e, string $fechaIso, int $secuencial, string $cl
     $L[] = '    </detalle>';
   }
   $L[] = '  </detalles>';
-  $campos = array_values(array_filter($campos, fn($c) => trim((string)($c['valor'] ?? '')) !== ''));
+  $campos = array_slice(array_values(array_filter($campos, fn($c) => ($c['valor'] ?? null) !== null && emi_limpiar($c['valor']) !== '' && emi_limpiar($c['nombre'] ?? '') !== '')), 0, 15);
   if ($campos) {
     $L[] = '  <infoAdicional>';
-    foreach ($campos as $c) $L[] = '    <campoAdicional nombre="' . emi_esc_attr($c['nombre']) . '">' . emi_esc(mb_substr((string)$c['valor'], 0, 300)) . '</campoAdicional>';
+    foreach ($campos as $c) $L[] = '    <campoAdicional nombre="' . emi_esc_attr($c['nombre']) . '">' . emi_esc(mb_substr(emi_limpiar($c['valor']), 0, 300)) . '</campoAdicional>';
     $L[] = '  </infoAdicional>';
   }
   $L[] = '</factura>';
@@ -163,19 +183,22 @@ function emi_validar_cliente(array $c): array {
   if ($tipo === 'CEDULA' && !validar_cedula($id)) throw new WebError('La cédula del cliente no es válida.');
   if ($tipo === 'RUC' && !validar_ruc($id)) throw new WebError('El RUC del cliente no es válido.');
   if ($tipo === 'PASAPORTE' && strlen($id) < 3) throw new WebError('La identificación del cliente no es válida.');
-  $nombre = mb_strtoupper(trim((string)($c['nombre'] ?? '')));
+  $original = trim((string)($c['nombre'] ?? ''));
+  $nombre = emi_limpiar(mb_strtoupper($original));
+  if ($original !== '' && $nombre === '') throw new WebError('El nombre del cliente solo tiene caracteres que el SRI no acepta (emojis o símbolos). Escríbelo con letras.');
   if ($nombre === '') throw new WebError('Falta el nombre del cliente.');
-  $email = trim((string)($c['email'] ?? ''));
+  $email = preg_replace('/\s+/', '', emi_limpiar($c['email'] ?? ''));
   if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) throw new WebError('El correo del cliente no es válido.');
-  return ['tipo' => $tipo, 'identificacion' => $id, 'nombre' => mb_substr($nombre, 0, 300), 'direccion' => mb_substr(trim((string)($c['direccion'] ?? '')), 0, 300),
-    'telefono' => mb_substr(trim((string)($c['telefono'] ?? '')), 0, 40), 'email' => mb_substr($email, 0, 160)];
+  return ['tipo' => $tipo, 'identificacion' => $id, 'nombre' => mb_substr($nombre, 0, 300), 'direccion' => mb_substr(emi_limpiar($c['direccion'] ?? ''), 0, 300),
+    'telefono' => mb_substr(emi_limpiar($c['telefono'] ?? ''), 0, 40), 'email' => mb_substr($email, 0, 160)];
 }
 
 function emi_validar_items(array $lista, array $tarifas): array {
   $items = [];
   foreach ($lista as $it) {
     if (!is_array($it)) continue;
-    $desc = trim((string)($it['descripcion'] ?? ''));
+    $desc = emi_limpiar($it['descripcion'] ?? '');
+    if ($desc === '' && trim((string)($it['descripcion'] ?? '')) !== '') throw new WebError('Una descripción solo tiene caracteres que el SRI no acepta (emojis o símbolos). Escríbela con letras.');
     $cant = (float)($it['cantidad'] ?? 0);
     $precio = (float)($it['precioUnitario'] ?? 0);
     $descPct = min(100, max(0, (float)($it['descuentoPct'] ?? 0)));
@@ -183,7 +206,7 @@ function emi_validar_items(array $lista, array $tarifas): array {
     if ($desc === '' || $cant <= 0) continue;
     if ($precio < 0) throw new WebError('Hay un precio negativo en "' . $desc . '".');
     if (!isset($tarifas[$tar])) throw new WebError('La tarifa de IVA de "' . $desc . '" no está habilitada.');
-    $items[] = ['codigo' => mb_substr(trim((string)($it['codigo'] ?? '')), 0, 25), 'codigoAux' => mb_substr(trim((string)($it['codigoAux'] ?? '')), 0, 25), 'descripcion' => mb_substr($desc, 0, 300),
+    $items[] = ['codigo' => mb_substr(emi_limpiar($it['codigo'] ?? ''), 0, 25), 'codigoAux' => mb_substr(emi_limpiar($it['codigoAux'] ?? ''), 0, 25), 'descripcion' => mb_substr($desc, 0, 300),
       'cantidad' => $cant, 'precioUnitario' => $precio, 'descuentoPct' => $descPct, 'tarifa' => $tar];
   }
   if (!$items) throw new WebError('Agrega al menos un producto con cantidad.');

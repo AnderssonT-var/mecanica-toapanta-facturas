@@ -7,6 +7,33 @@
   const r2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
   const dinero = (n) => '$' + r2(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+  // Antierror al escribir: el SRI rechaza comprobantes con emojis o símbolos fuera de Latin-1 (misma regla que
+  // emi_limpiar() en lib/emision.php). Se quitan en cuanto se escriben o se pegan.
+  const TIPOGRAFICOS = { '\u201C': '"', '\u201D': '"', '\u201E': '"', '\u201F': '"', '\u2033': '"', '\u2018': "'", '\u2019': "'", '\u201A': "'", '\u201B': "'",
+    '\u2032': "'", '\u2039': "'", '\u203A': "'", '\u2010': '-', '\u2011': '-', '\u2012': '-', '\u2013': '-', '\u2014': '-', '\u2015': '-', '\u2212': '-',
+    '\u2026': '...', '\u2022': '-', '\u20AC': 'EUR', '\u2122': 'TM', '\u00A0': ' ', '\u00AD': '', '\u0141': 'L', '\u0142': 'l', '\u0110': 'D', '\u0111': 'd', '\u0152': 'OE', '\u0153': 'oe' };
+  const NO_VALIDO = /[^\u0009\u000A\u000D\u0020-\u007E\u00A1-\u00AC\u00AE-\u00FF]/gu;
+  const textoValido = (v) => String(v).normalize('NFC').replace(NO_VALIDO, (ch) => (ch in TIPOGRAFICOS ? TIPOGRAFICOS[ch]
+    : /^[\u000B\u000C\u0085\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]$/u.test(ch) ? ' ' : ch.normalize('NFD').replace(NO_VALIDO, '')));
+  const SIN_FILTRO = ['password', 'number', 'file', 'checkbox', 'radio', 'range', 'color', 'date', 'datetime-local', 'month', 'time', 'hidden'];
+  let avisoCaracter = 0;
+  document.addEventListener('input', (e) => {
+    const el = e.target;
+    if (!el || !/^(INPUT|TEXTAREA)$/.test(el.tagName) || SIN_FILTRO.includes(el.type) || el.dataset.libre !== undefined) return;
+    const v = el.value; const nuevo = textoValido(v);
+    if (nuevo === v) return;
+    let pos = null; try { pos = el.selectionStart; } catch (er) { pos = null; }
+    el.value = nuevo;
+    if (pos !== null) { const p = textoValido(v.slice(0, pos)).length; try { el.setSelectionRange(p, p); } catch (er) { /* sin cursor */ } }
+    if (Date.now() - avisoCaracter > 6000) {
+      avisoCaracter = Date.now();
+      const n = document.createElement('div');
+      n.className = 'aviso-caracter'; n.setAttribute('role', 'status');
+      n.textContent = 'Se quitó un emoji o símbolo que el SRI no acepta (evita que la factura sea rechazada).';
+      document.body.appendChild(n); setTimeout(() => n.remove(), 4500);
+    }
+  }, true);
+
   // Confirmaciones y selects que se envían solos.
   document.addEventListener('click', (e) => {
     const c = e.target.closest('[data-confirmar]');
