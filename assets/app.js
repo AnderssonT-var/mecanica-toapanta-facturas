@@ -78,3 +78,13 @@ document.querySelectorAll('table').forEach((t) => {
   });
   pintar();
 })();
+
+// Monitor: la lista de equipos se recarga sola cada minuto mientras está a la vista (sin interrumpir si escribes un filtro).
+(() => {
+  const el = document.querySelector('[data-recargar]');
+  if (!el) return;
+  const seg = Math.max(30, Number(el.dataset.recargar) || 60);
+  setInterval(() => {
+    if (document.visibilityState === 'visible' && !document.activeElement.matches('input, select, textarea')) location.reload();
+  }, seg * 1000);
+})();

@@ -3,11 +3,13 @@
 //   POST api.php?a=activar     {clave, equipo:{id,nombre,so,version}}  → token firmado
 //   POST api.php?a=verificar   {clave, equipo}                          → token renovado
 //   POST api.php?a=desactivar  {clave, equipo}                          → libera el equipo
+//   POST api.php?a=latido      {clave, equipo, estado, errores}         → monitor de usuarios y errores
 //   GET  api.php?a=salud                                                 → estado del servicio
 declare(strict_types=1);
 define('FX_PORTAL', true);
 require __DIR__ . '/lib/nucleo.php';
 require __DIR__ . '/lib/licencias.php';
+require __DIR__ . '/lib/monitor.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
@@ -31,7 +33,7 @@ try {
   $r->execute([$ip, date('Y-m-d H:i:s', time() - 600)]);
   if ((int)$r->fetchColumn() >= 20) responder(429, ['ok' => false, 'codigo' => 'LIMITE', 'error' => 'Demasiados intentos. Espera unos minutos.']);
 
-  $raw = file_get_contents('php://input', false, null, 0, 16384);
+  $raw = file_get_contents('php://input', false, null, 0, $accion === 'latido' ? 262144 : 16384);
   $in = json_decode((string)$raw, true);
   if (!is_array($in)) responder(400, ['ok' => false, 'codigo' => 'JSON', 'error' => 'Solicitud inválida.']);
   $clave = (string)($in['clave'] ?? '');
@@ -41,6 +43,7 @@ try {
     case 'activar': responder(200, api_activar($clave, $equipo));
     case 'verificar': responder(200, api_verificar($clave, $equipo));
     case 'desactivar': responder(200, api_desactivar($clave, $equipo));
+    case 'latido': responder(200, api_latido($clave, $equipo, $in));
     default: responder(404, ['ok' => false, 'codigo' => 'ACCION', 'error' => 'Acción desconocida.']);
   }
 } catch (ErrorLicencia $ex) {

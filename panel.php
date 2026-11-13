@@ -3,6 +3,7 @@ declare(strict_types=1);
 define('FX_PORTAL', true);
 require __DIR__ . '/lib/nucleo.php';
 require __DIR__ . '/lib/licencias.php';
+require __DIR__ . '/lib/monitor.php';
 $admin = exigir_admin();
 $d = db();
 $hoy = hoy();
@@ -23,9 +24,11 @@ foreach ($q("SELECT plan, funciones FROM licencias WHERE estado = 'ACTIVA' AND v
 $proximas = $q("SELECT * FROM licencias WHERE estado = 'ACTIVA' AND vence <= ? ORDER BY vence LIMIT 12", [$en7])->fetchAll();
 $actividad = $q('SELECT e.*, l.cliente FROM eventos e LEFT JOIN licencias l ON l.id = e.licencia_id ORDER BY e.id DESC LIMIT 12')->fetchAll();
 
+$mon = mon_resumen();
 cabecera_html('Panel', $admin, 'panel');
 ?>
 <div class="head"><div><span class="crumb">Resumen</span><h1>Panel</h1></div><a class="btn btn-accent" href="licencia.php">+ Nueva licencia</a></div>
+<a class="aviso aviso-link <?= $mon['erroresNuevos'] ? 't-r' : 't-g' ?>" href="monitor.php<?= $mon['erroresNuevos'] ? '?t=errores' : '' ?>"><?= $mon['enLinea'] ?> equipo(s) en línea ahora · <?= $mon['erroresNuevos'] ? $mon['erroresNuevos'] . ' error(es) nuevo(s) por revisar →' : 'sin errores nuevos' ?></a>
 <section class="kpis">
   <div class="kpi"><span>Licencias activas</span><b><?= $activas ?></b><small>de <?= $total ?> registradas</small></div>
   <div class="kpi"><span>Por vencer (7 días)</span><b class="<?= $porVencer ? 'c-a' : '' ?>"><?= $porVencer ?></b><small>renovar pronto</small></div>

@@ -168,3 +168,22 @@ label.fun:has(input:checked) { border-color: var(--navy); background: #F7FBEA; }
 .legal .legal-meta { color: var(--muted, #4A5260); font-size: 13px; margin: 0 0 14px; }
 .legal-links { text-align: center; font-size: 12.5px; margin-top: 14px; }
 .legal-links a { color: inherit; margin: 0 6px; }
+
+/* ---------- Monitor ---------- */
+.tabs-m { display: inline-flex; gap: 4px; padding: 4px; border-radius: 12px; background: rgba(15, 27, 45, .06); }
+.tabs-m a { padding: 8px 16px; border-radius: 9px; font-weight: 700; font-size: 14px; color: inherit; text-decoration: none; }
+.tabs-m a.on { background: #fff; box-shadow: 0 1px 2px rgba(15, 27, 45, .12); }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chips .badge { text-transform: none; letter-spacing: 0; font-weight: 700; }
+.punto-m { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+.p-on { background: #16a34a; box-shadow: 0 0 0 3px rgba(22, 163, 74, .18); } .p-hoy { background: #94a3b8; } .p-off { background: #cbd5e1; } .p-mal { background: var(--r); }
+pre.det { white-space: pre-wrap; word-break: break-word; background: #0f1b2d; color: #e2e8f0; padding: 14px 16px; border-radius: 12px; font-size: 12.5px; line-height: 1.5; max-height: 360px; overflow: auto; margin: 0; }
+.fila-alerta td:first-child { box-shadow: inset 3px 0 0 var(--r); }
+form.en-linea { display: inline; }
+.acciones-m { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.auto-hint { margin-left: auto; align-self: center; }
+.mt8 { margin-top: 8px; }
+.kpi b.kpi-fecha { font-size: 18px; }
+.ctx-k { width: 200px; color: var(--muted); }
+.nowrap { white-space: nowrap; }
+.aviso-link { display: block; text-decoration: none; }
