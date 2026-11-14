@@ -5,3 +5,4 @@ nube/datos/*
 actualizaciones/*.exe
 actualizaciones/*.blockmap
 actualizaciones/latest.yml
+descargas/*.exe

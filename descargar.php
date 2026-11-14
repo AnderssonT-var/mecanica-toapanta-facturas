@@ -1,10 +1,21 @@
 <?php
-// Botón «Descargar para Windows» de facmit.com: lleva siempre al instalador de la versión publicada en Versiones
-// (el mismo que reciben los programas como actualización). Si aún no hay ninguno, lo explica en vez de dar un error.
+// Botón «Descargar para Windows» de facmit.com. Primero busca en descargas/ el instalador más nuevo (se sube con cada
+// cambio, para que quien instala por primera vez tenga siempre lo último); si no hay, usa el publicado en Versiones.
+// Así la página siempre ofrece lo último sin forzar la actualización automática de los clientes.
 declare(strict_types=1);
 define('FX_PORTAL', true);
 require __DIR__ . '/lib/nucleo.php';
 
+$mejor = '';
+foreach (glob(__DIR__ . '/descargas/Facmit-Setup-*.exe') ?: [] as $f) {
+  if (!preg_match('/Facmit-Setup-(\d+\.\d+\.\d+)\.exe$/', $f, $mv)) continue;
+  if ($mejor === '' || version_compare($mv[1], $mejor[1], '>')) $mejor = [basename($f), $mv[1]];
+}
+if ($mejor) {
+  header('Cache-Control: no-store');
+  header('Location: descargas/' . rawurlencode($mejor[0]), true, 302);
+  exit;
+}
 $yml = __DIR__ . '/actualizaciones/latest.yml';
 $texto = is_file($yml) ? (string)file_get_contents($yml) : '';
 $archivo = preg_match('/^path:\s*[\'"]?([A-Za-z0-9._-]+\.exe)/m', $texto, $m) ? $m[1] : '';

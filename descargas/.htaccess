@@ -1,0 +1,7 @@
+# Instaladores para el botón «Descargar» de facmit.com. Sin listado de carpeta.
+Options -Indexes
+<IfModule mod_headers.c>
+  <FilesMatch "\.exe$">
+    Header set Content-Disposition attachment
+  </FilesMatch>
+</IfModule>
