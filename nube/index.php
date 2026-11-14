@@ -5,6 +5,7 @@
 //   GET  api/sync/pull?desde=N         baja cambios (de la web u otros equipos) desde la revisión N
 //   PUT  api/backup                    sube el respaldo completo (.db) del perfil
 //   GET  api/backup/latest             descarga el último respaldo
+//   GET  api/backup/info               fecha y tamaño del último respaldo (sin descargarlo)
 //   POST api/series/reservar {series}  aparta los puntos de emisión (001-001) para este equipo
 //   POST api/pedidos/tomar {id}        (versión anterior) reserva un pedido de factura hecho en la web
 //   POST api/web/tomar {id}            reserva una factura emitida en la web para firmarla y enviarla desde este equipo
@@ -83,6 +84,12 @@ try {
       if ($bytes > 400 * 1024 * 1024) throw new ErrorNube(413, 'El respaldo es demasiado grande.');
       salir(200, ['ok' => true] + nube_guardar_respaldo($lic, $perfil, $tmp));
     } finally { @unlink($tmp); }
+  }
+  if ($ruta === 'backup/info' && $metodo === 'GET') {
+    // Para «Restaurar desde la nube» en una computadora nueva: fecha y tamaño del último respaldo, sin descargarlo.
+    $f = nube_ultimo_respaldo($lic, $perfil);
+    if (!$f) salir(200, ['ok' => true, 'existe' => false]);
+    salir(200, ['ok' => true, 'existe' => true, 'archivo' => basename($f), 'fecha' => gmdate('Y-m-d\TH:i:s\Z', filemtime($f)), 'bytes' => filesize($f)]);
   }
   if ($ruta === 'backup/latest' && $metodo === 'GET') {
     $f = nube_ultimo_respaldo($lic, $perfil);
