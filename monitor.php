@@ -65,6 +65,8 @@ cabecera_html('Monitor', $admin, 'monitor');
       foreach (array_slice(array_intersect($mias, $osr), 0, 2) as $c) $al[] = ['Misma serie ' . substr($c, 3) . ' que ' . $onom, 't-r'];
     }
     $dx = json_decode((string)$x['datos'], true) ?: [];
+    if (isset($dx['relojDesfaseMin']) && abs((int)$dx['relojDesfaseMin']) > 10) $al[] = ['Reloj desfasado ' . (abs((int)$dx['relojDesfaseMin']) >= 120 ? round(abs((int)$dx['relojDesfaseMin']) / 60) . ' h' : abs((int)$dx['relojDesfaseMin']) . ' min'), 't-a'];
+    if (isset($dx['zonaAplicada']) && !$dx['zonaAplicada']) $al[] = ['Zona horaria de Ecuador no aplicada', 't-r'];
     if ((int)($dx['correoFallidos7d'] ?? 0) > 0) $al[] = [(int)$dx['correoFallidos7d'] . ' correo(s) sin enviar en 7 días: revisar su configuración de correo', 't-a'];
     if ((int)$x['errores_cola'] > 0) $al[] = [(int)$x['errores_cola'] . ' error(es) sin enviar', 't-n'];
     if ($enLinea) $k['enLinea']++;

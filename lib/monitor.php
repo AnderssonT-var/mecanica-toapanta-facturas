@@ -50,7 +50,7 @@ function api_latido(string $clave, array $equipo, array $in): array {
   db()->prepare('UPDATE equipos SET ultimo_contacto = ?, version = ?, so = ?, ip = ? WHERE id = ?')->execute([$ahora, $eq['version'] ?: $e['version'], $eq['so'] ?: $e['so'], ip_cliente(), $e['id']]);
   $firma = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($s['firmaVence'] ?? '')) ? $s['firmaVence'] : null;
   $disco = isset($s['discoLibreGB']) && is_numeric($s['discoLibreGB']) ? round((float)$s['discoLibreGB'], 1) : null;
-  $extra = array_intersect_key($s, array_flip(['so', 'arquitectura', 'ramGB', 'perfiles', 'modo', 'licencia', 'nubeActiva', 'nubeUltimoOk', 'nubePendientes', 'ultimoComprobante', 'minutosInactivo', 'idioma', 'pantalla', 'diagnosticos', 'correoFallidos7d']));
+  $extra = array_intersect_key($s, array_flip(['so', 'arquitectura', 'ramGB', 'perfiles', 'modo', 'licencia', 'nubeActiva', 'nubeUltimoOk', 'nubePendientes', 'ultimoComprobante', 'minutosInactivo', 'idioma', 'pantalla', 'diagnosticos', 'correoFallidos7d', 'relojDesfaseMin', 'zonaHoraria', 'zonaAplicada']));
   $series = mon_series($s['series'] ?? []);
   if ($series) $extra['series'] = $series;
   $fila = [

@@ -17,6 +17,8 @@ header('X-Content-Type-Options: nosniff');
 
 function responder(int $status, array $cuerpo): void {
   http_response_code($status);
+  // Hora exacta del servidor (milisegundos UTC): el programa la usa para revisar el reloj del equipo.
+  $cuerpo['ahoraMs'] = (int)round(microtime(true) * 1000);
   echo json_encode($cuerpo, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
   exit;
 }
