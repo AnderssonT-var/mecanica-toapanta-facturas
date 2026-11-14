@@ -187,3 +187,22 @@ form.en-linea { display: inline; }
 .ctx-k { width: 200px; color: var(--muted); }
 .nowrap { white-space: nowrap; }
 .aviso-link { display: block; text-decoration: none; }
+
+/* ---------- Parches y antifallos ---------- */
+.t-b { background: #E3ECFB; color: #1D4ED8; }
+.parches { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
+.parche { border: 1px solid var(--line, rgba(15, 27, 45, .1)); border-radius: 14px; padding: 16px 18px; background: #fff; scroll-margin-top: 90px; }
+.parche:target { box-shadow: 0 0 0 3px rgba(190, 242, 100, .7); }
+.parche header { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.parche-cod { font-weight: 700; font-size: 13px; margin-right: 2px; }
+.parche-ver { margin-left: auto; }
+.parche h3 { margin: 10px 0 8px; font-size: 16px; }
+.parche-cuerpo { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.parche-cuerpo p { margin: 4px 0 0; font-size: 14px; line-height: 1.55; }
+.parche footer { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line, rgba(15, 27, 45, .08)); }
+.parche-autor { margin-left: auto; }
+.form-parche { display: flex; flex-direction: column; gap: 12px; }
+.form-parche label { display: flex; flex-direction: column; gap: 4px; font-weight: 600; font-size: 13px; }
+.form-parche textarea { font: inherit; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line, rgba(15, 27, 45, .15)); resize: vertical; }
+.grid-parche { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
+@media (max-width: 760px) { .parche-cuerpo { grid-template-columns: 1fr; } .parche-ver, .parche-autor { margin-left: 0; } }

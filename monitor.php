@@ -40,12 +40,17 @@ cabecera_html('Monitor', $admin, 'monitor');
   $f = (string)($_GET['f'] ?? '');
   $k = ['enLinea' => 0, 'usando' => 0, 'hoy' => 0, 'alertas' => 0, 'viejos' => 0, 'pruebas' => 0, 'sinConexion' => 0];
   $vistas = [];
+  // Antifallo: equipos con el mismo RUC usando el mismo punto de emisión (repetirán números).
+  $porRuc = [];
+  foreach ($filas as $x) { $sr = (json_decode((string)$x['datos'], true) ?: [])['series'] ?? []; if ($x['perfil_ruc'] && $sr && mon_minutos($x['actualizado']) < 30 * 1440) $porRuc[$x['perfil_ruc']][] = [$x['id'], $sr, $x['nombre'] ?: 'Equipo']; }
   foreach ($filas as $x) {
-    $min = mon_minutos($x['actualizado'] ?: $x['ultimo_contacto']);
+    // El contacto más reciente: el latido del monitor o la verificación de licencia (que sigue aunque apaguen el diagnóstico).
+    $min = mon_minutos(max((string)$x['actualizado'], (string)$x['ultimo_contacto']) ?: null);
     $enLinea = $x['actualizado'] && mon_minutos($x['actualizado']) <= MON_EN_LINEA_MIN;
     $version = $x['version'] ?: $x['version_equipo'];
     $al = [];
     if (!$x['actualizado']) $al[] = ['Sin monitor (versión antigua)', 't-n'];
+    elseif ($x['ultimo_contacto'] && strtotime((string)$x['ultimo_contacto']) > strtotime((string)$x['actualizado']) + 3600) $al[] = ['Diagnóstico apagado por el cliente', 't-n'];
     if ($x['ambiente'] === '1') $al[] = ['En ambiente de PRUEBAS', 't-a'];
     if ((int)$x['rechazados'] > 0) $al[] = [(int)$x['rechazados'] . ' rechazado(s) en 7 días', 't-r'];
     if ((int)$x['pendientes'] > 0) $al[] = [(int)$x['pendientes'] . ' pendiente(s) en el SRI', (int)$x['pendientes'] > 10 ? 't-r' : 't-a'];
@@ -54,6 +59,13 @@ cabecera_html('Monitor', $admin, 'monitor');
     if ($x['disco_gb'] !== null && (float)$x['disco_gb'] < 2) $al[] = ['Disco casi lleno (' . $x['disco_gb'] . ' GB)', 't-r'];
     if ($pub && $version && version_compare($version, $pub, '<')) { $al[] = ['Versión ' . $version . ' (hay ' . $pub . ')', 't-a']; $k['viejos']++; }
     if ($min !== null && $min >= 10 * 1440) { $al[] = ['Sin conectarse ' . floor($min / 1440) . ' días: a los 15 se bloquea', $min >= 15 * 1440 ? 't-r' : 't-a']; $k['sinConexion']++; }
+    foreach ($porRuc[$x['perfil_ruc']] ?? [] as [$oid, $osr, $onom]) {
+      if ($oid === $x['id']) continue;
+      $mias = (json_decode((string)$x['datos'], true) ?: [])['series'] ?? [];
+      foreach (array_slice(array_intersect($mias, $osr), 0, 2) as $c) $al[] = ['Misma serie ' . substr($c, 3) . ' que ' . $onom, 't-r'];
+    }
+    $dx = json_decode((string)$x['datos'], true) ?: [];
+    if ((int)($dx['correoFallidos7d'] ?? 0) > 0) $al[] = [(int)$dx['correoFallidos7d'] . ' correo(s) sin enviar en 7 días: revisar su configuración de correo', 't-a'];
     if ((int)$x['errores_cola'] > 0) $al[] = [(int)$x['errores_cola'] . ' error(es) sin enviar', 't-n'];
     if ($enLinea) $k['enLinea']++;
     if ($enLinea && (int)$x['en_uso']) $k['usando']++;

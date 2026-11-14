@@ -1,0 +1,156 @@
+<?php
+// Registro de parches y antifallos: constancia de cada corrección (algo que falló) y cada antifallo (protección
+// para que algo no falle) aplicado al programa y al portal. Los que vienen con cada versión se cargan solos al
+// desplegar (por código, sin duplicar); los que escribas a mano en el panel quedan igual en la tabla.
+declare(strict_types=1);
+if (!defined('FX_PORTAL')) { http_response_code(404); exit; }
+
+const PAR_TIPOS = ['ANTIFALLO' => 'Antifallo', 'PARCHE' => 'Parche', 'MEJORA' => 'Mejora'];
+const PAR_ESTADOS = ['PLANEADO' => 'Planeado', 'APLICADO' => 'Aplicado (sin publicar)', 'PUBLICADO' => 'Publicado'];
+const PAR_RIESGOS = ['ALTO' => 'Alto', 'MEDIO' => 'Medio', 'BAJO' => 'Bajo'];
+const PAR_AREAS = ['SRI' => 'SRI y comprobantes', 'NUMERACION' => 'Numeración', 'DINERO' => 'Pagos y cobros', 'LICENCIA' => 'Licencia y reloj', 'FIRMA' => 'Firma electrónica',
+  'DATOS' => 'Base de datos y equipo', 'CORREO' => 'Correo', 'PANTALLA' => 'Pantallas', 'INSTALADOR' => 'Instalador', 'PORTAL' => 'Portal', 'MONITOR' => 'Monitor'];
+
+// Historial: lo que ya se aplicó y lo que viene en esta versión. Cada despliegue agrega solo los códigos nuevos.
+function par_semilla(): array {
+  return [
+    ['AF-001', 'ANTIFALLO', 'SRI', 'ALTO', '0.13.1', '', 'APLICADO', '2026-11-09', 'Bloqueo de emojis y caracteres que el SRI no acepta',
+      'Un emoji o un carácter raro (por ejemplo «pag👆s») hacía inválido el XML y el SRI devolvía el comprobante.',
+      'Las pantallas no dejan escribir esos caracteres y, antes de firmar, el XML se limpia: comillas tipográficas, guiones largos y letras con signos raros se cambian por su equivalente aceptado.'],
+    ['AF-002', 'ANTIFALLO', 'SRI', 'ALTO', '0.13.1', '', 'APLICADO', '2026-11-09', 'Revisión previa antes de enviar al SRI',
+      'Errores de datos (clave de acceso, RUC, número, fecha futura, total) se descubrían recién con el rechazo del SRI.',
+      'Antes de enviar se revisa la clave de acceso (dígito verificador), tipo de documento, RUC, numeración, fecha y totales; si algo está mal se avisa en la pantalla con la explicación del código del SRI.'],
+    ['AF-003', 'ANTIFALLO', 'SRI', 'MEDIO', '0.13.1', '1.6.0', 'APLICADO', '2026-11-09', 'Reparación automática de XML ya generados',
+      'Comprobantes pendientes creados antes del antierror podían llevar caracteres inválidos.',
+      'Al reintentar, el XML se repara (misma limpieza) antes de volver a firmarlo. La versión web aplica la misma regla.'],
+    ['AF-014', 'ANTIFALLO', 'SRI', 'MEDIO', '', '', 'APLICADO', '2026-11-04', 'Recuperar la autorización ante «secuencial registrado»',
+      'Si la respuesta del SRI no llegaba (internet caído justo al enviar), el reintento daba «secuencial registrado» aunque el comprobante sí estaba autorizado.',
+      'Facmit consulta la autorización con la clave de acceso y comprueba que sea el mismo comprobante antes de darlo por autorizado.'],
+    ['PA-001', 'PARCHE', 'INSTALADOR', 'BAJO', '0.13.2', '', 'APLICADO', '2026-11-10', 'Icono del programa y del instalador',
+      'El instalador y el programa instalado aparecían sin el logo de Facmit.',
+      'Se incluyó el icono en todos los tamaños (16 a 256) en el instalador, la ventana y la bandeja.'],
+    ['AF-004', 'ANTIFALLO', 'DATOS', 'MEDIO', '0.14.0', '', 'APLICADO', '2026-11-10', 'Guardados dentro de guardados sin romper la base',
+      'Registrar un pago a varios documentos a la vez abría una transacción dentro de otra y fallaba.',
+      'Las transacciones ahora se pueden anidar (puntos de guardado): si algo falla, se deshace todo junto y no queda a medias.'],
+    ['AF-005', 'ANTIFALLO', 'INSTALADOR', 'MEDIO', '', '', 'APLICADO', '2026-11-13', 'El instalador no corre en Windows 7, 8 ni 32 bits',
+      'En Windows antiguos el programa se instalaba y no abría.',
+      'El instalador revisa la versión de Windows y explica que se necesita Windows 10 u 11 de 64 bits. (Protección que ya existía; se registra para tener constancia.)'],
+    ['AF-006', 'ANTIFALLO', 'NUMERACION', 'ALTO', '', '', 'APLICADO', '2026-11-13', 'No se puede bajar la numeración por debajo de lo emitido',
+      'Poner un «último número» menor al ya emitido repetía facturas.',
+      'Documentos y secuencias y los puntos de los socios rechazan un secuencial menor al último emitido en el programa. (Protección que ya existía; se registra para tener constancia.)'],
+    ['AF-007', 'ANTIFALLO', 'MONITOR', 'ALTO', '0.15.0', '1.8.0', 'APLICADO', '2026-11-13', 'Monitor de usuarios y de errores',
+      'Los problemas se conocían solo cuando el cliente llamaba.',
+      'Cada equipo informa su estado cada 5 minutos y los errores técnicos (limpios, sin datos de clientes). El panel Monitor los agrupa y avisa los que reaparecen.'],
+    ['PA-002', 'PARCHE', 'DINERO', 'ALTO', '0.15.1', '', 'APLICADO', '2026-11-13', 'Facturación masiva: montos con coma decimal',
+      'Al pegar desde Excel «25,50» se leía 25, «1.234,56» se leía 1.234 y «1,234.56» se leía 1. Las facturas salían con montos equivocados sin ningún aviso.',
+      'Se reconoce el formato ecuatoriano y el estadounidense; si el monto es ambiguo («1,234») la fila queda en error para que la corrijan, nunca se adivina. El campo acepta coma.'],
+    ['PA-003', 'PARCHE', 'MONITOR', 'BAJO', '', '1.8.1', 'APLICADO', '2026-11-13', 'Monitor: equipos con diagnóstico apagado no salen como desconectados',
+      'Si el cliente apagaba el diagnóstico, el panel avisaba «sin conectarse, a los 15 días se bloquea» aunque su licencia se verificaba bien.',
+      'Se toma el contacto más reciente (monitor o verificación de licencia) y se indica «Diagnóstico apagado por el cliente».'],
+    ['AF-008', 'ANTIFALLO', 'NUMERACION', 'ALTO', '0.15.1', '1.8.1', 'APLICADO', '2026-11-13', 'Aviso de misma serie en dos equipos',
+      'Dos cajas del mismo RUC con el mismo punto de emisión sacan los mismos números; el SRI rechaza uno («secuencial registrado»), sobre todo si trabajan sin internet.',
+      'Cada equipo informa qué puntos de emisión usa. Si otro equipo del mismo RUC usa el mismo, los dos ven un aviso rojo con el botón para cambiarlo, y en el Monitor aparece «Misma serie».'],
+    ['AF-009', 'ANTIFALLO', 'NUMERACION', 'MEDIO', '0.15.1', '', 'APLICADO', '2026-11-13', 'La numeración avanza sola tras «secuencial registrado»',
+      'Después de ese rechazo, la siguiente factura podía volver a chocar con el mismo número.',
+      'Cuando el SRI dice que el número ya existe, la serie se adelanta a ese número para que la próxima no lo repita.'],
+    ['AF-010', 'ANTIFALLO', 'LICENCIA', 'ALTO', '0.15.1', '', 'APLICADO', '2026-11-13', 'Reloj de Windows equivocado',
+      'Si el reloj estuvo adelantado (por ejemplo, un año) y luego se corregía, el programa quedaba bloqueado como «fecha incorrecta» hasta llegar a esa fecha. Con la fecha mal, el SRI además rechaza.',
+      'Al verificar la licencia se toma la fecha real del servidor: si la del equipo coincide, se desbloquea solo; si no, el mensaje dice qué fecha tiene el equipo, cuál es la real y cómo corregirla, con el botón «Verificar ahora» en el aviso.'],
+    ['AF-011', 'ANTIFALLO', 'DINERO', 'MEDIO', '0.15.1', '', 'APLICADO', '2026-11-13', 'Pago o cobro registrado dos veces seguidas',
+      'Un doble clic o el «no sé si se guardó» dejaba el mismo pago a proveedor o cobro a cliente registrado dos veces.',
+      'Si el mismo valor, documento y referencia se registró hace menos de 3 minutos, se avisa en lugar de guardarlo otra vez.'],
+    ['AF-012', 'ANTIFALLO', 'DATOS', 'MEDIO', '0.15.1', '', 'APLICADO', '2026-11-13', 'Carpeta de datos en OneDrive/Dropbox y disco casi lleno',
+      'OneDrive y Dropbox bloquean la base mientras sincronizan; sin espacio en disco la base puede dañarse al guardar.',
+      'El programa revisa dónde están sus datos y el espacio libre, y muestra un aviso con qué hacer.'],
+    ['AF-013', 'ANTIFALLO', 'CORREO', 'BAJO', '0.15.1', '1.8.1', 'APLICADO', '2026-11-13', 'Correo mal configurado separado de los errores del programa',
+      'Una contraseña de correo mal puesta llenaba el monitor de «errores» que no eran del programa.',
+      'Los fallos de usuario o contraseña del correo ya no cuentan como error; en Usuarios aparece «correos sin enviar: revisar su configuración».'],
+    ['PL-001', 'ANTIFALLO', 'FIRMA', 'MEDIO', '', '', 'PLANEADO', '2026-11-13', 'Firma vencida con comprobantes ya firmados en cola',
+      'Si la firma vence o se cambia mientras hay comprobantes firmados sin enviar, el SRI podría rechazarlos por firma no vigente.',
+      'Antes de reenviar un pendiente, revisar la vigencia del certificado con que se firmó y volver a firmarlo con la firma actual.'],
+    ['PL-002', 'MEJORA', 'PANTALLA', 'BAJO', '', '', 'PLANEADO', '2026-11-13', 'Revisión en pantallas pequeñas (1366×768)',
+      'Las pantallas nuevas (Masiva, Pagar, Reembolsos) no se han probado en laptops pequeñas.',
+      'Revisar cada pantalla a 1366×768; las tablas ya se desplazan de lado, falta confirmar formularios y botones.'],
+  ];
+}
+
+function par_esquema(): void {
+  static $listo = false;
+  if ($listo) return;
+  $pdo = db();
+  $sqlite = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite';
+  $ai = $sqlite ? 'INTEGER PRIMARY KEY AUTOINCREMENT' : 'INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY';
+  $fin = $sqlite ? '' : ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci';
+  $pdo->exec("CREATE TABLE IF NOT EXISTS parches (
+    id $ai, codigo VARCHAR(20) NOT NULL UNIQUE, tipo VARCHAR(12) NOT NULL, area VARCHAR(20) NOT NULL, riesgo VARCHAR(8) NOT NULL DEFAULT 'MEDIO',
+    version_programa VARCHAR(20) NOT NULL DEFAULT '', version_portal VARCHAR(20) NOT NULL DEFAULT '', estado VARCHAR(12) NOT NULL DEFAULT 'PLANEADO',
+    fecha DATE NOT NULL, titulo VARCHAR(200) NOT NULL, problema TEXT NOT NULL, solucion TEXT NOT NULL, autor VARCHAR(60) NOT NULL DEFAULT 'Sistema',
+    creado DATETIME NOT NULL, actualizado DATETIME NOT NULL)$fin");
+  $existe = $pdo->prepare('SELECT 1 FROM parches WHERE codigo = ?');
+  $ins = $pdo->prepare('INSERT INTO parches (codigo, tipo, area, riesgo, version_programa, version_portal, estado, fecha, titulo, problema, solucion, autor, creado, actualizado) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+  foreach (par_semilla() as $p) {
+    $existe->execute([$p[0]]);
+    if ($existe->fetchColumn()) continue;
+    $ins->execute([...$p, 'Sistema', ahora(), ahora()]);
+  }
+  $listo = true;
+}
+
+function par_lista(array $f = []): array {
+  $w = []; $a = [];
+  foreach (['tipo', 'estado', 'area', 'riesgo'] as $k) if (!empty($f[$k])) { $w[] = "$k = ?"; $a[] = $f[$k]; }
+  if (!empty($f['q'])) { $w[] = '(titulo LIKE ? OR problema LIKE ? OR solucion LIKE ? OR codigo LIKE ?)'; $q = '%' . $f['q'] . '%'; array_push($a, $q, $q, $q, $q); }
+  $sql = 'SELECT * FROM parches' . ($w ? ' WHERE ' . implode(' AND ', $w) : '')
+    . " ORDER BY CASE estado WHEN 'PLANEADO' THEN 0 WHEN 'APLICADO' THEN 1 ELSE 2 END, fecha DESC, codigo DESC";
+  $r = db()->prepare($sql);
+  $r->execute($a);
+  return $r->fetchAll();
+}
+
+function par_obtener(int $id): ?array {
+  $r = db()->prepare('SELECT * FROM parches WHERE id = ?');
+  $r->execute([$id]);
+  return $r->fetch() ?: null;
+}
+
+// Código siguiente para registros manuales: AF-014, PA-004, ME-001…
+function par_codigo_nuevo(string $tipo): string {
+  $pre = ['ANTIFALLO' => 'AF', 'PARCHE' => 'PA', 'MEJORA' => 'ME'][$tipo] ?? 'AF';
+  $max = 0;
+  foreach (db()->query("SELECT codigo FROM parches WHERE codigo LIKE '$pre-%'")->fetchAll(PDO::FETCH_COLUMN) as $c) $max = max($max, (int)substr((string)$c, 3));
+  return sprintf('%s-%03d', $pre, $max + 1);
+}
+
+function par_guardar(array $d, string $autor): int {
+  $tipo = array_key_exists($d['tipo'] ?? '', PAR_TIPOS) ? $d['tipo'] : 'ANTIFALLO';
+  $area = array_key_exists($d['area'] ?? '', PAR_AREAS) ? $d['area'] : 'SRI';
+  $riesgo = array_key_exists($d['riesgo'] ?? '', PAR_RIESGOS) ? $d['riesgo'] : 'MEDIO';
+  $estado = array_key_exists($d['estado'] ?? '', PAR_ESTADOS) ? $d['estado'] : 'PLANEADO';
+  $titulo = mb_substr(trim((string)($d['titulo'] ?? '')), 0, 200);
+  $problema = mb_substr(trim((string)($d['problema'] ?? '')), 0, 4000);
+  $solucion = mb_substr(trim((string)($d['solucion'] ?? '')), 0, 4000);
+  if (mb_strlen($titulo) < 4) throw new RuntimeException('Escribe un título.');
+  if (mb_strlen($problema) < 4) throw new RuntimeException('Describe qué falla o qué podría fallar.');
+  if (mb_strlen($solucion) < 4) throw new RuntimeException('Describe la solución (o el plan, si está planeado).');
+  $ver = fn($v) => preg_match('/^\d+\.\d+\.\d+$/', trim((string)$v)) ? trim((string)$v) : '';
+  $fecha = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($d['fecha'] ?? '')) ? $d['fecha'] : date('Y-m-d');
+  $vals = [$tipo, $area, $riesgo, $ver($d['version_programa'] ?? ''), $ver($d['version_portal'] ?? ''), $estado, $fecha, $titulo, $problema, $solucion];
+  $id = (int)($d['id'] ?? 0);
+  if ($id && par_obtener($id)) {
+    db()->prepare('UPDATE parches SET tipo = ?, area = ?, riesgo = ?, version_programa = ?, version_portal = ?, estado = ?, fecha = ?, titulo = ?, problema = ?, solucion = ?, actualizado = ? WHERE id = ?')
+      ->execute([...$vals, ahora(), $id]);
+    return $id;
+  }
+  db()->prepare('INSERT INTO parches (codigo, tipo, area, riesgo, version_programa, version_portal, estado, fecha, titulo, problema, solucion, autor, creado, actualizado) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    ->execute([par_codigo_nuevo($tipo), ...$vals, mb_substr($autor, 0, 60), ahora(), ahora()]);
+  return (int)db()->lastInsertId();
+}
+
+function par_cambiar_estado(int $id, string $estado): void {
+  if (!array_key_exists($estado, PAR_ESTADOS)) throw new RuntimeException('Estado no válido.');
+  db()->prepare('UPDATE parches SET estado = ?, actualizado = ? WHERE id = ?')->execute([$estado, ahora(), $id]);
+}
+
+function par_eliminar(int $id): void {
+  db()->prepare("DELETE FROM parches WHERE id = ? AND autor <> 'Sistema'")->execute([$id]);
+}

@@ -50,7 +50,9 @@ function api_latido(string $clave, array $equipo, array $in): array {
   db()->prepare('UPDATE equipos SET ultimo_contacto = ?, version = ?, so = ?, ip = ? WHERE id = ?')->execute([$ahora, $eq['version'] ?: $e['version'], $eq['so'] ?: $e['so'], ip_cliente(), $e['id']]);
   $firma = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($s['firmaVence'] ?? '')) ? $s['firmaVence'] : null;
   $disco = isset($s['discoLibreGB']) && is_numeric($s['discoLibreGB']) ? round((float)$s['discoLibreGB'], 1) : null;
-  $extra = array_intersect_key($s, array_flip(['so', 'arquitectura', 'ramGB', 'perfiles', 'modo', 'licencia', 'nubeActiva', 'nubeUltimoOk', 'nubePendientes', 'ultimoComprobante', 'minutosInactivo', 'idioma', 'pantalla', 'diagnosticos']));
+  $extra = array_intersect_key($s, array_flip(['so', 'arquitectura', 'ramGB', 'perfiles', 'modo', 'licencia', 'nubeActiva', 'nubeUltimoOk', 'nubePendientes', 'ultimoComprobante', 'minutosInactivo', 'idioma', 'pantalla', 'diagnosticos', 'correoFallidos7d']));
+  $series = mon_series($s['series'] ?? []);
+  if ($series) $extra['series'] = $series;
   $fila = [
     (int)$l['id'], $ahora, mon_txt($eq['version'], 20), in_array((string)($s['ambiente'] ?? ''), ['1', '2'], true) ? $s['ambiente'] : '',
     empty($s['enUso']) ? 0 : 1, mon_txt($s['usuario'] ?? '', 80), preg_replace('/\D/', '', mon_txt($s['perfilRuc'] ?? '', 13)), mon_txt($s['perfilNombre'] ?? '', 200),
@@ -95,7 +97,8 @@ function api_latido(string $clave, array $equipo, array $in): array {
   }
   // Limpieza ocasional: errores resueltos o ignorados con más de 120 días.
   if (random_int(1, 200) === 1) db()->prepare("DELETE FROM monitor_errores WHERE estado IN ('RESUELTO', 'IGNORADO') AND ultimo < ?")->execute([date('Y-m-d H:i:s', time() - 120 * 86400)]);
-  return ['ok' => true, 'recibidos' => $recibidos, 'intervaloMin' => (int)ajuste('monitor_intervalo', 5) ?: 5];
+  $avisos = $series ? mon_conflictos_serie((int)$e['id'], (string)($s['perfilRuc'] ?? ''), $series) : [];
+  return ['ok' => true, 'recibidos' => $recibidos, 'intervaloMin' => (int)ajuste('monitor_intervalo', 5) ?: 5, 'avisos' => $avisos];
 }
 
 // ---------- Consultas para el panel ----------
@@ -162,4 +165,32 @@ function mon_resumen(): array {
   $r = db()->prepare("SELECT COUNT(DISTINCT huella) FROM monitor_errores WHERE estado IN ('NUEVO', 'REAPARECIO')");
   $r->execute();
   return ['enLinea' => $enLinea, 'erroresNuevos' => (int)$r->fetchColumn()];
+}
+
+// ---------- Antifallo: misma serie en dos equipos ----------
+// Cada equipo cuenta qué puntos de emisión usa («01:001-002»). Si otro equipo con el mismo RUC usa el mismo punto
+// para el mismo documento, los dos sacarán los mismos números y el SRI rechazará uno («secuencial registrado»).
+function mon_series($lista): array {
+  $r = [];
+  foreach ((array)$lista as $x) if (is_string($x) && preg_match('/^\d{2}:\d{3}-\d{3}$/', $x)) $r[$x] = true;
+  return array_slice(array_keys($r), 0, 60);
+}
+
+function mon_conflictos_serie(int $equipoId, string $ruc, array $series): array {
+  if (!preg_match('/^\d{13}$/', $ruc) || !$series) return [];
+  $q = db()->prepare("SELECT m.equipo_id, m.datos, e.nombre FROM monitor_equipos m LEFT JOIN equipos e ON e.id = m.equipo_id
+    WHERE m.perfil_ruc = ? AND m.equipo_id <> ? AND m.actualizado >= ? AND (e.activo = 1 OR e.activo IS NULL)");
+  $q->execute([$ruc, $equipoId, date('Y-m-d H:i:s', time() - 30 * 86400)]);
+  $nombres = ['01' => 'Facturas', '03' => 'Liquidaciones de compra', '04' => 'Notas de crédito', '05' => 'Notas de débito', '06' => 'Guías de remisión', '07' => 'Retenciones'];
+  $avisos = [];
+  foreach ($q->fetchAll() as $o) {
+    $otras = (json_decode((string)$o['datos'], true) ?: [])['series'] ?? [];
+    foreach (array_intersect($series, (array)$otras) as $x) {
+      [$cod, $serie] = explode(':', $x);
+      $avisos[] = ['tipo' => 'SERIE_COMPARTIDA', 'codDoc' => $cod, 'serie' => $serie, 'equipo' => mb_substr((string)($o['nombre'] ?: 'otro equipo'), 0, 60),
+        'mensaje' => ($nombres[$cod] ?? 'Documentos') . ' ' . $serie . ' también se emiten en «' . ($o['nombre'] ?: 'otro equipo') . '». Dos equipos con el mismo punto de emisión repiten números y el SRI rechaza uno. Asigna a este equipo otro punto de emisión (Configuración › Documentos y secuencias).'];
+      if (count($avisos) >= 10) return $avisos;
+    }
+  }
+  return $avisos;
 }
