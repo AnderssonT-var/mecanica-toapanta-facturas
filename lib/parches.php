@@ -120,7 +120,22 @@ function par_esquema(): void {
     if ($existe->fetchColumn()) continue;
     $ins->execute([...$p, 'Sistema', ahora(), ahora()]);
   }
+  par_marcar_publicados();
   $listo = true;
+}
+
+// Lo aplicado pasa solo a «Publicado» cuando ya llegó a los clientes: el programa, al publicarse en Versiones una
+// versión igual o mayor; lo que es solo del portal, en cuanto el portal desplegado tiene esa versión.
+function par_marcar_publicados(): void {
+  $f = __DIR__ . '/../actualizaciones/latest.yml';
+  $pub = is_file($f) && preg_match('/^version:\s*[\'"]?([0-9]+\.[0-9]+\.[0-9]+)/m', (string)file_get_contents($f), $m) ? $m[1] : '';
+  $upd = db()->prepare("UPDATE parches SET estado = 'PUBLICADO', actualizado = ? WHERE id = ?");
+  foreach (db()->query("SELECT id, version_programa, version_portal FROM parches WHERE estado = 'APLICADO'")->fetchAll() as $p) {
+    $vp = (string)$p['version_programa']; $vw = (string)$p['version_portal'];
+    $listoProg = $vp === '' || ($pub !== '' && version_compare($vp, $pub, '<='));
+    $listoPortal = $vw === '' || version_compare($vw, FX_VERSION, '<=');
+    if (($vp !== '' || $vw !== '') && $listoProg && $listoPortal) $upd->execute([ahora(), $p['id']]);
+  }
 }
 
 function par_lista(array $f = []): array {
