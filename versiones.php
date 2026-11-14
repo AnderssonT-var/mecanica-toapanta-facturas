@@ -34,10 +34,14 @@ function publicar_actualizacion(array $f): void {
   // latest.yml al final y de forma atómica: los programas solo ven la versión nueva cuando ya está completa.
   file_put_contents(DIR_ACT . '/latest.yml.tmp', $yml, LOCK_EX);
   rename(DIR_ACT . '/latest.yml.tmp', DIR_ACT . '/latest.yml');
-  // Conserva solo esta versión y la anterior (para descargas diferenciales).
+  // Conserva esta versión y la anterior completas, y los .blockmap de las últimas 10: con el blockmap de la versión
+  // que tiene el cliente, el programa descarga solo los bloques que cambiaron aunque se haya saltado versiones.
   $exes = glob(DIR_ACT . '/*.exe') ?: [];
   usort($exes, fn($a, $b) => filemtime($b) <=> filemtime($a));
-  foreach (array_slice($exes, 2) as $viejo) { @unlink($viejo); @unlink($viejo . '.blockmap'); }
+  foreach (array_slice($exes, 2) as $viejo) @unlink($viejo);
+  $maps = glob(DIR_ACT . '/*.exe.blockmap') ?: [];
+  usort($maps, fn($a, $b) => filemtime($b) <=> filemtime($a));
+  foreach (array_slice($maps, 10) as $viejo) @unlink($viejo);
   registrar_evento(null, 'ACTUALIZACION', 'Versión ' . $info['version'] . ' publicada');
   aviso('Versión ' . $info['version'] . ' publicada. Los programas la descargarán solos en las próximas horas.');
 }
