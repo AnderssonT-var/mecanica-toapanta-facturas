@@ -111,6 +111,9 @@ function fx_config(): array {
   return $cfg;
 }
 
+// La base no aceptó la conexión tras los reintentos: se responde 503 (el programa reintenta solo), no 500.
+class ErrorBaseOcupada extends RuntimeException {}
+
 function db(): PDO {
   static $pdo = null;
   if ($pdo === null) {
@@ -118,11 +121,26 @@ function db(): PDO {
     $dsn = $c['driver'] === 'sqlite'
       ? 'sqlite:' . $c['ruta']
       : 'mysql:host=' . $c['host'] . ';port=' . ($c['puerto'] ?? 3306) . ';dbname=' . $c['nombre'] . ';charset=utf8mb4';
-    $pdo = new PDO($dsn, $c['usuario'] ?? null, $c['clave'] ?? null, [
+    $opc = [
       PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
       PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
       PDO::ATTR_EMULATE_PREPARES => false,
-    ]);
+      PDO::ATTR_TIMEOUT => 5,
+    ];
+    // Con muchos programas conectándose a la vez, el hosting a veces rechaza una conexión nueva por un instante
+    // ([2002] Operation not permitted, 1040 demasiadas conexiones). Se reintenta con una pausa corta y, si estaba
+    // por TCP (127.0.0.1), se prueba por el socket local (localhost), que el hosting limita menos.
+    $intentos = $c['driver'] === 'sqlite' ? [$dsn] : array_values(array_unique([$dsn, $dsn, str_replace('host=127.0.0.1', 'host=localhost', $dsn), $dsn]));
+    $ultimo = null;
+    foreach ($intentos as $n => $d) {
+      try { $pdo = new PDO($d, $c['usuario'] ?? null, $c['clave'] ?? null, $opc); break; }
+      catch (PDOException $ex) {
+        $ultimo = $ex;
+        if (!preg_match('/\[(2002|2006|1040|1203|2013)\]|Operation not permitted|Too many connections/i', $ex->getMessage())) throw $ex;
+        usleep([150000, 300000, 600000, 0][$n] ?? 0);
+      }
+    }
+    if ($pdo === null) throw new ErrorBaseOcupada('La base de datos está ocupada; intenta de nuevo en unos segundos.', 0, $ultimo);
     if ($c['driver'] !== 'sqlite') $pdo->exec("SET time_zone = '-05:00'");
     // Portales instalados antes de las funciones por licencia: se agrega la columna una sola vez.
     try { $pdo->query('SELECT funciones FROM licencias LIMIT 0'); }

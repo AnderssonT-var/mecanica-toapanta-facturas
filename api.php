@@ -54,6 +54,9 @@ try {
   }
   $status = ['NO_EXISTE' => 404, 'FORMATO' => 400, 'EQUIPO' => 400, 'SUSPENDIDA' => 403, 'LIMITE_EQUIPOS' => 409, 'EQUIPO_LIBERADO' => 409][$ex->codigo] ?? 400;
   responder($status, ['ok' => false, 'codigo' => $ex->codigo, 'error' => $ex->getMessage()]);
+} catch (ErrorBaseOcupada $ex) {
+  header('Retry-After: 5');
+  responder(503, ['ok' => false, 'codigo' => 'OCUPADO', 'error' => 'El servicio está muy ocupado. Se reintenta en unos segundos.']);
 } catch (Throwable $ex) {
   error_log('[licencias] ' . $ex->getMessage());
   responder(500, ['ok' => false, 'codigo' => 'INTERNO', 'error' => 'Error interno del servicio de licencias.']);

@@ -80,7 +80,9 @@ function emi_caracter_sri(string $ch): string {
   return (string)preg_replace(EMI_NO_VALIDO, '', $d);
 }
 function emi_solo_validos($s): string {
-  $s = mb_scrub((string)($s ?? ''), 'UTF-8');
+  // Solo texto o números: una lista u otro tipo que llegue por error no se convierte en «Array».
+  $s = is_string($s) ? $s : ((is_int($s) || (is_float($s) && is_finite($s))) ? (string)$s : '');
+  $s = mb_scrub($s, 'UTF-8');
   if (class_exists('Normalizer')) $s = (string)Normalizer::normalize($s, Normalizer::FORM_C);
   return (string)preg_replace_callback(EMI_NO_VALIDO, fn($m) => emi_caracter_sri($m[0]), $s);
 }

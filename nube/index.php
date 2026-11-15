@@ -116,6 +116,9 @@ try {
   throw new ErrorNube(404, 'Ruta no encontrada.');
 } catch (ErrorNube $ex) {
   salir($ex->status, ['ok' => false, 'error' => $ex->getMessage()]);
+} catch (ErrorBaseOcupada $ex) {
+  header('Retry-After: 5');
+  salir(503, ['ok' => false, 'error' => 'La nube está muy ocupada. Se reintenta en unos segundos.']);
 } catch (Throwable $ex) {
   error_log('[nube] ' . $ex->getMessage() . ' @' . $ex->getFile() . ':' . $ex->getLine());
   salir(500, ['ok' => false, 'error' => 'Error interno de la nube.']);
