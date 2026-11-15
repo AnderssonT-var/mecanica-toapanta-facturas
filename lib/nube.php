@@ -7,6 +7,8 @@ if (!defined('FX_PORTAL')) { http_response_code(403); exit; }
 const NUBE_TABLAS = ['clientes', 'productos', 'comprobantes', 'catalogo', 'proformas', 'pedidos', 'movimientos', 'compras', 'abonos', 'cajas', 'caja_movimientos', 'bodegas', 'pagos'];
 const NUBE_TABLAS_DESDE_PROGRAMA = ['clientes', 'productos', 'comprobantes', 'catalogo', 'proformas', 'pedidos', 'movimientos', 'compras', 'abonos', 'cajas', 'caja_movimientos', 'bodegas', 'pagos'];
 const NUBE_LOTE_PULL = 1000;
+// Solo portal web (sin la nube de respaldo): lo único que se guarda es lo que el portal necesita.
+const NUBE_TABLAS_PORTAL = ['clientes', 'productos', 'catalogo', 'pedidos', 'comprobantes'];
 const NUBE_RESPALDOS = 10;
 
 class ErrorNube extends RuntimeException {
@@ -73,7 +75,7 @@ function nube_licencia_vigente(int $id, string $perfil): array {
   $est = estado_licencia($l);
   if ($est['code'] === 'SUSP') throw new ErrorNube(403, 'Tu licencia está suspendida' . ($l['motivo'] ? ': ' . $l['motivo'] : '') . '. Contacta a soporte.');
   if ($est['code'] === 'VENC') throw new ErrorNube(403, 'Tu licencia está vencida. Renueva para seguir usando la nube.');
-  if (!tiene_funcion($l, 'nube')) throw new ErrorNube(403, 'Tu plan no incluye la nube. Pide agregar «Nube y varios equipos» a tu licencia.');
+  if (!tiene_funcion($l, 'nube') && !tiene_funcion($l, 'movil')) throw new ErrorNube(403, 'Tu plan no incluye la nube ni el portal web. Pide agregar alguna de las dos a tu licencia.');
   if (!nube_perfil_permitido($l, $perfil)) throw new ErrorNube(403, 'Este RUC no está incluido en tu licencia.');
   return $l;
 }
@@ -174,14 +176,21 @@ function nube_guardar(int $lic, string $perfil, string $tabla, array $r): bool {
   return true;
 }
 
-function nube_push(int $lic, string $perfil, array $cambios): int {
+// ¿La licencia tiene solo el portal (sin la nube de respaldo)?
+function nube_solo_portal(array $l): bool { return !tiene_funcion($l, 'nube') && tiene_funcion($l, 'movil'); }
+
+function nube_push(int $lic, string $perfil, array $cambios, bool $soloPortal = false): int {
   $d = db();
   $aceptados = 0;
+  $existe = $d->prepare("SELECT 1 FROM nube_registros WHERE licencia_id = ? AND perfil = ? AND tabla = 'comprobantes' AND id = ?");
   $d->beginTransaction();
   try {
-    foreach (NUBE_TABLAS_DESDE_PROGRAMA as $tabla) {
+    foreach ($soloPortal ? NUBE_TABLAS_PORTAL : NUBE_TABLAS_DESDE_PROGRAMA as $tabla) {
       foreach (($cambios[$tabla] ?? []) as $r) {
-        if (is_array($r) && nube_guardar($lic, $perfil, $tabla, $r)) $aceptados++;
+        if (!is_array($r)) continue;
+        // Solo portal: de los comprobantes solo se aceptan los que nacieron en el portal (su estado al autorizarse).
+        if ($soloPortal && $tabla === 'comprobantes') { $existe->execute([$lic, $perfil, (string)($r['id'] ?? '')]); if (!$existe->fetchColumn()) continue; }
+        if (nube_guardar($lic, $perfil, $tabla, $r)) $aceptados++;
       }
     }
     $d->commit();
@@ -192,8 +201,9 @@ function nube_push(int $lic, string $perfil, array $cambios): int {
   return $aceptados;
 }
 
-function nube_pull(int $lic, string $perfil, int $desde): array {
-  $r = db()->prepare('SELECT tabla, datos, revision FROM nube_registros WHERE licencia_id = ? AND perfil = ? AND revision > ? ORDER BY revision LIMIT ' . (NUBE_LOTE_PULL + 1));
+function nube_pull(int $lic, string $perfil, int $desde, bool $soloPortal = false): array {
+  $filtro = $soloPortal ? " AND tabla IN ('" . implode("','", NUBE_TABLAS_PORTAL) . "')" : '';
+  $r = db()->prepare('SELECT tabla, datos, revision FROM nube_registros WHERE licencia_id = ? AND perfil = ? AND revision > ?' . $filtro . ' ORDER BY revision LIMIT ' . (NUBE_LOTE_PULL + 1));
   $r->execute([$lic, $perfil, $desde]);
   $filas = $r->fetchAll();
   $mas = count($filas) > NUBE_LOTE_PULL;

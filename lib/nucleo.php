@@ -5,7 +5,7 @@ declare(strict_types=1);
 if (!defined('FX_PORTAL')) { http_response_code(403); exit; }
 date_default_timezone_set('America/Guayaquil');
 
-const FX_VERSION = '1.9.4';
+const FX_VERSION = '1.10.0';
 const FX_MARCA = 'Facmit';
 
 // Nombre del producto. Los portales instalados antes del cambio de marca guardaron el nombre anterior en su
@@ -38,8 +38,8 @@ const FX_FUNCIONES = [
   'compras'     => ['label' => 'Compras y liquidaciones', 'desc' => 'Registro de compras desde el XML o el SRI, liquidaciones de compra y libro de compras', 'grupo' => 'pro'],
   'cartera'     => ['label' => 'Cuentas por cobrar', 'desc' => 'Ventas a crédito, abonos, retenciones recibidas, cartera vencida y estados de cuenta', 'grupo' => 'pro'],
   'pos'         => ['label' => 'Punto de venta y caja', 'desc' => 'Venta rápida con lector, apertura y cierre de caja con arqueo y tickets de 58/80 mm', 'grupo' => 'pro'],
-  'nube'        => ['label' => 'Nube y varios equipos', 'desc' => 'Respaldo en la nube y datos sincronizados entre computadoras', 'grupo' => 'extra'],
-  'movil'       => ['label' => 'Facturar desde el celular', 'desc' => 'App web para facturar y consultar desde el teléfono (incluye la nube)', 'grupo' => 'extra'],
+  'nube'        => ['label' => 'Respaldo en la nube y varios equipos', 'desc' => 'Copia diaria completa en la nube, restaurar en otra PC y la misma información en varias computadoras', 'grupo' => 'extra'],
+  'movil'       => ['label' => 'Portal web (facturar desde el celular)', 'desc' => 'Facturar y consultar desde el celular o el navegador con los clientes y productos de la PC; la PC firma y autoriza', 'grupo' => 'extra'],
 ];
 const FX_PRO = ['documentos', 'retenciones', 'inventario', 'compras', 'cartera', 'pos'];
 // Versión de las funciones: los programas tratan las licencias sin ella como emitidas antes de compras/cobros/caja.
@@ -57,7 +57,7 @@ function funciones_licencia(array $l): array {
 
 function normalizar_funciones(array $f): array {
   $f = array_values(array_intersect(array_keys(FX_FUNCIONES), array_map('strval', $f)));
-  if (in_array('movil', $f, true) && !in_array('nube', $f, true)) $f[] = 'nube'; // el celular trabaja sobre la nube
+  // Desde noviembre de 2026 el portal web y la nube de respaldo son funciones separadas (se cobran por separado).
   return array_values(array_intersect(array_keys(FX_FUNCIONES), $f));
 }
 
@@ -72,8 +72,7 @@ function nombre_plan(array $f): string {
   if ($pro && in_array('nube', $f, true) && in_array('movil', $f, true)) return 'Completo';
   $base = $pro ? 'Profesional' : 'Básico';
   $extras = array_diff($f, $pro ? FX_PRO : []);
-  $cortos = ['documentos' => 'Documentos', 'retenciones' => 'Retenciones', 'inventario' => 'Inventario', 'compras' => 'Compras', 'cartera' => 'Cobros', 'pos' => 'Punto de venta', 'nube' => 'Nube', 'movil' => 'Móvil'];
-  if (in_array('movil', $extras, true)) $extras = array_diff($extras, ['nube']);
+  $cortos = ['documentos' => 'Documentos', 'retenciones' => 'Retenciones', 'inventario' => 'Inventario', 'compras' => 'Compras', 'cartera' => 'Cobros', 'pos' => 'Punto de venta', 'nube' => 'Nube', 'movil' => 'Portal'];
   return $base . ($extras ? ' + ' . implode(' + ', array_map(fn($x) => $cortos[$x], $extras)) : '');
 }
 
@@ -95,7 +94,7 @@ function precio_sugerido(array $f): float {
   $cat = categoria_plan($f);
   if ($cat === 'Completo') return $p('completo');
   $total = $cat === 'Profesional' ? $p('profesional') : $p('basico');
-  foreach (array_diff($f, $cat === 'Profesional' ? FX_PRO : []) as $x) if (!($x === 'nube' && in_array('movil', $f, true))) $total += $p('extra_' . $x);
+  foreach (array_diff($f, $cat === 'Profesional' ? FX_PRO : []) as $x) $total += $p('extra_' . $x);
   return round($total, 2);
 }
 

@@ -43,10 +43,13 @@ try {
   $a = nube_autenticar_programa();
   $lic = (int)$a['licencia']['id'];
   $perfil = $a['perfil'];
+  $soloPortal = nube_solo_portal($a['licencia']);
+  // Los respaldos son de la nube de respaldo; con solo el portal no se guardan.
+  if (str_starts_with($ruta, 'backup') && $soloPortal) throw new ErrorNube(403, 'Tu plan incluye el portal web, pero no la nube de respaldo. Pide agregar «Respaldo en la nube y varios equipos» para guardar respaldos en la nube.');
 
   if ($ruta === 'sync/push' && $metodo === 'POST') {
     $in = cuerpo_json(64 * 1024 * 1024);
-    $aceptados = nube_push($lic, $perfil, is_array($in['cambios'] ?? null) ? $in['cambios'] : []);
+    $aceptados = nube_push($lic, $perfil, is_array($in['cambios'] ?? null) ? $in['cambios'] : [], $soloPortal);
     if (is_array($in['empresa'] ?? null)) nube_guardar_perfil($lic, $perfil, $in['empresa'], $a['equipo']);
     else nube_marcar_contacto($lic, $perfil, $a['equipo']);
     salir(200, ['ok' => true, 'aceptados' => $aceptados, 'revision' => nube_revision_actual($lic, $perfil)]);
@@ -54,7 +57,7 @@ try {
   if ($ruta === 'sync/pull' && $metodo === 'GET') {
     $desde = max(0, (int)($_GET['desde'] ?? 0));
     nube_marcar_contacto($lic, $perfil, $a['equipo']);
-    salir(200, ['ok' => true] + nube_pull($lic, $perfil, $desde));
+    salir(200, ['ok' => true, 'soloPortal' => $soloPortal] + nube_pull($lic, $perfil, $desde, $soloPortal));
   }
   if ($ruta === 'series/reservar' && $metodo === 'POST') {
     $in = cuerpo_json(8192);

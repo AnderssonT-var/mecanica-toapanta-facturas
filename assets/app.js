@@ -35,7 +35,7 @@ document.querySelectorAll('table').forEach((t) => {
   if (!caja) return;
   const PRO = ['documentos', 'retenciones', 'inventario', 'compras', 'cartera', 'pos'];
   const ORDEN = ['documentos', 'retenciones', 'inventario', 'compras', 'cartera', 'pos', 'nube', 'movil'];
-  const CORTOS = { documentos: 'Documentos', retenciones: 'Retenciones', inventario: 'Inventario', compras: 'Compras', cartera: 'Cobros', pos: 'Punto de venta', nube: 'Nube', movil: 'Móvil' };
+  const CORTOS = { documentos: 'Documentos', retenciones: 'Retenciones', inventario: 'Inventario', compras: 'Compras', cartera: 'Cobros', pos: 'Punto de venta', nube: 'Nube', movil: 'Portal' };
   const checks = () => [...caja.querySelectorAll('input[name="funciones[]"]:not([type=hidden])')];
   const marcadas = () => ORDEN.filter((k) => checks().some((c) => c.checked && c.value === k));
   const precios = JSON.parse((document.getElementById('precio-sugerido') || {}).dataset.precios || '{}');
@@ -43,14 +43,13 @@ document.querySelectorAll('table').forEach((t) => {
     const pro = PRO.every((x) => f.includes(x));
     if (pro && f.includes('nube') && f.includes('movil')) return 'Completo';
     let extras = f.filter((x) => !(pro && PRO.includes(x)));
-    if (extras.includes('movil')) extras = extras.filter((x) => x !== 'nube');
     return (pro ? 'Profesional' : 'Básico') + (extras.length ? ' + ' + extras.map((x) => CORTOS[x]).join(' + ') : '');
   }
   function precio(f, n) {
     if (n === 'Completo') return precios.completo || 0;
     const pro = n.startsWith('Profesional');
     let t = (pro ? precios.profesional : precios.basico) || 0;
-    f.filter((x) => !(pro && PRO.includes(x))).forEach((x) => { if (!(x === 'nube' && f.includes('movil'))) t += (precios.extra || {})[x] || 0; });
+    f.filter((x) => !(pro && PRO.includes(x))).forEach((x) => { t += (precios.extra || {})[x] || 0; });
     return Math.round(t * 100) / 100;
   }
   function pintar() {
@@ -65,8 +64,6 @@ document.querySelectorAll('table').forEach((t) => {
   }
   caja.addEventListener('change', (e) => {
     const c = e.target;
-    if (c.value === 'movil' && c.checked) checks().find((x) => x.value === 'nube').checked = true; // el celular trabaja sobre la nube
-    if (c.value === 'nube' && !c.checked) checks().find((x) => x.value === 'movil').checked = false;
     pintar();
   });
   caja.addEventListener('click', (e) => {

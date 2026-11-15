@@ -180,7 +180,7 @@ $in = fn($k, $label, $extra = '') => '<label>' . $label . '<input name="' . $k .
     <td class="right"><?php if ((int)$q['activo']): ?><form method="post"><?= campo_csrf() ?><input type="hidden" name="accion" value="liberar"><input type="hidden" name="equipo" value="<?= (int)$q['id'] ?>"><button class="btn btn-sm" data-confirmar="¿Liberar este equipo? Dejará de poder facturar.">Liberar</button></form><?php endif; ?></td></tr>
   <?php endforeach; ?></tbody></table><?php endif; ?>
 </section>
-<?php if (tiene_funcion($l, 'nube')): $resNube = nube_resumen_licencia($id); $usuWeb = nube_usuarios_licencia($id); ?>
+<?php if (tiene_funcion($l, 'nube') || tiene_funcion($l, 'movil')): $resNube = nube_resumen_licencia($id); $usuWeb = nube_usuarios_licencia($id); ?>
 <section class="card">
   <div class="card-head"><h2>Nube y app web</h2><a class="link" href="app/" target="_blank" rel="noopener">Abrir app web</a></div>
   <?php if (!$resNube): ?><div class="empty">El programa del cliente todavía no sincroniza con la nube.</div><?php else: ?>
