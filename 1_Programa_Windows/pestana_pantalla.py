@@ -77,6 +77,19 @@ class PestanaPantalla:
         fila = ttk.Frame(f); fila.grid(row=r, column=0, columnspan=3, sticky="w", pady=(2, 4)); r += 1
         ttk.Button(fila, text="Abrir en el monitor", command=self._abrir_monitor).pack(side="left")
         ttk.Button(fila, text="Cerrar", command=self._cerrar_monitor).pack(side="left", padx=8)
+        # vista en vivo de lo que se ve en el monitor del cliente
+        vivo = ttk.Frame(f); vivo.grid(row=r, column=0, columnspan=3, sticky="w", pady=(6, 6)); r += 1
+        self.lbl_vivo = tk.Label(vivo, bg="#050506", fg="#8aa0a8", width=48, height=12, text="Vista en vivo del monitor",
+                                 cursor="hand2", font=(self.fuente[0], 9))
+        self.lbl_vivo.pack(side="left")
+        self.lbl_vivo.bind("<Button-1>", lambda e: self._vivo_grande())
+        lado = ttk.Frame(vivo); lado.pack(side="left", padx=10, anchor="n")
+        ttk.Label(lado, text="En vivo: lo que está viendo\nel cliente en el monitor.", justify="left").pack(anchor="w")
+        ttk.Button(lado, text="Ver en grande", command=self._vivo_grande).pack(anchor="w", pady=6)
+        self.vivo_grande = None
+        self._vivo_foto = None
+        self._vivo_ocupado = False
+        self.root.after(1500, self._vivo_ciclo)
         ttk.Checkbutton(f, text="También en teléfonos o tablets (por internet)", variable=self.var_tel).grid(
             row=r, column=0, columnspan=3, sticky="w"); r += 1
 
@@ -104,6 +117,69 @@ class PestanaPantalla:
         self.lbl_pant.grid(row=r, column=0, columnspan=3, sticky="w", pady=(8, 0)); r += 1
         self._cargar_pantalla()
         self.root.after(2000, self._pintar_pantalla)
+
+    # ---- vista en vivo del monitor -----------------------------------------------------
+    def _vivo_monitor(self):
+        if not hdmi.activo(self.cfg) and not self.monitor_hdmi:
+            return None
+        return hdmi.elegido(self.cfg)
+
+    def _vivo_ciclo(self):
+        """Cada segundo, solo si la vista está a la vista (pestaña abierta o ventana grande)."""
+        try:
+            grande = self.vivo_grande is not None and self.vivo_grande.winfo_exists()
+            visible = self.lbl_vivo.winfo_viewable() or grande
+            if visible and not self._vivo_ocupado and not getattr(self, "saliendo", False):
+                self._vivo_ocupado = True
+                tam = (900, 506) if grande else (384, 216)
+                threading.Thread(target=self._vivo_tomar, args=(tam, grande), daemon=True).start()
+        except tk.TclError:
+            pass
+        self.root.after(1000, self._vivo_ciclo)
+
+    def _vivo_tomar(self, tam, grande):
+        texto, img = "", None
+        try:
+            m = self._vivo_monitor()
+            if not m:
+                texto = "Marca «Mostrar en un monitor conectado a esta PC»\npara ver aquí lo que ve el cliente."
+            elif m["principal"]:
+                texto = "El monitor elegido es el principal (el de FactuSYS).\nElige el monitor del cliente."
+            else:
+                from PIL import Image, ImageGrab
+                img = ImageGrab.grab(bbox=(m["x"], m["y"], m["x"] + m["w"], m["y"] + m["h"]), all_screens=True)
+                img.thumbnail(tam, Image.BILINEAR)
+        except Exception as e:  # noqa: BLE001
+            texto, img = f"No se pudo ver el monitor:\n{e}", None
+
+        def poner():
+            self._vivo_ocupado = False
+            try:
+                destino = self.lbl_vivo_g if grande else self.lbl_vivo
+                if img is None:
+                    destino.configure(image="", text=texto, width=48 if not grande else 90, height=12 if not grande else 25)
+                    return
+                from PIL import ImageTk
+                foto = ImageTk.PhotoImage(img)
+                destino.configure(image=foto, text="", width=img.width, height=img.height)
+                if grande:
+                    self._vivo_foto_g = foto
+                else:
+                    self._vivo_foto = foto
+            except tk.TclError:
+                pass
+        self.root.after(0, poner)
+
+    def _vivo_grande(self):
+        if self.vivo_grande is not None and self.vivo_grande.winfo_exists():
+            self.vivo_grande.lift()
+            return
+        v = tk.Toplevel(self.root)
+        v.title("Monitor del cliente — en vivo")
+        v.configure(bg="#050506")
+        self.lbl_vivo_g = tk.Label(v, bg="#050506", fg="#8aa0a8", text="Cargando…", width=90, height=25)
+        self.lbl_vivo_g.pack(padx=8, pady=8)
+        self.vivo_grande = v
 
     def _editar_cartel(self):
         import editor_cartel
