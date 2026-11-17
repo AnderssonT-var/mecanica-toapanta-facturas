@@ -182,6 +182,35 @@ function nube_guardar(int $lic, string $perfil, string $tabla, array $r): bool {
   return true;
 }
 
+// ---------- Enlaces públicos firmados (RIDE y XML de un comprobante, válidos 30 días) ----------
+// Los usa el programa al enviar por WhatsApp o mostrar el QR en la pantalla del cliente: se abren sin iniciar sesión.
+function nube_secreto_enlaces(): string { return hash('sha256', 'facmit-ride-publico|' . (string)(fx_config()['llave_privada'] ?? ''), true); }
+function nube_firma_enlace(int $lic, string $perfil, string $id, int $vence): string {
+  return rtrim(strtr(base64_encode(hash_hmac('sha256', $lic . '|' . $perfil . '|' . $id . '|' . $vence, nube_secreto_enlaces(), true)), '+/', '-_'), '=');
+}
+function nube_enlace_publico(int $lic, string $perfil, string $id, string $tipo = 'ride', int $dias = 30): string {
+  $vence = time() + $dias * 86400;
+  $base = rtrim((string)(fx_config()['url_publica'] ?? 'https://facmit.com/licencias'), '/');
+  return $base . '/app/?v=' . ($tipo === 'xml' ? 'xml_publico' : 'ride_publico') . '&l=' . $lic . '&p=' . $perfil . '&id=' . rawurlencode($id) . '&e=' . $vence . '&t=' . nube_firma_enlace($lic, $perfil, $id, $vence);
+}
+function nube_enlace_valido(int $lic, string $perfil, string $id, int $vence, string $firma): bool {
+  if ($vence < time() || $vence > time() + 400 * 86400 || $id === '') return false;
+  return hash_equals(nube_firma_enlace($lic, $perfil, $id, $vence), $firma);
+}
+// El programa sube un comprobante para compartirlo y recibe sus enlaces públicos.
+function nube_compartir(int $lic, string $perfil, array $c): array {
+  $id = (string)($c['id'] ?? '');
+  $clave = preg_replace('/\D/', '', (string)($c['clave_acceso'] ?? ''));
+  if ($id === '' || strlen($clave) !== 49) throw new ErrorNube(400, 'Comprobante incompleto.');
+  if (substr($clave, 10, 13) !== $perfil) throw new ErrorNube(403, 'El comprobante no es de este perfil.');
+  if (in_array((string)($c['estado'] ?? ''), ['INVALIDO', 'DEVUELTA', 'NO AUTORIZADO'], true)) throw new ErrorNube(400, 'Un comprobante rechazado no se puede compartir.');
+  nube_guardar($lic, $perfil, 'comprobantes', $c);
+  $q = db()->prepare("SELECT 1 FROM nube_registros WHERE licencia_id = ? AND perfil = ? AND tabla = 'comprobantes' AND id = ? AND borrado = 0");
+  $q->execute([$lic, $perfil, $id]);
+  if (!$q->fetchColumn()) throw new ErrorNube(400, 'No se pudo guardar el comprobante en la nube.');
+  return ['ride' => nube_enlace_publico($lic, $perfil, $id, 'ride'), 'xml' => nube_enlace_publico($lic, $perfil, $id, 'xml')];
+}
+
 // ¿La licencia tiene solo el portal (sin la nube de respaldo)?
 function nube_solo_portal(array $l): bool { return !tiene_funcion($l, 'nube') && tiene_funcion($l, 'movil'); }
 

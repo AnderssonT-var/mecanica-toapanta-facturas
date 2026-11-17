@@ -59,6 +59,10 @@ try {
     nube_marcar_contacto($lic, $perfil, $a['equipo']);
     salir(200, ['ok' => true, 'soloPortal' => $soloPortal] + nube_pull($lic, $perfil, $desde, $soloPortal));
   }
+  if ($ruta === 'compartir' && $metodo === 'POST') {
+    $in = cuerpo_json(8 * 1024 * 1024);
+    salir(200, ['ok' => true] + nube_compartir($lic, $perfil, is_array($in['comprobante'] ?? null) ? $in['comprobante'] : []));
+  }
   if ($ruta === 'series/reservar' && $metodo === 'POST') {
     $in = cuerpo_json(8192);
     if ($a['equipo'] === '') throw new ErrorNube(400, 'La licencia no identifica al equipo.');

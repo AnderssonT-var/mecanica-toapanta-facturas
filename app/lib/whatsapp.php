@@ -233,18 +233,8 @@ function wa_ayuda(): string {
 }
 
 // Enlace firmado para ver el RIDE sin iniciar sesión (vence en 30 días).
-function wa_enlace_ride(int $lic, string $perfil, string $id): string {
-  $vence = time() + 30 * 86400;
-  $firma = rtrim(strtr(base64_encode(hash_hmac('sha256', $lic . '|' . $perfil . '|' . $id . '|' . $vence, wa_secreto_enlaces(), true)), '+/', '-_'), '=');
-  $base = (string)(fx_config()['url_publica'] ?? 'https://facmit.com/licencias');
-  return rtrim($base, '/') . '/app/?v=ride_publico&l=' . $lic . '&p=' . $perfil . '&id=' . rawurlencode($id) . '&e=' . $vence . '&t=' . $firma;
-}
-function wa_secreto_enlaces(): string { return hash('sha256', 'facmit-ride-publico|' . (string)(fx_config()['llave_privada'] ?? ''), true); }
-function wa_enlace_valido(int $lic, string $perfil, string $id, int $vence, string $firma): bool {
-  if ($vence < time()) return false;
-  $esperada = rtrim(strtr(base64_encode(hash_hmac('sha256', $lic . '|' . $perfil . '|' . $id . '|' . $vence, wa_secreto_enlaces(), true)), '+/', '-_'), '=');
-  return hash_equals($esperada, $firma);
-}
+function wa_enlace_ride(int $lic, string $perfil, string $id): string { return nube_enlace_publico($lic, $perfil, $id, 'ride'); }
+function wa_enlace_valido(int $lic, string $perfil, string $id, int $vence, string $firma): bool { return nube_enlace_valido($lic, $perfil, $id, $vence, $firma); }
 
 // ---------- Registro del número (desde la app web) ----------
 function wa_registro_usuario(int $uid): ?array {

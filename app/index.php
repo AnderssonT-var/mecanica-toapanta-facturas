@@ -33,6 +33,14 @@ try {
     require __DIR__ . '/vistas/ride.php';
     exit;
   }
+  if ($v === 'xml_publico') {
+    $lic = (int)($_GET['l'] ?? 0); $perfil = preg_replace('/\D/', '', (string)($_GET['p'] ?? '')); $idDoc = (string)($_GET['id'] ?? '');
+    if (!wa_enlace_valido($lic, $perfil, $idDoc, (int)($_GET['e'] ?? 0), (string)($_GET['t'] ?? ''))) { http_response_code(403); exit('Este enlace no es válido o ya venció.'); }
+    $ctx = ['lic' => $lic, 'perfil' => $perfil];
+    $_GET['id'] = $idDoc;
+    require __DIR__ . '/vistas/xml.php';
+    exit;
+  }
 
   $ctx = web_contexto();
   if (!$ctx) web_ir('v=login');

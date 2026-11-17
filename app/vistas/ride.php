@@ -13,7 +13,7 @@ $datos = ['c' => $c, 'empresa' => $emp, 'logo' => str_starts_with($logo, 'data:i
 ?><!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>RIDE <?= e($c['numero']) ?></title><link rel="stylesheet" href="assets/app.css?v=<?= FX_VERSION ?>"></head>
 <body class="pantalla-ride">
-<div class="ride-barra"><?php if (empty($publico)): ?><a class="btn" href="./?v=comprobante&id=<?= e(urlencode($c['id'])) ?>">Volver</a><?php else: ?><span></span><?php endif; ?><b><?= e($c['numero']) ?></b><button class="btn btn-primario" id="imprimir">Imprimir o guardar PDF</button></div>
+<div class="ride-barra"><?php if (empty($publico)): ?><a class="btn" href="./?v=comprobante&id=<?= e(urlencode($c['id'])) ?>">Volver</a><?php else: ?><a class="btn" href="./?<?= e(http_build_query(['v' => 'xml_publico', 'l' => (int)($_GET['l'] ?? 0), 'p' => (string)($_GET['p'] ?? ''), 'id' => (string)$c['id'], 'e' => (int)($_GET['e'] ?? 0), 't' => (string)($_GET['t'] ?? '')])) ?>" download>Descargar XML</a><?php endif; ?><b><?= e($c['numero']) ?></b><button class="btn btn-primario" id="imprimir">Imprimir o guardar PDF</button></div>
 <iframe id="ride" title="RIDE" class="ride-marco"></iframe>
 <script type="application/json" id="ride-datos"><?= json_encode($datos, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP) ?></script>
 <script src="assets/ride.js?v=<?= FX_VERSION ?>"></script>
