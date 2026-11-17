@@ -2,20 +2,18 @@
 // Instalador de un solo uso: copia la actualización a su lugar y se borra a sí mismo.
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
-if (!hash_equals('f44c1a434046dfdb60acbf1bd43d5f34440fb267a0f90600191e52c380a068d9', hash('sha256', (string)($_GET['t'] ?? '')))) { http_response_code(404); exit('{}'); }
+if (!hash_equals('18ec5de87c02d95a29a53aa91749ead66c90b304e88572958af16bd01d975ece', hash('sha256', (string)($_GET['t'] ?? '')))) { http_response_code(404); exit('{}'); }
 $raiz = dirname(__DIR__);
 $archivos = [
-    'pantalla.php' => '2cdd278192d81e78d0a6baac60e1c0ee5c5ad6f861a472bf5e32317f75bc97eb',
-    'lib/app.php' => '9208bd9dcd90c9f69c6b2bb44ec46a4cfcd6b85a643e72fd7bd7f97b4c57ca8a',
-    'admin/pantalla.php' => '013b13017adcce43269c48568577c8be88f3b567a53be2172353c50c25acc6b2',
-    'api/agente.php' => 'f637b6ea9cbe4dbdea76803ddd44c79aa3f610c8998d96d8d7cece1a4284c0f7',
+    'pantalla.php' => '3c6a2ab2c6421d8ba41b3a7507f8e9259b6c55c68e245bdf9051417cf9d9e934',
+    'lib/app.php' => '160dec4834690ce01c7ef17591d83e32717721b6691e53586d18174452ee3fda',
+    'admin/pantalla.php' => '7e75827fb3e71cb6015195f2f3bf9472012311064a7d69d89c170b399dbeed5b',
 ];
 // versión que debe haber hoy en el sitio: si alguien la cambió, no se pisa
 $antes = [
-    'pantalla.php' => '4c5b20a373556333fd523e84b4d4d7fd6b9da09cf994bf241922eecbb65bd069',
-    'lib/app.php' => '12dfaf2cfa5b0437d04b8f7ed9f29b2691d63722c1483714f845b18237a8f583',
-    'admin/pantalla.php' => '6ad2d12f9612768e958883b8198371697709ef6c81ca0f6864e3182b3e37c9c8',
-    'api/agente.php' => 'c37b10f28cc0d86a251c455eded466c012383a0bd07fef891961fccdc5d143aa',
+    'pantalla.php' => '2cdd278192d81e78d0a6baac60e1c0ee5c5ad6f861a472bf5e32317f75bc97eb',
+    'lib/app.php' => '9208bd9dcd90c9f69c6b2bb44ec46a4cfcd6b85a643e72fd7bd7f97b4c57ca8a',
+    'admin/pantalla.php' => '013b13017adcce43269c48568577c8be88f3b567a53be2172353c50c25acc6b2',
 ];
 $respaldo = dirname($raiz) . '/respaldo_web_' . date('Ymd_His');
 $res = ['ok' => true, 'archivos' => []];

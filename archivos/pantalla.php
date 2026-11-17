@@ -423,7 +423,7 @@ body.pc, body.pc * { cursor: none !important; }
       pagoMostrado = '';
       relojPago();
     }
-    function fondoPago(r) { pagoEl.style.backgroundColor = (r && r.borde) || conf.fondo; }
+    function fondoPago(r) { pagoEl.style.backgroundColor = conf.pago.fondo || (r && r.borde) || conf.fondo; }
     function relojPago() {
       if (!conf.pago.reloj) return;
       var texto = textoHora(conf.hora) + (conf.hora.fecha ? '  ·  ' + textoFecha() : '');
