@@ -8,22 +8,26 @@ echo   El resultado se copia a la PC del taller (no necesita Python).
 echo ==========================================================
 echo.
 
-where python >nul 2>nul
-if errorlevel 1 (
+rem Python: primero "py" (instalador de python.org), luego "python"
+set "PY="
+py -3 --version >nul 2>nul && set "PY=py -3"
+if not defined PY python --version >nul 2>nul && set "PY=python"
+if not defined PY (
   echo No se encontro Python. Instalalo desde https://www.python.org/downloads/
   echo marcando "Add python.exe to PATH" y vuelve a ejecutar este archivo.
   pause & exit /b 1
 )
+echo Usando: %PY%
 
-python -m pip install --upgrade pip >nul
-python -m pip install -r requirements.txt pyinstaller
+%PY% -m pip install --upgrade pip >nul
+%PY% -m pip install -r requirements.txt pyinstaller
 if errorlevel 1 ( echo Error instalando dependencias. & pause & exit /b 1 )
-rem para convertir PDF de formas de pago en el programa (si no se instala, se usa el panel de la página)
-python -m pip install pypdfium2
+rem para convertir PDF de formas de pago en el programa (si no se instala, se usa el panel de la pagina)
+%PY% -m pip install pypdfium2
 
-python hacer_icono.py
+%PY% hacer_icono.py
 
-python -m PyInstaller --noconfirm --clean --windowed --onedir ^
+%PY% -m PyInstaller --noconfirm --clean --windowed --onedir ^
   --name "MonitorFacturas" --icon icono.ico ^
   --hidden-import pystray._win32 ^
   --hidden-import ride_pdf --hidden-import reportlab.graphics.barcode.code128 ^
