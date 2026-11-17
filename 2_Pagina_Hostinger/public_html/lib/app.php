@@ -180,7 +180,7 @@ const PANTALLA_CARTEL_DEFECTO = [
     ],
     'estilo' => 'neon', 'segundos_mensaje' => 5, 'velocidad' => 'normal', 'fondo' => '#050506',
     // formas de pago: la hora arriba y 1 o 2 imágenes abajo, como un turno más del cartel
-    'pago' => ['activa' => false, 'segundos' => 15, 'reloj' => true, 'en_datos' => true, 'imagenes' => []],
+    'pago' => ['activa' => false, 'segundos' => 15, 'reloj' => true, 'en_datos' => true, 'fondo' => '', 'imagenes' => []],
 ];
 const PANTALLA_IMG_MAX = 2;                 // imágenes de pago que se muestran a la vez
 const PANTALLA_IMG_BYTES = 4 * 1024 * 1024;
@@ -239,7 +239,10 @@ function pantalla_pago_normalizar(array $p): array {
         if (count($ids) >= PANTALLA_IMG_MAX) break;
     }
     return ['activa' => (bool)$p['activa'], 'segundos' => max(4, min(300, (int)$p['segundos'])),
-        'reloj' => (bool)$p['reloj'], 'en_datos' => (bool)$p['en_datos'], 'imagenes' => $ids];
+        'reloj' => (bool)$p['reloj'], 'en_datos' => (bool)$p['en_datos'],
+        // fondo detrás de las imágenes de pago: '' = automático (el color del borde de la imagen)
+        'fondo' => trim((string)$p['fondo']) === '' ? '' : pantalla_color((string)$p['fondo'], '#3d1766'),
+        'imagenes' => $ids];
 }
 
 /** El cartel tal como lo usa la pantalla: las imágenes de pago con su huella (para la caché)

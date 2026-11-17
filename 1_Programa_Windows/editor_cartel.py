@@ -180,6 +180,14 @@ class EditorCartel:
         ttk.Checkbutton(self.f, text="La hora arriba de las imágenes", variable=self.p_reloj).pack(anchor="w")
         ttk.Checkbutton(self.f, text="Mostrarlas también junto a los datos y el total mientras se factura",
                         variable=self.p_datos).pack(anchor="w")
+        self.p_fondo = tk.StringVar(value=p.get("fondo") or "#3d1766")
+        self.p_fondo_auto = tk.BooleanVar(value=not p.get("fondo"))
+        fila = ttk.Frame(self.f); fila.pack(anchor="w", pady=2)
+        ttk.Label(fila, text="Color de fondo detrás de las imágenes").pack(side="left")
+        boton = self._boton_color(fila, self.p_fondo)
+        boton.pack(side="left", padx=6)
+        self.p_fondo.trace_add("write", lambda *a: self.p_fondo_auto.set(False))
+        ttk.Checkbutton(fila, text="Automático (color del borde de la imagen)", variable=self.p_fondo_auto).pack(side="left", padx=6)
         ttk.Label(self.f, text=f"Marca 1 o {self.maximo} imágenes para mostrar:", style="Suave.TLabel").pack(anchor="w", pady=(6, 2))
         self.marco_img = ttk.Frame(self.f); self.marco_img.pack(fill="x")
         self._pintar_imagenes(j.get("imagenes") or [], p["imagenes"])
@@ -265,7 +273,8 @@ class EditorCartel:
             "estilo": inv(ESTILOS, self.m_estilo.get()), "segundos_mensaje": int(self.m_seg.get() or 5),
             "velocidad": inv(VELOCIDADES, self.m_vel.get()), "fondo": self.fondo.get(),
             "pago": {"activa": self.p_activa.get(), "segundos": int(self.p_seg.get() or 15), "reloj": self.p_reloj.get(),
-                     "en_datos": self.p_datos.get(), "imagenes": [i for i, v in self.vars_img.items() if v.get()]},
+                     "en_datos": self.p_datos.get(), "fondo": "" if self.p_fondo_auto.get() else self.p_fondo.get(),
+                     "imagenes": [i for i, v in self.vars_img.items() if v.get()]},
         }
 
     def guardar(self, despues=None):

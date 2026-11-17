@@ -58,6 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'segundos' => (int)($_POST['p_segundos'] ?? 15),
                 'reloj' => !empty($_POST['p_reloj']),
                 'en_datos' => !empty($_POST['p_en_datos']),
+                'fondo' => !empty($_POST['p_fondo_auto']) ? '' : (string)($_POST['p_fondo'] ?? ''),
                 'imagenes' => array_map('intval', (array)($_POST['p_img'] ?? [])),
             ],
         ]);
@@ -244,6 +245,11 @@ que entren. Sube las imágenes o PDF más abajo y marca <b>1 o 2</b> para mostra
 </div>
 <label class="casilla"><input type="checkbox" name="p_reloj" value="1"<?= $cartel['pago']['reloj'] ? ' checked' : '' ?>> La hora arriba de las imágenes (con el estilo y color de la hora)</label>
 <label class="casilla"><input type="checkbox" name="p_en_datos" value="1"<?= $cartel['pago']['en_datos'] ? ' checked' : '' ?>> Mostrarlas también junto a los datos y el total mientras se factura</label>
+<div class="fila-campos">
+<div class="campo"><label for="p_fondo">Color de fondo detrás de las imágenes</label>
+<input type="color" id="p_fondo" name="p_fondo" value="<?= e($cartel['pago']['fondo'] ?: '#3d1766') ?>"></div>
+</div>
+<label class="casilla"><input type="checkbox" id="p_fondo_auto" name="p_fondo_auto" value="1"<?= $cartel['pago']['fondo'] === '' ? ' checked' : '' ?>> Automático (toma el color del borde de la imagen)</label>
 <?php if ($imagenesPago): ?>
 <div class="pagos" id="pagos">
 <?php foreach ($imagenesPago as $im): $sel = in_array((int)$im['id'], $cartel['pago']['imagenes'], true); ?>
@@ -338,6 +344,14 @@ que entren. Sube las imágenes o PDF más abajo y marca <b>1 o 2</b> para mostra
   }
   document.querySelectorAll('.elegir-pago').forEach(function (c) { c.addEventListener('change', contarPago); });
   contarPago();
+
+  // color de fondo de las formas de pago: al elegir un color se quita «Automático»
+  var pf = document.getElementById('p_fondo'), pa = document.getElementById('p_fondo_auto');
+  if (pf && pa) {
+    pf.addEventListener('input', function () { pa.checked = false; });
+    var sync = function () { pf.style.opacity = pa.checked ? .45 : 1; };
+    pa.addEventListener('change', sync); pf.addEventListener('input', sync); sync();
+  }
 
   // vista previa horizontal / vertical
   document.querySelectorAll('[data-or]').forEach(function (b) {
