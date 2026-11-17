@@ -100,10 +100,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             guardar_ajuste($pdo, 'admin_password_hash', password_hash($nueva, PASSWORD_DEFAULT));
             session_regenerate_id(true);
-            flash('Contraseña cambiada.');
+            admin_olvidar_todos($pdo);   // los celulares recordados deben volver a entrar
+            flash('Contraseña cambiada. Los celulares recordados tendrán que entrar de nuevo.');
         }
         volver('clave');
     }
+
     volver();
 }
 

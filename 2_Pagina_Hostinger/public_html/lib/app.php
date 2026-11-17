@@ -13,6 +13,8 @@ function app_schema(PDO $pdo): void {
     static $hecho = false;
     if ($hecho) return;
     $hecho = true;
+    // Hora de Ecuador también en MySQL (sin horario de verano), para que NOW() coincida con PHP.
+    $pdo->exec("SET time_zone = '-05:00'");
     $opciones = 'ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci';
     $pdo->exec("CREATE TABLE IF NOT EXISTS site_settings (
         skey VARCHAR(64) NOT NULL PRIMARY KEY,
@@ -42,6 +44,343 @@ function app_schema(PDO $pdo): void {
         attempts INT NOT NULL DEFAULT 0,
         last_at DATETIME NOT NULL
     ) $opciones");
+    // Sesiones recordadas del panel (para usar "Facturar" desde el celular sin entrar cada vez)
+    $pdo->exec("CREATE TABLE IF NOT EXISTS admin_tokens (
+        token_hash CHAR(64) NOT NULL PRIMARY KEY,
+        expires_at DATETIME NOT NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    ) $opciones");
+    // Copia de los clientes de FactuSYS (la envía el programa de la PC) para autocompletar
+    $pdo->exec("CREATE TABLE IF NOT EXISTS fs_clientes (
+        perfil TINYINT UNSIGNED NOT NULL,
+        ruc VARCHAR(20) NOT NULL,
+        codigo VARCHAR(20) NOT NULL DEFAULT '',
+        nombre VARCHAR(200) NOT NULL DEFAULT '',
+        direccion VARCHAR(255) NOT NULL DEFAULT '',
+        telefono VARCHAR(40) NOT NULL DEFAULT '',
+        email VARCHAR(160) NOT NULL DEFAULT '',
+        PRIMARY KEY (perfil, ruc)
+    ) $opciones");
+    // Facturas pedidas desde el celular, en espera de que la PC las haga en FactuSYS
+    $pdo->exec("CREATE TABLE IF NOT EXISTS fs_cola (
+        id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        perfil TINYINT UNSIGNED NOT NULL,
+        ruc VARCHAR(20) NOT NULL DEFAULT '',
+        nombre VARCHAR(200) NOT NULL,
+        direccion VARCHAR(255) NOT NULL DEFAULT '',
+        telefono VARCHAR(40) NOT NULL DEFAULT '',
+        email VARCHAR(160) NOT NULL DEFAULT '',
+        cliente_nuevo TINYINT(1) NOT NULL DEFAULT 0,
+        detalle VARCHAR(300) NOT NULL,
+        total DECIMAL(12,2) NOT NULL,
+        base DECIMAL(12,2) NOT NULL,
+        iva DECIMAL(12,2) NOT NULL,
+        con_iva TINYINT(1) NOT NULL DEFAULT 0,
+        origen VARCHAR(10) NOT NULL DEFAULT 'nuevo',
+        estado VARCHAR(20) NOT NULL DEFAULT 'cola',
+        numero VARCHAR(20) NOT NULL DEFAULT '',
+        autorizacion VARCHAR(60) NOT NULL DEFAULT '',
+        mensaje VARCHAR(400) NOT NULL DEFAULT '',
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        tomada_at DATETIME NULL,
+        KEY idx_cola_estado (estado, id)
+    ) $opciones");
+    // tablas creadas antes de que existiera la opción con/sin IVA
+    if (!$pdo->query("SHOW COLUMNS FROM fs_cola LIKE 'con_iva'")->fetch()) {
+        $pdo->exec("ALTER TABLE fs_cola ADD con_iva TINYINT(1) NOT NULL DEFAULT 0 AFTER iva");
+    }
+    // de dónde salieron los datos del cliente: factusys (registrado), sri (consulta) o nuevo (escritos a mano)
+    if (!$pdo->query("SHOW COLUMNS FROM fs_cola LIKE 'origen'")->fetch()) {
+        $pdo->exec("ALTER TABLE fs_cola ADD origen VARCHAR(10) NOT NULL DEFAULT 'nuevo' AFTER con_iva");
+    }
+    // Teléfonos autorizados como «pantalla del cliente» (se emparejan con un código de 6 dígitos)
+    $pdo->exec("CREATE TABLE IF NOT EXISTS pantalla_disp (
+        id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        token_hash CHAR(64) NOT NULL,
+        codigo CHAR(6) NOT NULL,
+        nombre VARCHAR(60) NOT NULL DEFAULT '',
+        aprobado TINYINT(1) NOT NULL DEFAULT 0,
+        creado DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        visto DATETIME NULL,
+        UNIQUE KEY uq_pantalla_token (token_hash),
+        KEY idx_pantalla_codigo (codigo)
+    ) $opciones");
+    // Imágenes de formas de pago para el cartel (QR, cuenta bancaria…); un PDF se convierte
+    // a imagen en el navegador antes de subirlo
+    $pdo->exec("CREATE TABLE IF NOT EXISTS pantalla_img (
+        id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        nombre VARCHAR(80) NOT NULL DEFAULT '',
+        mime VARCHAR(20) NOT NULL,
+        ancho INT UNSIGNED NOT NULL DEFAULT 0,
+        alto INT UNSIGNED NOT NULL DEFAULT 0,
+        huella CHAR(16) NOT NULL,
+        datos MEDIUMBLOB NOT NULL,
+        creado DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    ) $opciones");
+}
+
+// ---------------------------------------------------------------------------
+// Pantalla del cliente: lo que se está facturando, para que el cliente lo revise
+// ---------------------------------------------------------------------------
+
+const PANTALLA_CADUCA_SEG = 900;    // datos de un cliente sin cambios por 15 min: la pantalla se limpia
+const PANTALLA_FASES = ['vacio', 'llenando', 'revisar', 'gracias'];
+
+function pantalla_leer(PDO $pdo): array {
+    $st = $pdo->query("SELECT svalue FROM site_settings WHERE skey = 'pantalla_estado'");
+    $e = $st ? json_decode((string)$st->fetchColumn(), true) : null;
+    if (!is_array($e)) $e = [];
+    $e += ['v' => 0, 'fase' => 'vacio', 'datos' => [], 'resp' => '', 't' => 0];
+    if ($e['fase'] !== 'vacio' && time() - (int)$e['t'] > PANTALLA_CADUCA_SEG) {
+        $e['fase'] = 'vacio';
+        $e['datos'] = [];
+    }
+    return $e;
+}
+
+function pantalla_guardar(PDO $pdo, array $e): void {
+    $e['t'] = time();
+    guardar_ajuste($pdo, 'pantalla_estado', json_encode($e, JSON_UNESCAPED_UNICODE));
+}
+
+/** Pone en la pantalla del cliente una fase y sus datos. Si los datos o la fase cambian,
+ *  la respuesta anterior del cliente se borra (debe revisar otra vez). Devuelve el estado. */
+function pantalla_poner(PDO $pdo, string $fase, array $entrada): array {
+    if (!in_array($fase, PANTALLA_FASES, true)) throw new InvalidArgumentException('fase');
+    $limites = ['nombre' => 200, 'ruc' => 13, 'direccion' => 255, 'telefono' => 10, 'email' => 160,
+        'detalle' => 300, 'base' => 14, 'iva' => 14, 'iva_txt' => 20, 'total' => 14];
+    $datos = [];
+    if ($fase !== 'vacio') {
+        foreach ($limites as $k => $max) {
+            $datos[$k] = mb_substr(trim(preg_replace('/\s+/u', ' ', (string)($entrada[$k] ?? ''))), 0, $max);
+        }
+    }
+    $e = pantalla_leer($pdo);
+    if (!($e['fase'] === $fase && $e['datos'] == $datos)) {
+        $e = ['v' => (int)$e['v'] + 1, 'fase' => $fase, 'datos' => $datos, 'resp' => ''];
+    }
+    pantalla_guardar($pdo, $e);
+    return $e;
+}
+
+// Cartel de la pantalla del cliente (cuando no hay una factura en curso): la hora y los
+// mensajes se turnan, cada uno con su estilo (neón o LED) y su color.
+const PANTALLA_CARTEL_ESTILOS = ['neon' => 'Neón', 'led' => 'Letrero LED'];
+const PANTALLA_CARTEL_VELOCIDADES = ['lenta' => 'Lenta', 'normal' => 'Normal', 'rapida' => 'Rápida'];
+const PANTALLA_COLORES_VIEJOS = ['rosa' => '#ff2bd6', 'azul' => '#29d9ff', 'verde' => '#39ff7a', 'ambar' => '#ffb020',
+    'rojo' => '#ff3b3b', 'blanco' => '#f4f4f4'];
+const PANTALLA_CARTEL_DEFECTO = [
+    'hora' => ['activa' => true, 'estilo' => 'led', 'color' => '#29d9ff', 'segundos' => 10, 'formato' => '12', 'fecha' => true],
+    'mensajes' => [
+        ['texto' => 'BIENVENIDOS', 'color' => '#ff2bd6'],
+        ['texto' => 'MECÁNICA TOAPANTA VÉLEZ', 'color' => '#ffb020'],
+        ['texto' => 'MANTENIMIENTO Y REPUESTOS', 'color' => '#39ff7a'],
+        ['texto' => 'GRACIAS POR SU PREFERENCIA', 'color' => '#29d9ff'],
+    ],
+    'estilo' => 'neon', 'segundos_mensaje' => 5, 'velocidad' => 'normal', 'fondo' => '#050506',
+    // formas de pago: la hora arriba y 1 o 2 imágenes abajo, como un turno más del cartel
+    'pago' => ['activa' => false, 'segundos' => 15, 'reloj' => true, 'imagenes' => []],
+];
+const PANTALLA_IMG_MAX = 2;                 // imágenes de pago que se muestran a la vez
+const PANTALLA_IMG_BYTES = 4 * 1024 * 1024;
+
+function pantalla_color(string $c, string $defecto): string {
+    $c = strtolower(trim($c));
+    if (isset(PANTALLA_COLORES_VIEJOS[$c])) return PANTALLA_COLORES_VIEJOS[$c];
+    return preg_match('/^#[0-9a-f]{6}$/', $c) ? $c : $defecto;
+}
+
+/** Configuración del cartel, siempre completa y válida (acepta el formato anterior). */
+function pantalla_cartel(PDO $pdo): array {
+    $st = $pdo->query("SELECT svalue FROM site_settings WHERE skey = 'pantalla_cartel'");
+    $c = $st ? json_decode((string)$st->fetchColumn(), true) : null;
+    return pantalla_cartel_normalizar(is_array($c) ? $c : []);
+}
+
+function pantalla_cartel_normalizar(array $c): array {
+    $d = PANTALLA_CARTEL_DEFECTO;
+    $colorViejo = pantalla_color((string)($c['color'] ?? ''), '#ff2bd6');      // formato anterior: un color para todo
+    $h = is_array($c['hora'] ?? null) ? $c['hora'] + $d['hora'] : $d['hora'];
+    $hora = [
+        'activa' => (bool)$h['activa'],
+        'estilo' => isset(PANTALLA_CARTEL_ESTILOS[$h['estilo']]) ? $h['estilo'] : 'led',
+        'color' => pantalla_color((string)$h['color'], $d['hora']['color']),
+        'segundos' => max(3, min(120, (int)$h['segundos'])),
+        'formato' => (string)$h['formato'] === '24' ? '24' : '12',
+        'fecha' => (bool)$h['fecha'],
+    ];
+    $mensajes = [];
+    $lista = array_key_exists('mensajes', $c) ? (array)$c['mensajes'] : $d['mensajes'];
+    foreach ($lista as $m) {
+        $texto = is_array($m) ? (string)($m['texto'] ?? '') : (string)$m;
+        $texto = mb_substr(trim(preg_replace('/\s+/u', ' ', $texto)), 0, 60);
+        if ($texto === '') continue;
+        $mensajes[] = ['texto' => $texto, 'color' => pantalla_color(is_array($m) ? (string)($m['color'] ?? '') : '', $colorViejo)];
+        if (count($mensajes) >= 12) break;
+    }
+    return [
+        'hora' => $hora,
+        'mensajes' => $mensajes,
+        'estilo' => isset(PANTALLA_CARTEL_ESTILOS[$c['estilo'] ?? '']) ? $c['estilo'] : 'neon',
+        'segundos_mensaje' => max(2, min(60, (int)($c['segundos_mensaje'] ?? 5))),
+        'velocidad' => isset(PANTALLA_CARTEL_VELOCIDADES[$c['velocidad'] ?? '']) ? $c['velocidad'] : 'normal',
+        'fondo' => pantalla_color((string)($c['fondo'] ?? ''), '#050506'),
+        'pago' => pantalla_pago_normalizar(is_array($c['pago'] ?? null) ? $c['pago'] : []),
+    ];
+}
+
+function pantalla_pago_normalizar(array $p): array {
+    $p += PANTALLA_CARTEL_DEFECTO['pago'];
+    $ids = [];
+    foreach ((array)$p['imagenes'] as $i) {
+        $i = (int)(is_array($i) ? ($i['id'] ?? 0) : $i);
+        if ($i > 0 && !in_array($i, $ids, true)) $ids[] = $i;
+        if (count($ids) >= PANTALLA_IMG_MAX) break;
+    }
+    return ['activa' => (bool)$p['activa'], 'segundos' => max(4, min(300, (int)$p['segundos'])),
+        'reloj' => (bool)$p['reloj'], 'imagenes' => $ids];
+}
+
+/** El cartel tal como lo usa la pantalla: las imágenes de pago con su huella (para la caché)
+ *  y solo las que todavía existen. */
+function pantalla_cartel_publico(PDO $pdo): array {
+    $c = pantalla_cartel($pdo);
+    $imgs = [];
+    if ($c['pago']['imagenes']) {
+        $marcas = implode(',', array_fill(0, count($c['pago']['imagenes']), '?'));
+        $st = $pdo->prepare("SELECT id, huella, ancho, alto FROM pantalla_img WHERE id IN ($marcas)");
+        $st->execute($c['pago']['imagenes']);
+        $hay = [];
+        foreach ($st->fetchAll() as $f) $hay[(int)$f['id']] = $f;
+        foreach ($c['pago']['imagenes'] as $id) {
+            if (isset($hay[$id])) {
+                $imgs[] = ['id' => $id, 'h' => $hay[$id]['huella'], 'w' => (int)$hay[$id]['ancho'], 'a' => (int)$hay[$id]['alto']];
+            }
+        }
+    }
+    $c['pago']['imagenes'] = $imgs;
+    if (!$imgs) $c['pago']['activa'] = false;
+    return $c;
+}
+
+/** Guarda una imagen de pago (PNG, JPG o WEBP ya validada). Devuelve su id o un error. */
+function pantalla_img_guardar(PDO $pdo, string $datos, string $nombre) {
+    if ($datos === '' || strlen($datos) > PANTALLA_IMG_BYTES) return 'La imagen debe pesar menos de 4 MB.';
+    $info = @getimagesizefromstring($datos);
+    $tipos = [IMAGETYPE_PNG => 'image/png', IMAGETYPE_JPEG => 'image/jpeg', IMAGETYPE_WEBP => 'image/webp'];
+    if (!$info || !isset($tipos[$info[2]])) return 'Solo se aceptan imágenes PNG, JPG o WEBP (o un PDF).';
+    if ($info[0] < 50 || $info[1] < 50 || $info[0] > 6000 || $info[1] > 6000) return 'La imagen tiene un tamaño fuera de lo normal.';
+    if ((int)$pdo->query('SELECT COUNT(*) FROM pantalla_img')->fetchColumn() >= 20) return 'Ya hay 20 imágenes: borra alguna antes de subir otra.';
+    $nombre = mb_substr(trim(preg_replace('/\s+/u', ' ', $nombre)), 0, 80) ?: 'Forma de pago';
+    $pdo->prepare('INSERT INTO pantalla_img (nombre, mime, ancho, alto, huella, datos) VALUES (:n, :m, :w, :a, :h, :d)')
+        ->execute(['n' => $nombre, 'm' => $tipos[$info[2]], 'w' => $info[0], 'a' => $info[1],
+            'h' => substr(hash('sha256', $datos), 0, 16), 'd' => $datos]);
+    return (int)$pdo->lastInsertId();
+}
+
+function pantalla_activa(PDO $pdo): bool {
+    return (bool)$pdo->query('SELECT 1 FROM pantalla_disp WHERE aprobado = 1 AND visto > NOW() - INTERVAL 1 MINUTE LIMIT 1')->fetchColumn();
+}
+
+/** El teléfono-pantalla que hace la consulta (por su llave), o null. */
+function pantalla_dispositivo(PDO $pdo, string $token): ?array {
+    if (!preg_match('/^[a-f0-9]{64}$/', $token)) return null;
+    $st = $pdo->prepare('SELECT * FROM pantalla_disp WHERE token_hash = :h');
+    $st->execute(['h' => hash('sha256', $token)]);
+    return $st->fetch() ?: null;
+}
+
+function pantallas_aprobadas(PDO $pdo): int {
+    return (int)$pdo->query('SELECT COUNT(*) FROM pantalla_disp WHERE aprobado = 1')->fetchColumn();
+}
+
+// ---------------------------------------------------------------------------
+// Facturación desde el celular
+// ---------------------------------------------------------------------------
+
+const FS_PERFILES = [
+    1 => ['corto' => 'Nancy Vélez', 'largo' => 'VELEZ MOGROVEJO NANCY PREDILECTA'],
+    2 => ['corto' => 'Nelson Toapanta', 'largo' => 'TOAPANTA CENTENO NELSON EFRAIN'],
+];
+const FS_DETALLE_POR_DEFECTO = 'VENTA DE REPUESTOS Y MANTENIMIENTO';
+const FS_IVA = 0.15;
+
+const FS_ESTADOS = [
+    'cola' => 'En espera de la PC',
+    'procesando' => 'La PC está facturando en FactuSYS',
+    'registrada' => 'Registrada · pendiente de autorización',
+    'autorizada' => 'Autorizada por el SRI',
+    'enviada' => 'Enviada por WhatsApp',
+    'enviada_pend' => 'Enviada por WhatsApp · autorización del SRI pendiente',
+    'sin_envio' => 'Autorizada · sin celular para enviar',
+    'error' => 'No se pudo facturar',
+    'revisar' => 'Revisar en FactuSYS',
+    'cancelada' => 'Cancelada',
+];
+
+/** Cédula (10), RUC (13) o pasaporte simple. */
+function fs_identificacion_valida(string $id): bool {
+    return (bool)preg_match('/^(\d{10}|\d{13})$/', $id);
+}
+
+/** Desglose a partir del valor con IVA incluido, igual que "Extraer IVA" de FactuSYS. Sin IVA: todo es base. */
+function fs_desglose(float $total, bool $conIva = true): array {
+    if (!$conIva) {
+        $total = round($total, 2);
+        return ['total' => $total, 'base' => $total, 'iva' => 0.0];
+    }
+    // FactuSYS redondea la base a 2 decimales y luego calcula el IVA; se busca la base
+    // cuyo total final coincida exactamente con lo que se quiere cobrar.
+    $total = round($total, 2);
+    $aprox = round($total / (1 + FS_IVA), 2);
+    $mejor = null;
+    foreach ([0, -0.01, 0.01, -0.02, 0.02] as $ajuste) {
+        $base = round($aprox + $ajuste, 2);
+        $iva = round($base * FS_IVA, 2);
+        $dif = abs(round($base + $iva, 2) - $total);
+        if ($mejor === null || $dif < $mejor['dif'] - 0.0001) {
+            $mejor = ['base' => $base, 'iva' => $iva, 'dif' => $dif];
+        }
+        if ($dif < 0.0001) break;
+    }
+    return ['total' => round($mejor['base'] + $mejor['iva'], 2), 'base' => $mejor['base'], 'iva' => $mejor['iva']];
+}
+
+/**
+ * Consulta pública del SRI (catastro de RUC) para traer nombre y dirección de un cliente nuevo.
+ * Solo funciona con RUC (13 dígitos) o cédulas que tienen RUC (se prueba cédula + 001).
+ * Si el SRI no responde, devuelve null y se escribe a mano.
+ */
+function fs_consulta_sri(string $id): ?array {
+    if (!function_exists('curl_init')) return null;
+    $rucs = strlen($id) === 13 ? [$id] : (strlen($id) === 10 ? [$id . '001'] : []);
+    $base = 'https://srienlinea.sri.gob.ec/sri-catastro-sujeto-servicio-internet/rest/';
+    $pedir = function (string $url) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 6, CURLOPT_CONNECTTIMEOUT => 4,
+            CURLOPT_HTTPHEADER => ['Accept: application/json'], CURLOPT_USERAGENT => 'Mozilla/5.0']);
+        $r = curl_exec($ch);
+        $codigo = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        return ($r !== false && $codigo === 200) ? json_decode((string)$r, true) : null;
+    };
+    foreach ($rucs as $ruc) {
+        $datos = $pedir($base . 'ConsolidadoContribuyente/obtenerPorNumerosRuc?&ruc=' . rawurlencode($ruc));
+        $fila = is_array($datos) ? ($datos[0] ?? $datos) : null;
+        $nombre = is_array($fila) ? trim((string)($fila['razonSocial'] ?? '')) : '';
+        if ($nombre === '') continue;
+        $direccion = '';
+        $est = $pedir($base . 'Establecimiento/consultarPorNumeroRuc?numeroRuc=' . rawurlencode($ruc));
+        if (is_array($est)) {
+            foreach ($est as $e) {
+                if (!is_array($e)) continue;
+                if ($direccion === '' || ($e['matriz'] ?? '') === 'SI') $direccion = trim((string)($e['direccionCompleta'] ?? ''));
+            }
+        }
+        return ['nombre' => mb_substr($nombre, 0, 200), 'direccion' => mb_substr($direccion, 0, 255)];
+    }
+    return null;
 }
 
 /** Ajustes del sitio (WhatsApp, enlace de reseñas, nombre). */
@@ -197,7 +536,7 @@ function pagina_inicio(array $config, string $titulo, string $subtitulo): void {
 <meta property="og:image:height" content="630">
 <meta name="theme-color" content="#0d5c63">
 <link rel="icon" href="assets/icono.png">
-<link rel="stylesheet" href="assets/app.css?v=2">
+<link rel="stylesheet" href="assets/app.css?v=3">
 </head>
 <body>
 <main class="shell">
@@ -241,6 +580,7 @@ function pagina_fin(array $config): void {
 <footer class="pie">
 <a href="sugerencias.php"><?= icono('mensaje', 16) ?> Déjanos una sugerencia</a>
 <span>Por privacidad, cada factura se retira 30 días después de emitida.</span>
+<span class="credito">Desarrollado por <a href="https://anderssont-var.github.io/AnderssonT-var.github/#inicio" target="_blank" rel="noopener">A.T.</a></span>
 </footer>
 </main>
 </body>

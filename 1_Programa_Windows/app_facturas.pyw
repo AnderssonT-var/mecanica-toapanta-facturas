@@ -23,6 +23,8 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 import monitor_facturas as core
+from pestana_movil import PestanaMovil
+from pestana_pantalla import PestanaPantalla
 
 try:
     import pystray
@@ -135,7 +137,7 @@ class ManejadorCola(logging.Handler):
 # Ventana
 # ---------------------------------------------------------------------------
 
-class App:
+class App(PestanaMovil, PestanaPantalla):
     def __init__(self, oculto: bool, servidor):
         self.servidor = servidor
         self.cola: queue.Queue = queue.Queue()
@@ -206,11 +208,17 @@ class App:
         self.tab_inicio = ttk.Frame(self.pestanas, padding=14)
         self.tab_config = ttk.Frame(self.pestanas, padding=14)
         self.tab_hist = ttk.Frame(self.pestanas, padding=14)
+        self.tab_movil = ttk.Frame(self.pestanas, padding=14)
+        self.tab_pantalla = ttk.Frame(self.pestanas, padding=14)
         self.pestanas.add(self.tab_inicio, text="  Inicio  ")
         self.pestanas.add(self.tab_config, text="  Configuración  ")
+        self.pestanas.add(self.tab_pantalla, text="  Pantalla del cliente  ")
+        # La facturación desde el celular está en pausa: su pestaña no se muestra y no se inicia.
         self.pestanas.add(self.tab_hist, text="  Historial  ")
         self._construir_inicio()
         self._construir_config()
+        self._construir_movil(self.tab_movil)
+        self._construir_pantalla(self.tab_pantalla)
         self._construir_historial()
 
     def _construir_inicio(self):
@@ -422,6 +430,7 @@ class App:
         self.var_auto.set(c.getboolean("general", "iniciar_automaticamente", fallback=True))
         self._vista_previa()
         self._cargar_historial()
+        self._cargar_movil()
 
     def _plantilla_actual(self) -> str:
         return self.txt_plantilla.get("1.0", "end-1c").strip().replace("\r", "").replace("\n", "\\n")
@@ -517,8 +526,15 @@ class App:
             messagebox.showwarning(APP, "Antes de empezar falta:\n\n• " + "\n• ".join(problemas))
             return
         try:
-            self.monitor = core.Monitor(self.cfg, al_evento=lambda *ev: self.cola.put(("evento",) + ev))
+            aprobador = self.crear_pantalla()
+        except BaseException as e:
+            aprobador = None
+            core.log.error("No se pudo iniciar la pantalla del cliente: %s", e)
+        try:
+            self.monitor = core.Monitor(self.cfg, al_evento=lambda *ev: self.cola.put(("evento",) + ev),
+                                        aprobador=aprobador)
         except BaseException as e:  # incluye SystemExit de un método de envío no disponible
+            self.detener_pantalla()
             messagebox.showerror(APP, f"No se pudo iniciar:\n{e}")
             return
         self.hilo = threading.Thread(target=self._trabajar, daemon=True)
@@ -534,6 +550,8 @@ class App:
             self.cola.put(("detenido",))
 
     def detener(self):
+        self.detener_facturador()
+        self.detener_pantalla()
         if self.monitor and self._corriendo():
             self.monitor.detener.set()
             self.lbl_estado.configure(text="Deteniendo…")
@@ -573,7 +591,11 @@ class App:
             while True:
                 msg = self.cola.get_nowait()
                 tipo = msg[0]
-                if tipo == "log":
+                if self.atender_prueba_lectura(msg) or self.atender_mensaje_pantalla(msg):
+                    pass
+                elif self.atender_mensaje_movil(msg):
+                    pass
+                elif tipo == "log":
                     self._log(msg[1], msg[2])
                 elif tipo == "evento":
                     _, clase, tel, archivo, detalle = msg
@@ -640,6 +662,8 @@ class App:
             self.num_espera.set(str(sum(1 for p in carpeta.iterdir() if p.suffix.lower() == ".pdf")))
         except OSError:
             self.num_espera.set("–")
+        if not una_vez:
+            self._pintar_movil()
         if not una_vez and not self.saliendo:
             self.root.after(5000, self._refrescar)
 
@@ -705,6 +729,8 @@ class App:
         self.saliendo = True
         if self.monitor:
             self.monitor.detener.set()
+        self.detener_facturador()
+        self.detener_pantalla(cerrar_monitor=True)
         if self.tray:
             try:
                 self.tray.stop()

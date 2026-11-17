@@ -171,8 +171,13 @@ def leer_historial(limite: int = 200) -> list[dict]:
 
 
 def normalizar_telefono(nombre_archivo: str) -> str | None:
-    """'593 0959133066' -> '593959133066'. Devuelve None si no es un celular de Ecuador."""
-    nombre = re.sub(r"\(\d+\)\s*$", "", nombre_archivo.strip())  # quita copias "(1)"
+    """'593 0959133066' -> '593959133066'. Devuelve None si no es un celular de Ecuador.
+
+    Lo que va después de un guion bajo se ignora: '0959133066_00002550' es el
+    nombre que pone la facturación desde el celular (celular_número de factura).
+    """
+    nombre = nombre_archivo.strip().split("_", 1)[0]
+    nombre = re.sub(r"\(\d+\)\s*$", "", nombre)  # quita copias "(1)"
     digitos = re.sub(r"\D", "", nombre)
     if digitos.startswith("5930"):
         digitos = "593" + digitos[4:]
@@ -654,8 +659,11 @@ def crear_enviador(cfg: configparser.ConfigParser):
 # ---------------------------------------------------------------------------
 
 class Monitor:
-    def __init__(self, cfg: configparser.ConfigParser, al_evento=None):
+    def __init__(self, cfg: configparser.ConfigParser, al_evento=None, aprobador=None):
         self.cfg = cfg
+        # aprobador (opcional): objeto con decidir(ruta, telefono) -> "enviar"/"esperar"/"descartar"
+        # y enviada(telefono). Lo usa la pantalla del cliente para no enviar sin confirmación.
+        self.aprobador = aprobador
         self.al_evento = al_evento or (lambda *a: None)   # avisa a la ventana: ("enviada"/"error", tel, archivo, detalle)
         self.detener = threading.Event()
         self.entrada = Path(cfg.get("carpetas", "entrada"))
@@ -689,6 +697,13 @@ class Monitor:
             return
         if not archivo_estable(ruta, self.espera_estable):
             return  # todavía se está guardando; se revisa en la siguiente vuelta
+        if self.aprobador is not None:
+            decision = self.aprobador.decidir(ruta, telefono)
+            if decision == "esperar":
+                return  # el cliente aún no confirma sus datos en la pantalla
+            if decision == "descartar":
+                self.a_errores(ruta, telefono, "No se envió: el cliente indicó un error en sus datos")
+                return
 
         clave = huella(ruta)
         info = self.estado.get(clave, {"telefono": telefono, "intentos": 0, "proximo": 0})
@@ -713,6 +728,8 @@ class Monitor:
             self.estado.pop(clave, None)
             guardar_estado(self.estado)
             log.info("✓ %s enviada a %s y movida a 'Facturas enviadas'", ruta.name, telefono)
+            if self.aprobador is not None:
+                self.aprobador.enviada(telefono)
             self.al_evento("enviada", telefono, ruta.name, info["link"])
 
         except (ErrorSubida, ErrorEnvio, requests.RequestException) as e:

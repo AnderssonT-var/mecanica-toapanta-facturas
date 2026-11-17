@@ -24,6 +24,10 @@ python hacer_icono.py
 python -m PyInstaller --noconfirm --clean --windowed --onedir ^
   --name "MonitorFacturas" --icon icono.ico ^
   --hidden-import pystray._win32 ^
+  --hidden-import ride_pdf --hidden-import reportlab.graphics.barcode.code128 ^
+  --hidden-import pantalla_cliente --hidden-import pestana_pantalla --hidden-import monitor_hdmi ^
+  --hidden-import PIL.ImageGrab --hidden-import PIL.ImageTk ^
+  --collect-submodules reportlab.graphics.barcode ^
   app_facturas.pyw
 if errorlevel 1 ( echo Error al construir. & pause & exit /b 1 )
 

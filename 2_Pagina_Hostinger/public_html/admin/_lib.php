@@ -10,6 +10,8 @@ header('Cache-Control: no-store');
 const ADMIN_INACTIVIDAD = 7200;     // 2 horas sin uso cierra la sesión
 const ADMIN_MAX_INTENTOS = 5;       // intentos fallidos antes de bloquear
 const ADMIN_BLOQUEO_MIN = 15;       // minutos de bloqueo
+const ADMIN_RECORDAR_DIAS = 30;     // "Recordar este celular"
+const ADMIN_COOKIE_RECORDAR = 'mtv_recordar';
 
 $pdo = db($config);
 app_schema($pdo);
@@ -42,11 +44,55 @@ function admin_intento(PDO $pdo, bool $exito): void {
     $st->execute(['ip' => ip_hash()]);
 }
 
+function admin_cookie(string $valor, int $expira): void {
+    setcookie(ADMIN_COOKIE_RECORDAR, $valor, [
+        'expires' => $expira, 'path' => '/admin/', 'httponly' => true, 'samesite' => 'Lax',
+        'secure' => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+    ]);
+}
+
+/** Crea el acceso recordado de este navegador (celular). */
+function admin_recordar(PDO $pdo): void {
+    $token = rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
+    $pdo->prepare('INSERT INTO admin_tokens (token_hash, expires_at) VALUES (:h, NOW() + INTERVAL '
+        . ADMIN_RECORDAR_DIAS . ' DAY)')->execute(['h' => hash('sha256', $token)]);
+    $pdo->exec('DELETE FROM admin_tokens WHERE expires_at < NOW()');
+    admin_cookie($token, time() + ADMIN_RECORDAR_DIAS * 86400);
+}
+
+function admin_olvidar(PDO $pdo): void {
+    $token = (string)($_COOKIE[ADMIN_COOKIE_RECORDAR] ?? '');
+    if ($token !== '') {
+        $pdo->prepare('DELETE FROM admin_tokens WHERE token_hash = :h')->execute(['h' => hash('sha256', $token)]);
+    }
+    admin_cookie('', time() - 3600);
+}
+
+/** Cierra todas las sesiones recordadas (al cambiar la contraseña). */
+function admin_olvidar_todos(PDO $pdo): void {
+    $pdo->exec('DELETE FROM admin_tokens');
+}
+
+function admin_por_cookie(PDO $pdo): bool {
+    $token = (string)($_COOKIE[ADMIN_COOKIE_RECORDAR] ?? '');
+    if ($token === '' || strlen($token) > 100) return false;
+    $st = $pdo->prepare('SELECT 1 FROM admin_tokens WHERE token_hash = :h AND expires_at > NOW()');
+    $st->execute(['h' => hash('sha256', $token)]);
+    if (!$st->fetchColumn()) {
+        admin_cookie('', time() - 3600);
+        return false;
+    }
+    session_regenerate_id(true);
+    $_SESSION['admin_desde'] = $_SESSION['admin_uso'] = time();
+    return true;
+}
+
 function admin_logueado(): bool {
-    if (empty($_SESSION['admin_desde'])) return false;
+    global $pdo;
+    if (empty($_SESSION['admin_desde'])) return admin_por_cookie($pdo);
     if (time() - (int)($_SESSION['admin_uso'] ?? 0) > ADMIN_INACTIVIDAD) {
         unset($_SESSION['admin_desde'], $_SESSION['admin_uso']);
-        return false;
+        return admin_por_cookie($pdo);
     }
     $_SESSION['admin_uso'] = time();
     return true;
@@ -54,7 +100,8 @@ function admin_logueado(): bool {
 
 function requiere_admin(): void {
     if (!admin_logueado()) {
-        header('Location: index.php');
+        $ir = basename((string)($_SERVER['SCRIPT_NAME'] ?? ''), '.php');
+        header('Location: index.php' . ($ir === 'facturar' ? '?ir=facturar' : ''));
         exit;
     }
 }
@@ -78,8 +125,10 @@ function admin_inicio(PDO $pdo, string $titulo, string $actual): void {
     $sinLeer = sugerencias_sin_leer($pdo);
     $menu = [
         'index' => ['Resumen', 'index.php'],
+        'facturar' => ['Facturar', 'facturar.php'],
         'clientes' => ['Clientes y facturas', 'clientes.php'],
         'sugerencias' => ['Reseñas y sugerencias', 'sugerencias.php'],
+        'pantalla' => ['Pantalla del cliente', 'pantalla.php'],
         'configuracion' => ['Configuración', 'configuracion.php'],
         'limpiar' => ['Limpiar base de datos', 'limpiar.php'],
     ];
@@ -91,7 +140,7 @@ function admin_inicio(PDO $pdo, string $titulo, string $actual): void {
 <meta name="robots" content="noindex, nofollow">
 <title><?= e($titulo) ?> | Admin</title>
 <link rel="icon" href="../assets/icono.png">
-<link rel="stylesheet" href="../assets/app.css?v=2">
+<link rel="stylesheet" href="../assets/app.css?v=3">
 </head>
 <body class="admin">
 <header class="admin-barra">
@@ -116,7 +165,10 @@ function admin_inicio(PDO $pdo, string $titulo, string $actual): void {
 }
 
 function admin_fin(): void {
-    echo "</main>\n</body>\n</html>\n";
+    echo "</main>\n"
+        . '<footer style="text-align:center;color:#5b6c75;font-size:.85rem;padding:0 16px 28px">Desarrollado por '
+        . '<a href="https://anderssont-var.github.io/AnderssonT-var.github/#inicio" target="_blank" rel="noopener">A.T.</a></footer>'
+        . "\n</body>\n</html>\n";
 }
 
 /**
