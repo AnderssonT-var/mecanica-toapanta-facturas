@@ -91,13 +91,26 @@ class PestanaPantalla:
         self.lbl_campos = ttk.Label(f, text="", style="Suave.TLabel", wraplength=680, justify="left")
         self.lbl_campos.grid(row=r, column=0, columnspan=3, sticky="w"); r += 1
 
-        titulo("3. Guardar")
+        titulo("3. Cartel, mensajes y formas de pago",
+               "La hora, los mensajes, las imágenes de pago (QR, cuenta del banco) y los colores. Es lo mismo que el panel "
+               "de la página: se guarda allá y lo ven el monitor y los teléfonos.")
+        fila = ttk.Frame(f); fila.grid(row=r, column=0, columnspan=3, sticky="w", pady=4); r += 1
+        ttk.Button(fila, text="Editar cartel…", command=self._editar_cartel).pack(side="left")
+
+        titulo("4. Guardar")
         fila = ttk.Frame(f); fila.grid(row=r, column=0, columnspan=3, sticky="w", pady=4); r += 1
         ttk.Button(fila, text="Guardar", style="Grande.TButton", command=self.guardar_pantalla).pack(side="left")
         self.lbl_pant = ttk.Label(f, text="", foreground=GRIS, wraplength=680, justify="left")
         self.lbl_pant.grid(row=r, column=0, columnspan=3, sticky="w", pady=(8, 0)); r += 1
         self._cargar_pantalla()
         self.root.after(2000, self._pintar_pantalla)
+
+    def _editar_cartel(self):
+        import editor_cartel
+        if not self.cfg.get("servidor", "upload_key", fallback="").strip():
+            messagebox.showwarning(APP, "Primero configura la conexión con la página (pestaña Configuración).")
+            return
+        editor_cartel.EditorCartel(self)
 
     def _llenar_monitores(self):
         self.lista_monitores = hdmi.monitores()
@@ -438,7 +451,21 @@ class PestanaPantalla:
                     vals, crudo = pc.leer_zona(lector, zona, img.crop((x, y, x + w, y + h)))
                     valores.update(vals)
                     crudos.append(crudo)
+                fuentes = self.pantalla.fuentes if self.pantalla else pc.FuentesCliente(self.cfg, pc.Pagina(self.cfg))
+                ruc = valores.get("ruc", "")
+                cliente = fuentes.buscar(ruc)
+                verificados = fuentes.aplicar(pc.armar_datos(valores))
+                for k in ("nombre", "direccion", "telefono", "email"):
+                    valores[k] = verificados.get(k, valores.get(k, ""))
                 filas = [f"{texto}:  {valores.get(k) or '— no se encontró —'}" for k, texto in pc.DATOS]
+                if ruc:
+                    filas.append("✓ Cédula/RUC con dígito verificador correcto." if pc.identificacion_valida(ruc)
+                                 else "⚠ La cédula/RUC no cumple el dígito verificador: revisa el número o el recuadro.")
+                    filas.append("✓ Cliente encontrado en FactuSYS: nombre, dirección, teléfono y correo exactos."
+                                 if cliente else "Cliente nuevo (no está en FactuSYS): se usa lo que se lee de la pantalla.")
+                if valores.get("total"):
+                    filas.append("✓ El IVA cuadra con el subtotal." if pc.totales_cuadran(valores)
+                                 else "⚠ El IVA leído no cuadra con el total: revisa el recuadro de totales.")
                 datos = pc.armar_datos(valores)
                 pie = ("\n\n✓ Así se lo mostraría la pantalla al cliente." if pc.datos_completos(datos)
                        else "\n\n⚠ Falta la cédula/RUC, el nombre o el total: revisa que los recuadros abarquen esos "

@@ -18,6 +18,8 @@ if errorlevel 1 (
 python -m pip install --upgrade pip >nul
 python -m pip install -r requirements.txt pyinstaller
 if errorlevel 1 ( echo Error instalando dependencias. & pause & exit /b 1 )
+rem para convertir PDF de formas de pago en el programa (si no se instala, se usa el panel de la página)
+python -m pip install pypdfium2
 
 python hacer_icono.py
 
@@ -25,7 +27,7 @@ python -m PyInstaller --noconfirm --clean --windowed --onedir ^
   --name "MonitorFacturas" --icon icono.ico ^
   --hidden-import pystray._win32 ^
   --hidden-import ride_pdf --hidden-import reportlab.graphics.barcode.code128 ^
-  --hidden-import pantalla_cliente --hidden-import pestana_pantalla --hidden-import monitor_hdmi ^
+  --hidden-import pantalla_cliente --hidden-import pestana_pantalla --hidden-import monitor_hdmi --hidden-import editor_cartel --collect-all pypdfium2 --collect-all pypdfium2_raw ^
   --hidden-import PIL.ImageGrab --hidden-import PIL.ImageTk ^
   --collect-submodules reportlab.graphics.barcode ^
   app_facturas.pyw

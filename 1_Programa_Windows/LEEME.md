@@ -155,10 +155,20 @@ completa en ese monitor con Microsoft Edge, sin pasar por internet.
 3. Si se cierra sola, el programa la vuelve a abrir en unos segundos. Si cambias
    algo en el panel de la página, el monitor lo toma en menos de 1 minuto.
 
+### Lectura verificada (v3.6)
+
+- La cédula/RUC solo se muestra al instante si cumple el dígito verificador.
+- Con esa cédula/RUC se busca al cliente en las tablas de FactuSYS (solo lectura) y se
+  muestran sus datos exactos. Si en el formulario se ve algo claramente distinto (se
+  cambió a mano), se respeta lo que se ve.
+- Cliente nuevo: el nombre se compara con el del SRI y se corrige la ortografía.
+- El total pasa al instante solo si el IVA corresponde a una tarifa real del subtotal.
+- «Probar lectura» dice qué se verificó.
+
 ### Formas de pago
 
-En el panel de la página → Pantalla del cliente → «Subir forma de pago» sube una
-imagen o un PDF (se usa su primera página) y marca 1 o 2 para mostrar. Salen como un
+En el programa (pestaña «Pantalla del cliente» → «Editar cartel…») o en el panel de
+la página → Pantalla del cliente → «Subir forma de pago» sube una imagen o un PDF (se usa su primera página) y marca 1 o 2 para mostrar. Salen como un
 turno más del cartel: la hora arriba y las imágenes abajo, lo más grandes posible.
 
 La facturación desde el celular está en pausa: su pestaña ya no se muestra.

@@ -539,9 +539,52 @@ def datos_completos(d: dict) -> bool:
 # OCR de Windows (proceso de PowerShell que queda abierto)
 # ---------------------------------------------------------------------------
 
+def identificacion_valida(n: str) -> bool:
+    """Cédula (10) o RUC (13) de Ecuador con su dígito verificador correcto.
+    Un número mal leído (un 8 por un 3, una cifra de más) casi nunca lo cumple."""
+    if not n.isdigit() or len(n) not in (10, 13):
+        return False
+    if n in ("9999999999", "9999999999999"):          # consumidor final
+        return True
+    prov, tercero = int(n[:2]), int(n[2])
+    if not (1 <= prov <= 24 or prov == 30):
+        return False
+    d = [int(c) for c in n]
+    if tercero < 6:                                     # persona natural: módulo 10
+        s = sum((x * c - 9) if x * c > 9 else x * c for x, c in zip(d[:9], (2, 1, 2, 1, 2, 1, 2, 1, 2)))
+        return (10 - s % 10) % 10 == d[9] and (len(n) == 10 or n[10:] != "000")
+    if len(n) != 13:
+        return False
+    if tercero == 6:                                    # entidad pública: módulo 11
+        s = sum(x * c for x, c in zip(d[:8], (3, 2, 7, 6, 5, 4, 3, 2)))
+        v = 11 - s % 11
+        return (0 if v == 11 else v) == d[8]
+    if tercero == 9:                                    # sociedad: módulo 11
+        s = sum(x * c for x, c in zip(d[:9], (4, 3, 2, 7, 6, 5, 4, 3, 2)))
+        v = 11 - s % 11
+        return (0 if v == 11 else v) == d[9]
+    return False
+
+
+def totales_cuadran(v: dict) -> bool:
+    """El IVA leído corresponde a una tarifa real (0, 5, 8, 12 o 15 %) del subtotal."""
+    try:
+        total, iva = float(v.get("total") or 0), float(v.get("iva") or 0)
+    except ValueError:
+        return False
+    if total <= 0:
+        return False
+    base = total - iva
+    if iva == 0:
+        return True
+    if base <= 0:
+        return False
+    return any(abs(round(base * t, 2) - iva) <= 0.011 for t in (0.05, 0.08, 0.12, 0.15))
+
+
 def _completo(k: str, v: str) -> bool:
     if k == "ruc":
-        return len(v) in (10, 13) and v.isdigit()
+        return identificacion_valida(v)
     if k == "telefono":
         return 7 <= len(v) <= 10 and v.isdigit()
     if k == "email":
@@ -820,6 +863,135 @@ class Pagina:
         return self.api("pantalla_ver")
 
 
+# ---------------------------------------------------------------------------
+# Verificación de lo leído contra los clientes de FactuSYS y el SRI
+# ---------------------------------------------------------------------------
+
+def _parecido(a: str, b: str) -> float:
+    import difflib
+    a, b = _clave(a), _clave(b)
+    if not a or not b:
+        return 0.0
+    return difflib.SequenceMatcher(None, a, b).ratio()
+
+
+class FuentesCliente:
+    """El OCR puede confundir letras; los datos guardados no. Con la cédula/RUC leída (y con
+    su dígito verificador correcto) se busca el cliente en las tablas de FactuSYS (solo
+    lectura) y se muestran sus datos exactos. Si es un cliente nuevo, el nombre se compara
+    con el del SRI. Si lo que se ve en el formulario es claramente distinto (se cambió a
+    mano), se respeta lo que se ve."""
+
+    def __init__(self, cfg, pagina=None):
+        self.cfg = cfg
+        self.pagina = pagina
+        self.mapa: dict[str, dict] = {}
+        self.marca = None
+        self.revisado = 0.0
+        self.sri: dict[str, dict | None] = {}
+        self.lock = threading.Lock()
+
+    # ---- clientes de FactuSYS ---------------------------------------------------------
+    def _tablas(self) -> list[Path]:
+        raiz = Path(self.cfg.get("facturacion", "factusys", fallback=r"C:\FACTUSYS"))
+        try:
+            import facturador as fz
+            datos = fz.DatosFactuSYS(raiz)
+            return [datos.tabla_clientes(n) for n in datos.perfiles()]
+        except Exception:  # noqa: BLE001
+            return sorted(raiz.glob("PERFIL*/Cob/DP05A110.DBF"))
+
+    def _cargar(self) -> None:
+        if time.time() - self.revisado < 3:
+            return
+        self.revisado = time.time()
+        tablas = [t for t in self._tablas() if t.is_file()]
+        try:
+            marca = tuple((str(t), t.stat().st_mtime, t.stat().st_size) for t in tablas)
+        except OSError:
+            return
+        if marca == self.marca:
+            return
+        from dbf_lector import leer_dbf
+        mapa: dict[str, dict] = {}
+        for t in tablas:
+            try:
+                filas = leer_dbf(t, ["EMPCLI", "NOMCLI", "NCOMERCIAL", "RUC", "PASAPORTE", "DIRECCION",
+                                     "FONO1", "FONO2", "FONO3", "EMAIL", "EMAIL2"])
+            except Exception as e:  # noqa: BLE001
+                log.debug("Pantalla del cliente: no se pudo leer %s: %s", t, e)
+                continue
+            for f in filas:
+                ruc = re.sub(r"\D", "", f.get("RUC") or f.get("PASAPORTE") or "")
+                if len(ruc) not in (10, 13):
+                    continue
+                nombres = [n.strip() for n in (f.get("EMPCLI"), f.get("NOMCLI"), f.get("NCOMERCIAL")) if n and n.strip()]
+                fonos = [x.strip() for x in (f.get("FONO1"), f.get("FONO2"), f.get("FONO3")) if x and x.strip()]
+                correos = [c.strip() for c in ";".join(x or "" for x in (f.get("EMAIL"), f.get("EMAIL2"))).split(";") if c.strip()]
+                if nombres:
+                    mapa[ruc] = {"nombres": nombres, "direccion": (f.get("DIRECCION") or "").strip(),
+                                 "fonos": fonos, "correos": correos}
+        self.mapa, self.marca = mapa, marca
+        log.info("Pantalla del cliente: %d clientes de FactuSYS para verificar la lectura.", len(mapa))
+
+    def buscar(self, ruc: str) -> dict | None:
+        if not ruc:
+            return None
+        self._cargar()
+        return self.mapa.get(ruc)
+
+    # ---- SRI (clientes nuevos) -----------------------------------------------------
+    def del_sri(self, ruc: str) -> dict | None:
+        if not self.pagina or not identificacion_valida(ruc) or ruc.startswith("9999"):
+            return None
+        with self.lock:
+            if ruc in self.sri:
+                return self.sri[ruc]
+            self.sri[ruc] = None
+
+        def consultar():
+            try:
+                j = self.pagina.api("consulta_ruc", ruc=ruc)
+                with self.lock:
+                    self.sri[ruc] = j.get("sri") or {}
+            except Exception as e:  # noqa: BLE001
+                log.debug("Pantalla del cliente: SRI no respondió: %s", e)
+                with self.lock:
+                    self.sri.pop(ruc, None) if len(self.sri) > 200 else None
+        threading.Thread(target=consultar, daemon=True).start()
+        return None
+
+    # ---- corrección -------------------------------------------------------------------
+    def aplicar(self, d: dict) -> dict:
+        d = dict(d)
+        ruc = d.get("ruc", "")
+        cli = self.buscar(ruc)
+        if cli:
+            d["ruc_ok"] = True
+            leido = d.get("nombre", "")
+            mejor = max(cli["nombres"], key=lambda n: _parecido(leido, n)) if leido else cli["nombres"][0]
+            if not leido or _parecido(leido, mejor) >= 0.55:
+                d["nombre"] = mejor.upper()
+            if cli["direccion"] and (not d.get("direccion") or _parecido(d["direccion"], cli["direccion"]) >= 0.5):
+                d["direccion"] = cli["direccion"].upper()
+            tel = d.get("telefono", "")
+            if not _completo("telefono", tel):
+                propio = next((limpiar_telefono(x) for x in cli["fonos"] if limpiar_telefono(x)), "")
+                d["telefono"] = propio or tel
+            correo = d.get("email", "")
+            if cli["correos"]:
+                parecido = max(cli["correos"], key=lambda c: _parecido(correo, c)) if correo else cli["correos"][0]
+                if not correo or _parecido(correo, parecido) >= 0.8:
+                    d["email"] = parecido.lower()
+            return d
+        if ruc and identificacion_valida(ruc):
+            sri = self.del_sri(ruc)
+            nombre = (sri or {}).get("nombre", "")
+            if nombre and d.get("nombre") and _parecido(d["nombre"], nombre) >= 0.6:
+                d["nombre"] = nombre.upper()
+        return d
+
+
 class Salida:
     """Adónde va lo que se lee: el monitor por cable (al instante) y la página (teléfonos).
     Con monitor, la página se actualiza en segundo plano para no hacerlo esperar."""
@@ -870,13 +1042,15 @@ class PantallaCliente:
         self.al_evento = al_evento or (lambda *a: None)
         self.ventana = ventana or VentanaFactuSYS(cfg)
         self.ocr = ocr or LectorOCR()
-        self.pagina = Salida(pagina or Pagina(cfg), monitor,
-                             telefono=cfg.getboolean(SECCION, "enviar_telefono", fallback=True))
+        base = pagina or Pagina(cfg)
+        self.pagina = Salida(base, monitor, telefono=cfg.getboolean(SECCION, "enviar_telefono", fallback=True))
+        self.fuentes = FuentesCliente(cfg, base if hasattr(base, "api") else None)
         self.detener = threading.Event()
         self.ultimo_img: dict[str, str] = {}      # huella de la imagen de cada campo
         self.ultimo_txt: dict[str, str] = {}      # texto limpio de la lectura anterior
         self.estables: dict[str, str] = {}        # valor confirmado (igual en 2 lecturas)
         self.zonas: dict[str, dict] = {}          # datos sacados de cada recuadro
+        self.ruc_dudoso: dict[str, int] = {}      # cédulas/RUC sin dígito verificador válido: lecturas
         self.enviado: dict | None = None          # lo último que se mandó a la página
         self.fase_enviada = ""
         self.formulario = False
@@ -903,12 +1077,13 @@ class PantallaCliente:
                 self.zonas[zona] = leer_zona(self.ocr, zona, img)[0]
                 self.ultimo_img[zona] = huella
             leidos.update(self.zonas[zona])
+        cuadran = totales_cuadran(leidos)
         valores = {}
         for k, limpio in leidos.items():
             # Un dato que ya se ve completo (cédula/RUC de 10 o 13 cifras, teléfono, correo, valores)
             # pasa al instante; el resto se acepta cuando sale igual dos veces seguidas (evita
             # mostrar lecturas a medias mientras se escribe).
-            if limpio and _completo(k, limpio):
+            if limpio and _completo(k, limpio) and (cuadran or k not in ("subtotal", "iva", "total")):
                 self.estables[k] = limpio
             elif limpio == self.ultimo_txt.get(k) and (limpio or not self.estables.get(k)):
                 self.estables[k] = limpio      # un dato ya leído no se borra por una lectura vacía
@@ -933,6 +1108,7 @@ class PantallaCliente:
         if not self.formulario:
             self.formulario = True
             self.ultimo_img.clear(); self.ultimo_txt.clear(); self.estables.clear(); self.zonas.clear()
+            self.ruc_dudoso.clear()
             log.info("Pantalla del cliente: factura abierta en FactuSYS, leyendo datos…")
         if not self.ventana.al_frente():
             self.texto_estado = "FactuSYS no está al frente (no se lee)"
@@ -952,7 +1128,18 @@ class PantallaCliente:
             self.error_ocr = str(e)
             self.texto_estado = f"sin lectura: {e}"
             return
-        datos = armar_datos(valores)
+        # la cédula/RUC que no cumple el dígito verificador y no está en FactuSYS espera una
+        # lectura más (puede ser un número a medio escribir o mal leído)
+        if valores.get("ruc") and not identificacion_valida(valores["ruc"]) and not self.fuentes.buscar(valores["ruc"]):
+            self.ruc_dudoso[valores["ruc"]] = self.ruc_dudoso.get(valores["ruc"], 0) + 1
+            if self.ruc_dudoso[valores["ruc"]] < 3:
+                valores = dict(valores, ruc="")
+        try:
+            datos = self.fuentes.aplicar(armar_datos(valores))
+        except Exception as e:  # noqa: BLE001
+            log.debug("Pantalla del cliente: verificación: %s", e)
+            datos = armar_datos(valores)
+        datos.pop("ruc_ok", None)
         try:
             hay_total = float(datos["total"] or 0) > 0
         except ValueError:

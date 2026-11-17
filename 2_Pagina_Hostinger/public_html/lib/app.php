@@ -180,7 +180,7 @@ const PANTALLA_CARTEL_DEFECTO = [
     ],
     'estilo' => 'neon', 'segundos_mensaje' => 5, 'velocidad' => 'normal', 'fondo' => '#050506',
     // formas de pago: la hora arriba y 1 o 2 imágenes abajo, como un turno más del cartel
-    'pago' => ['activa' => false, 'segundos' => 15, 'reloj' => true, 'imagenes' => []],
+    'pago' => ['activa' => false, 'segundos' => 15, 'reloj' => true, 'en_datos' => true, 'imagenes' => []],
 ];
 const PANTALLA_IMG_MAX = 2;                 // imágenes de pago que se muestran a la vez
 const PANTALLA_IMG_BYTES = 4 * 1024 * 1024;
@@ -239,7 +239,7 @@ function pantalla_pago_normalizar(array $p): array {
         if (count($ids) >= PANTALLA_IMG_MAX) break;
     }
     return ['activa' => (bool)$p['activa'], 'segundos' => max(4, min(300, (int)$p['segundos'])),
-        'reloj' => (bool)$p['reloj'], 'imagenes' => $ids];
+        'reloj' => (bool)$p['reloj'], 'en_datos' => (bool)$p['en_datos'], 'imagenes' => $ids];
 }
 
 /** El cartel tal como lo usa la pantalla: las imágenes de pago con su huella (para la caché)
@@ -260,8 +260,36 @@ function pantalla_cartel_publico(PDO $pdo): array {
         }
     }
     $c['pago']['imagenes'] = $imgs;
-    if (!$imgs) $c['pago']['activa'] = false;
+    if (!$imgs) { $c['pago']['activa'] = false; $c['pago']['en_datos'] = false; }
     return $c;
+}
+
+/** Lista de imágenes de pago guardadas (sin los datos). */
+function pantalla_imagenes(PDO $pdo): array {
+    $res = [];
+    foreach ($pdo->query('SELECT id, nombre, huella, ancho, alto FROM pantalla_img ORDER BY id')->fetchAll() as $f) {
+        $res[] = ['id' => (int)$f['id'], 'nombre' => $f['nombre'], 'h' => $f['huella'], 'w' => (int)$f['ancho'], 'a' => (int)$f['alto']];
+    }
+    return $res;
+}
+
+/** Tras subir una imagen: si todavía hay lugar, queda elegida para mostrarse. Devuelve si se eligió. */
+function pantalla_img_elegir_si_hay_lugar(PDO $pdo, int $id): bool {
+    $cartel = pantalla_cartel($pdo);
+    $hay = array_map('intval', $pdo->query('SELECT id FROM pantalla_img')->fetchAll(PDO::FETCH_COLUMN));
+    $cartel['pago']['imagenes'] = array_values(array_intersect($cartel['pago']['imagenes'], $hay));   // sin borradas
+    if (count($cartel['pago']['imagenes']) >= PANTALLA_IMG_MAX) return false;
+    $cartel['pago']['imagenes'][] = $id;
+    $cartel['pago']['activa'] = true;
+    guardar_ajuste($pdo, 'pantalla_cartel', json_encode(pantalla_cartel_normalizar($cartel), JSON_UNESCAPED_UNICODE));
+    return true;
+}
+
+function pantalla_img_borrar(PDO $pdo, int $id): void {
+    $pdo->prepare('DELETE FROM pantalla_img WHERE id = :id')->execute(['id' => $id]);
+    $cartel = pantalla_cartel($pdo);
+    $cartel['pago']['imagenes'] = array_values(array_diff($cartel['pago']['imagenes'], [$id]));
+    guardar_ajuste($pdo, 'pantalla_cartel', json_encode(pantalla_cartel_normalizar($cartel), JSON_UNESCAPED_UNICODE));
 }
 
 /** Guarda una imagen de pago (PNG, JPG o WEBP ya validada). Devuelve su id o un error. */
