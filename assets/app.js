@@ -34,19 +34,20 @@ document.querySelectorAll('table').forEach((t) => {
   const caja = document.getElementById('funciones');
   if (!caja) return;
   const PRO = ['documentos', 'retenciones', 'inventario', 'compras', 'cartera', 'pos'];
-  const ORDEN = ['documentos', 'retenciones', 'inventario', 'compras', 'cartera', 'pos', 'nube', 'movil'];
-  const CORTOS = { documentos: 'Documentos', retenciones: 'Retenciones', inventario: 'Inventario', compras: 'Compras', cartera: 'Cobros', pos: 'Punto de venta', nube: 'Nube', movil: 'Portal' };
+  const ORDEN = ['documentos', 'retenciones', 'inventario', 'compras', 'cartera', 'pos', 'nube', 'contabilidad', 'movil'];
+  const CORTOS = { documentos: 'Documentos', retenciones: 'Retenciones', inventario: 'Inventario', compras: 'Compras', cartera: 'Cobros', pos: 'Punto de venta', nube: 'Nube', contabilidad: 'Contabilidad', movil: 'Portal' };
+  const COMPLETO = ['nube', 'movil'];
   const checks = () => [...caja.querySelectorAll('input[name="funciones[]"]:not([type=hidden])')];
   const marcadas = () => ORDEN.filter((k) => checks().some((c) => c.checked && c.value === k));
   const precios = JSON.parse((document.getElementById('precio-sugerido') || {}).dataset.precios || '{}');
   function nombre(f) {
     const pro = PRO.every((x) => f.includes(x));
-    if (pro && f.includes('nube') && f.includes('movil')) return 'Completo';
+    if (pro && f.includes('nube') && f.includes('movil')) { const ex = f.filter((x) => !PRO.includes(x) && !COMPLETO.includes(x)); return 'Completo' + (ex.length ? ' + ' + ex.map((x) => CORTOS[x]).join(' + ') : ''); }
     let extras = f.filter((x) => !(pro && PRO.includes(x)));
     return (pro ? 'Profesional' : 'Básico') + (extras.length ? ' + ' + extras.map((x) => CORTOS[x]).join(' + ') : '');
   }
   function precio(f, n) {
-    if (n === 'Completo') return precios.completo || 0;
+    if (n.startsWith('Completo')) { let c = precios.completo || 0; f.filter((x) => !PRO.includes(x) && !COMPLETO.includes(x)).forEach((x) => { c += (precios.extra || {})[x] || 0; }); return Math.round(c * 100) / 100; }
     const pro = n.startsWith('Profesional');
     let t = (pro ? precios.profesional : precios.basico) || 0;
     f.filter((x) => !(pro && PRO.includes(x))).forEach((x) => { t += (precios.extra || {})[x] || 0; });

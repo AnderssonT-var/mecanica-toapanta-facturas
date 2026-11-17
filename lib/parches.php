@@ -9,7 +9,7 @@ const PAR_TIPOS = ['ANTIFALLO' => 'Antifallo', 'PARCHE' => 'Parche', 'MEJORA' =>
 const PAR_ESTADOS = ['PLANEADO' => 'Planeado', 'APLICADO' => 'Aplicado (sin publicar)', 'PUBLICADO' => 'Publicado'];
 const PAR_RIESGOS = ['ALTO' => 'Alto', 'MEDIO' => 'Medio', 'BAJO' => 'Bajo'];
 const PAR_AREAS = ['SRI' => 'SRI y comprobantes', 'NUMERACION' => 'Numeración', 'DINERO' => 'Pagos y cobros', 'LICENCIA' => 'Licencia y reloj', 'FIRMA' => 'Firma electrónica',
-  'DATOS' => 'Base de datos y equipo', 'CORREO' => 'Correo', 'PANTALLA' => 'Pantallas', 'INSTALADOR' => 'Instalador', 'PORTAL' => 'Portal', 'MONITOR' => 'Monitor'];
+  'DATOS' => 'Base de datos y equipo', 'CORREO' => 'Correo', 'PANTALLA' => 'Pantallas', 'INSTALADOR' => 'Instalador', 'PORTAL' => 'Portal', 'MONITOR' => 'Monitor', 'NUBE' => 'Nube y sincronización', 'INVENTARIO' => 'Inventario', 'CONTABILIDAD' => 'Contabilidad', 'BANCOS' => 'Bancos y tesorería'];
 
 // Historial: lo que ya se aplicó y lo que viene en esta versión. Cada despliegue agrega solo los códigos nuevos.
 function par_semilla(): array {
@@ -101,6 +101,36 @@ function par_semilla(): array {
     ['ME-001', 'MEJORA', 'PORTAL', 'MEDIO', '0.16.4', '1.10.0', 'APLICADO', '2026-11-15', 'Nube de respaldo y portal web separados',
       'El portal web obligaba a tener la nube completa: quien solo quería el portal pagaba y guardaba en la nube toda su información, y quien solo quería respaldo no podía elegirlo por separado.',
       'Son dos funciones independientes y se suman al plan por separado. Solo nube: respaldo diario completo, restaurar en otra PC y varios equipos sincronizados. Solo portal: al portal viajan únicamente clientes, productos y catálogo, y el estado de las facturas hechas en el portal; nada más sale de la PC y no se guardan respaldos. Las dos: todo sincronizado. El portal sigue usando la PC encendida para firmar y autorizar.'],
+    ['AF-022', 'ANTIFALLO', 'NUBE', 'ALTO', '0.17.0', '', 'APLICADO', '2026-11-16', 'Primera sincronización de una base grande',
+      'En la prueba de saturación (30.000 facturas) la primera subida a la nube cargaba todo en memoria de una vez (más de 700 MB) y con cientos de equipos quietos el servidor recibía una consulta cada 20 segundos de cada uno.',
+      'La subida va por tandas de 2.000 registros por tabla. La sincronización es adaptable: cada 20 s mientras hay movimiento y hasta 2 a 5 minutos cuando no hay nada nuevo; cualquier venta o cambio vuelve a la frecuencia rápida. Los puntos de emisión se confirman cada 10 minutos o al cambiar.'],
+    ['AF-023', 'ANTIFALLO', 'SRI', 'ALTO', '0.17.0', '1.11.0', 'APLICADO', '2026-11-16', 'Datos absurdos o de tipo equivocado en una factura',
+      'Con 3.000 facturas de prueba llenas de errores de usuario salieron 23 fallas: plazos con decimales (XML inválido), textos que llegaban como objeto («[object Object]» o «Array» en el XML) y cantidades o precios gigantes que superan los 14 dígitos del SRI (número de factura perdido).',
+      'El plazo se redondea a días enteros, los textos solo aceptan texto o números, cantidades y precios tienen tope y el total no puede superar el máximo del SRI. Lo mismo en la app web (incluido «1e999» = infinito). Repetida la prueba: 0 fallas.'],
+    ['AF-024', 'ANTIFALLO', 'SRI', 'MEDIO', '0.17.0', '', 'APLICADO', '2026-11-16', 'ATS de negocios con muchos clientes',
+      'El validador del ATS tenía 32 MB de memoria y se quedaba sin memoria con anexos de unos 8 MB (miles de clientes en el mes).',
+      'La memoria del validador crece con el tamaño del XML (probado con 60.000 clientes, 34 MB, en 1 segundo). Los informes con decenas de miles de filas muestran las primeras 3.000 en pantalla (el total incluye todas) para no congelar el programa.'],
+    ['AF-025', 'ANTIFALLO', 'PORTAL', 'ALTO', '', '1.11.0', 'APLICADO', '2026-11-16', 'Base del hosting ocupada con muchos programas a la vez',
+      'Con 5 a 10 peticiones simultáneas el hosting rechazaba conexiones nuevas a MySQL por un instante y el portal respondía «error interno» (500).',
+      'El portal reintenta la conexión (pausas de 0,15 a 0,6 s, también por el socket local) y, si sigue ocupada, responde 503 «ocupado, reintenta»; el programa lo trata como falta de conexión y reintenta solo, sin registrarlo como error.'],
+    ['PA-008', 'PARCHE', 'INVENTARIO', 'ALTO', '0.17.0', '', 'APLICADO', '2026-11-16', 'Factura anulada en el SRI no devolvía el stock',
+      'Al anular una factura en el SRI sin nota de crédito, la venta desaparecía de los informes pero las unidades seguían descontadas del inventario y del kardex.',
+      'La anulación sin nota de crédito devuelve el stock al momento; con nota de crédito, la devolución la sigue haciendo la nota.'],
+    ['AF-026', 'ANTIFALLO', 'CONTABILIDAD', 'ALTO', '0.17.0', '', 'APLICADO', '2026-11-16', 'Cambios en periodos ya declarados',
+      'Una compra, cobro, pago o asiento registrado con fecha de un mes ya declarado cambiaría los estados financieros y el ATS ya presentados.',
+      'Cierre de periodo en Contabilidad: nada con fecha dentro del periodo cerrado se registra, cambia ni anula (facturas, compras, cobros, pagos, bancos, conciliaciones y asientos). Para cerrar no puede haber comprobantes sin autorizar ni asientos descuadrados. Reabrir exige motivo y queda registrado.'],
+    ['AF-027', 'ANTIFALLO', 'BANCOS', 'MEDIO', '0.17.0', '', 'APLICADO', '2026-11-16', 'Cheques repetidos y partidas ya conciliadas',
+      'Un mismo número de cheque podía registrarse dos veces y un movimiento ya cuadrado con el banco podía anularse después, descuadrando la conciliación.',
+      'El número de cheque es único por cuenta (avanza solo; un cheque puede pagar varias facturas del mismo proveedor). Lo conciliado no se puede anular; solo se reabre la última conciliación, con motivo. Las salidas que dejarían la cuenta en negativo piden confirmación (sobregiro).'],
+    ['ME-002', 'MEJORA', 'CONTABILIDAD', 'ALTO', '0.17.0', '1.11.0', 'APLICADO', '2026-11-16', 'Contabilidad completa',
+      'Facmit no llevaba contabilidad: el contador tenía que volver a digitar ventas, compras, cobros y pagos en otro sistema.',
+      'Plan de cuentas NIIF para PYMES (Supercias), asientos automáticos que nunca se descuadran con lo facturado (se arman desde los documentos), asientos manuales, libro diario, mayor, balance de comprobación, estado de resultados y de situación financiera, exportables a PDF y Excel. Probado: cartera, proveedores, bancos, IVA e inventario valorizado cuadran con su cuenta contable. Nueva función de licencia «Contabilidad y bancos».'],
+    ['ME-003', 'MEJORA', 'BANCOS', 'ALTO', '0.17.0', '', 'APLICADO', '2026-11-16', 'Bancos y tesorería',
+      'Los cobros y pagos por transferencia o cheque no decían a qué cuenta entraban o de cuál salían, y no había forma de cuadrar con el estado de cuenta del banco.',
+      'Cuentas bancarias y caja chica, libro de bancos, cheques (posfechados y en tránsito), transferencias entre cuentas, conciliación bancaria y flujo de caja real y proyectado. Saldos iniciales de clientes y proveedores. Nuevos informes de cuentas por pagar, pagos, bancos y flujo.'],
+    ['ME-004', 'MEJORA', 'SRI', 'MEDIO', '0.17.0', '', 'APLICADO', '2026-11-16', 'ATS según la norma de comprobantes electrónicos',
+      'Sin el detalle de ventas el ATS salía también sin el total por establecimiento; no avisaba de retenciones emitidas fuera de los 5 días ni de retenciones sin su compra registrada (que no salían en el anexo).',
+      'El total de ventas por establecimiento va siempre. Por defecto no se repite el detalle de facturas electrónicas (como pide el SRI), salvo los clientes que entregaron retenciones físicas. Opción para omitir las compras con retención electrónica. Avisos de plazo y de retenciones sin compra.'],
     ['PL-001', 'ANTIFALLO', 'FIRMA', 'MEDIO', '', '', 'PLANEADO', '2026-11-13', 'Firma vencida con comprobantes ya firmados en cola',
       'Si la firma vence o se cambia mientras hay comprobantes firmados sin enviar, el SRI podría rechazarlos por firma no vigente.',
       'Antes de reenviar un pendiente, revisar la vigencia del certificado con que se firmó y volver a firmarlo con la firma actual.'],

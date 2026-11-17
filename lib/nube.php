@@ -4,8 +4,8 @@
 declare(strict_types=1);
 if (!defined('FX_PORTAL')) { http_response_code(403); exit; }
 
-const NUBE_TABLAS = ['clientes', 'productos', 'comprobantes', 'catalogo', 'proformas', 'pedidos', 'movimientos', 'compras', 'abonos', 'cajas', 'caja_movimientos', 'bodegas', 'pagos'];
-const NUBE_TABLAS_DESDE_PROGRAMA = ['clientes', 'productos', 'comprobantes', 'catalogo', 'proformas', 'pedidos', 'movimientos', 'compras', 'abonos', 'cajas', 'caja_movimientos', 'bodegas', 'pagos'];
+const NUBE_TABLAS = ['clientes', 'productos', 'comprobantes', 'catalogo', 'proformas', 'pedidos', 'movimientos', 'compras', 'abonos', 'cajas', 'caja_movimientos', 'bodegas', 'pagos', 'bancos', 'banco_movimientos', 'conciliaciones', 'saldos_iniciales', 'asientos'];
+const NUBE_TABLAS_DESDE_PROGRAMA = ['clientes', 'productos', 'comprobantes', 'catalogo', 'proformas', 'pedidos', 'movimientos', 'compras', 'abonos', 'cajas', 'caja_movimientos', 'bodegas', 'pagos', 'bancos', 'banco_movimientos', 'conciliaciones', 'saldos_iniciales', 'asientos'];
 const NUBE_LOTE_PULL = 1000;
 // Solo portal web (sin la nube de respaldo): lo único que se guarda es lo que el portal necesita.
 const NUBE_TABLAS_PORTAL = ['clientes', 'productos', 'catalogo', 'pedidos', 'comprobantes'];
@@ -143,6 +143,11 @@ function nube_indices(string $tabla, array $r): array {
     case 'cajas': return [$fecha($r['apertura'] ?? ''), 'CAJA', '', (string)($r['estado'] ?? ''), (float)($r['esperado'] ?? 0), $txt($r['nombre'] ?? '', $r['usuario'] ?? '')];
     case 'caja_movimientos': return [$fecha($r['fecha'] ?? ''), mb_substr((string)($r['tipo'] ?? ''), 0, 20), '', '', (float)($r['valor'] ?? 0), $txt($r['motivo'] ?? '')];
     case 'pagos': return [$fecha($r['fecha'] ?? ''), mb_substr((string)($r['forma'] ?? ''), 0, 20), '', '', (float)($r['valor'] ?? 0), $txt($r['proveedor_id'] ?? '', $r['referencia'] ?? '')];
+    case 'bancos': return [$fecha($r['fecha_inicial'] ?? ''), 'BANCO', mb_substr((string)($r['numero'] ?? ''), 0, 20), '', (float)($r['saldo_inicial'] ?? 0), $txt($r['nombre'] ?? '', $r['banco'] ?? '')];
+    case 'banco_movimientos': return [$fecha($r['fecha'] ?? ''), mb_substr((string)($r['tipo'] ?? ''), 0, 20), mb_substr((string)($r['referencia'] ?? ''), 0, 20), '', (float)($r['valor'] ?? 0), $txt($r['beneficiario'] ?? '', $r['referencia'] ?? '')];
+    case 'conciliaciones': return [$fecha($r['hasta'] ?? ''), 'CONC', '', (string)($r['estado'] ?? ''), (float)($r['saldo_banco'] ?? 0), ''];
+    case 'saldos_iniciales': return [$fecha($r['fecha'] ?? ''), mb_substr((string)($r['tipo'] ?? ''), 0, 20), mb_substr((string)($r['documento'] ?? ''), 0, 20), '', (float)($r['valor'] ?? 0), $txt($r['tercero_id'] ?? '', $r['tercero_nombre'] ?? '')];
+    case 'asientos': return [$fecha($r['fecha'] ?? ''), 'ASI', mb_substr((string)($r['numero'] ?? ''), 0, 20), '', (float)($r['total'] ?? 0), $txt($r['concepto'] ?? '')];
     case 'bodegas': return [null, 'BOD', mb_substr((string)($r['codigo'] ?? ''), 0, 20), '', 0, $txt($r['codigo'] ?? '', $r['nombre'] ?? '')];
     default: return [null, (string)($r['tipo'] ?? ''), '', '', 0, $txt($r['clave'] ?? '')];
   }

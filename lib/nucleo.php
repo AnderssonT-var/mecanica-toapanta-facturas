@@ -5,7 +5,7 @@ declare(strict_types=1);
 if (!defined('FX_PORTAL')) { http_response_code(403); exit; }
 date_default_timezone_set('America/Guayaquil');
 
-const FX_VERSION = '1.10.0';
+const FX_VERSION = '1.11.0';
 const FX_MARCA = 'Facmit';
 
 // Nombre del producto. Los portales instalados antes del cambio de marca guardaron el nombre anterior en su
@@ -39,6 +39,7 @@ const FX_FUNCIONES = [
   'cartera'     => ['label' => 'Cuentas por cobrar', 'desc' => 'Ventas a crédito, abonos, retenciones recibidas, cartera vencida y estados de cuenta', 'grupo' => 'pro'],
   'pos'         => ['label' => 'Punto de venta y caja', 'desc' => 'Venta rápida con lector, apertura y cierre de caja con arqueo y tickets de 58/80 mm', 'grupo' => 'pro'],
   'nube'        => ['label' => 'Respaldo en la nube y varios equipos', 'desc' => 'Copia diaria completa en la nube, restaurar en otra PC y la misma información en varias computadoras', 'grupo' => 'extra'],
+  'contabilidad'=> ['label' => 'Contabilidad y bancos', 'desc' => 'Plan de cuentas, asientos automáticos, libro diario y mayor, balances y estados financieros; cuentas bancarias, cheques, conciliación y flujo de caja', 'grupo' => 'extra'],
   'movil'       => ['label' => 'Portal web (facturar desde el celular)', 'desc' => 'Facturar y consultar desde el celular o el navegador con los clientes y productos de la PC; la PC firma y autoriza', 'grupo' => 'extra'],
 ];
 const FX_PRO = ['documentos', 'retenciones', 'inventario', 'compras', 'cartera', 'pos'];
@@ -50,7 +51,7 @@ const FX_FUNCIONES_VERSION = 2;
 function funciones_licencia(array $l): array {
   $f = json_decode((string)($l['funciones'] ?? ''), true);
   if (!is_array($f)) {
-    $f = match ($l['plan'] ?? '') { 'FULL' => array_keys(FX_FUNCIONES), 'WEB' => ['nube', 'movil'], default => FX_PRO };
+    $f = match ($l['plan'] ?? '') { 'FULL' => array_merge(FX_PRO, ['nube', 'movil']), 'WEB' => ['nube', 'movil'], default => FX_PRO };
   }
   return normalizar_funciones($f);
 }
@@ -69,10 +70,13 @@ function tiene_funcion(array $l, string $f): bool {
 function nombre_plan(array $f): string {
   $f = array_values(array_intersect(array_keys(FX_FUNCIONES), $f));
   $pro = !array_diff(FX_PRO, $f);
-  if ($pro && in_array('nube', $f, true) && in_array('movil', $f, true)) return 'Completo';
+  $cortos = ['documentos' => 'Documentos', 'retenciones' => 'Retenciones', 'inventario' => 'Inventario', 'compras' => 'Compras', 'cartera' => 'Cobros', 'pos' => 'Punto de venta', 'nube' => 'Nube', 'contabilidad' => 'Contabilidad', 'movil' => 'Portal'];
+  if ($pro && in_array('nube', $f, true) && in_array('movil', $f, true)) {
+    $extras = array_diff($f, FX_PRO, ['nube', 'movil']);
+    return 'Completo' . ($extras ? ' + ' . implode(' + ', array_map(fn($x) => $cortos[$x], $extras)) : '');
+  }
   $base = $pro ? 'Profesional' : 'Básico';
   $extras = array_diff($f, $pro ? FX_PRO : []);
-  $cortos = ['documentos' => 'Documentos', 'retenciones' => 'Retenciones', 'inventario' => 'Inventario', 'compras' => 'Compras', 'cartera' => 'Cobros', 'pos' => 'Punto de venta', 'nube' => 'Nube', 'movil' => 'Portal'];
   return $base . ($extras ? ' + ' . implode(' + ', array_map(fn($x) => $cortos[$x], $extras)) : '');
 }
 
@@ -92,7 +96,7 @@ function plan_de(array $l): string { return nombre_plan(funciones_licencia($l));
 function precio_sugerido(array $f): float {
   $p = fn($k) => (float)ajuste('precio_' . $k, '0');
   $cat = categoria_plan($f);
-  if ($cat === 'Completo') return $p('completo');
+  if ($cat === 'Completo') { $t = $p('completo'); foreach (array_diff($f, FX_PRO, ['nube', 'movil']) as $x) $t += $p('extra_' . $x); return round($t, 2); }
   $total = $cat === 'Profesional' ? $p('profesional') : $p('basico');
   foreach (array_diff($f, $cat === 'Profesional' ? FX_PRO : []) as $x) $total += $p('extra_' . $x);
   return round($total, 2);

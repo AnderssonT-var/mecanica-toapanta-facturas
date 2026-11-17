@@ -177,15 +177,19 @@ function emi_factura_xml(array $e, string $fechaIso, int $secuencial, string $cl
 }
 
 // ---------- Validación de cliente e ítems (formulario web y WhatsApp) ----------
+// Texto seguro: listas u otros tipos (formularios manipulados) cuentan como vacío, sin avisos de PHP.
+function emi_txt($v): string { return is_string($v) ? $v : ((is_int($v) || (is_float($v) && is_finite($v))) ? (string)$v : ''); }
+// Número finito y razonable (evita «1e999» = infinito en el XML).
+function emi_num_ok($v, float $max = 1e9): float { $n = is_numeric(emi_txt($v)) ? (float)emi_txt($v) : 0.0; return is_finite($n) && abs($n) <= $max ? $n : NAN; }
 function emi_validar_cliente(array $c): array {
-  $tipo = (string)($c['tipo'] ?? '');
+  $tipo = emi_txt($c['tipo'] ?? '');
   if ($tipo === 'CF') return ['tipo' => 'CF', 'identificacion' => '9999999999999', 'nombre' => 'CONSUMIDOR FINAL', 'direccion' => '', 'telefono' => '', 'email' => ''];
   if (!in_array($tipo, ['CEDULA', 'RUC', 'PASAPORTE'], true)) throw new WebError('Elige el tipo de identificación del cliente.');
-  $id = $tipo === 'PASAPORTE' ? strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string)($c['identificacion'] ?? ''))) : preg_replace('/\D/', '', (string)($c['identificacion'] ?? ''));
+  $id = $tipo === 'PASAPORTE' ? strtoupper(preg_replace('/[^A-Za-z0-9]/', '', emi_txt($c['identificacion'] ?? ''))) : preg_replace('/\D/', '', emi_txt($c['identificacion'] ?? ''));
   if ($tipo === 'CEDULA' && !validar_cedula($id)) throw new WebError('La cédula del cliente no es válida.');
   if ($tipo === 'RUC' && !validar_ruc($id)) throw new WebError('El RUC del cliente no es válido.');
   if ($tipo === 'PASAPORTE' && strlen($id) < 3) throw new WebError('La identificación del cliente no es válida.');
-  $original = trim((string)($c['nombre'] ?? ''));
+  $original = trim(emi_txt($c['nombre'] ?? ''));
   $nombre = emi_limpiar(mb_strtoupper($original));
   if ($original !== '' && $nombre === '') throw new WebError('El nombre del cliente solo tiene caracteres que el SRI no acepta (emojis o símbolos). Escríbelo con letras.');
   if ($nombre === '') throw new WebError('Falta el nombre del cliente.');
@@ -200,11 +204,13 @@ function emi_validar_items(array $lista, array $tarifas): array {
   foreach ($lista as $it) {
     if (!is_array($it)) continue;
     $desc = emi_limpiar($it['descripcion'] ?? '');
-    if ($desc === '' && trim((string)($it['descripcion'] ?? '')) !== '') throw new WebError('Una descripción solo tiene caracteres que el SRI no acepta (emojis o símbolos). Escríbela con letras.');
-    $cant = (float)($it['cantidad'] ?? 0);
-    $precio = (float)($it['precioUnitario'] ?? 0);
-    $descPct = min(100, max(0, (float)($it['descuentoPct'] ?? 0)));
-    $tar = (string)($it['tarifa'] ?? '');
+    if ($desc === '' && trim(emi_txt($it['descripcion'] ?? '')) !== '') throw new WebError('Una descripción solo tiene caracteres que el SRI no acepta (emojis o símbolos). Escríbela con letras.');
+    $cant = emi_num_ok($it['cantidad'] ?? 0);
+    $precio = emi_num_ok($it['precioUnitario'] ?? 0);
+    $dp = emi_num_ok($it['descuentoPct'] ?? 0, 100);
+    $descPct = is_nan($dp) ? 0.0 : min(100, max(0, $dp));
+    $tar = emi_txt($it['tarifa'] ?? '');
+    if ($desc !== '' && (is_nan($cant) || is_nan($precio))) throw new WebError('La cantidad o el precio de "' . $desc . '" no es un número válido.');
     if ($desc === '' || $cant <= 0) continue;
     if ($precio < 0) throw new WebError('Hay un precio negativo en "' . $desc . '".');
     if (!isset($tarifas[$tar])) throw new WebError('La tarifa de IVA de "' . $desc . '" no está habilitada.');
