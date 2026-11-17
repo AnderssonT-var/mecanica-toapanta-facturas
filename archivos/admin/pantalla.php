@@ -57,6 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'activa' => !empty($_POST['p_activa']),
                 'segundos' => (int)($_POST['p_segundos'] ?? 15),
                 'reloj' => !empty($_POST['p_reloj']),
+                'en_datos' => !empty($_POST['p_en_datos']),
                 'imagenes' => array_map('intval', (array)($_POST['p_img'] ?? [])),
             ],
         ]);
@@ -80,11 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $r = pantalla_img_guardar($pdo, (string)file_get_contents($f['tmp_name']), $nombre);
         if (is_string($r)) { flash($r, 'error'); volver_pantalla('pago'); }
         // si todavía hay lugar, la nueva imagen queda elegida para mostrarse
-        $cartel = pantalla_cartel($pdo);
-        if (count($cartel['pago']['imagenes']) < PANTALLA_IMG_MAX) {
-            $cartel['pago']['imagenes'][] = $r;
-            $cartel['pago']['activa'] = true;
-            guardar_ajuste($pdo, 'pantalla_cartel', json_encode(pantalla_cartel_normalizar($cartel), JSON_UNESCAPED_UNICODE));
+        if (pantalla_img_elegir_si_hay_lugar($pdo, $r)) {
             flash('Imagen subida y elegida para mostrarse en la pantalla.');
         } else {
             flash('Imagen subida. Ya hay ' . PANTALLA_IMG_MAX . ' elegidas: marca cuáles quieres mostrar y guarda.');
@@ -93,11 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($accion === 'borrar_img') {
-        $id = (int)($_POST['id'] ?? 0);
-        $pdo->prepare('DELETE FROM pantalla_img WHERE id = :id')->execute(['id' => $id]);
-        $cartel = pantalla_cartel($pdo);
-        $cartel['pago']['imagenes'] = array_values(array_diff($cartel['pago']['imagenes'], [$id]));
-        guardar_ajuste($pdo, 'pantalla_cartel', json_encode(pantalla_cartel_normalizar($cartel), JSON_UNESCAPED_UNICODE));
+        pantalla_img_borrar($pdo, (int)($_POST['id'] ?? 0));
         flash('Imagen borrada.');
         volver_pantalla('pago');
     }
@@ -250,6 +243,7 @@ que entren. Sube las imágenes o PDF más abajo y marca <b>1 o 2</b> para mostra
 <div class="campo"><label for="p_segundos">Tiempo en pantalla (segundos)</label><input type="number" id="p_segundos" name="p_segundos" min="4" max="300" value="<?= (int)$cartel['pago']['segundos'] ?>"></div>
 </div>
 <label class="casilla"><input type="checkbox" name="p_reloj" value="1"<?= $cartel['pago']['reloj'] ? ' checked' : '' ?>> La hora arriba de las imágenes (con el estilo y color de la hora)</label>
+<label class="casilla"><input type="checkbox" name="p_en_datos" value="1"<?= $cartel['pago']['en_datos'] ? ' checked' : '' ?>> Mostrarlas también junto a los datos y el total mientras se factura</label>
 <?php if ($imagenesPago): ?>
 <div class="pagos" id="pagos">
 <?php foreach ($imagenesPago as $im): $sel = in_array((int)$im['id'], $cartel['pago']['imagenes'], true); ?>

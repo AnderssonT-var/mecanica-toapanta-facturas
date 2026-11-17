@@ -139,6 +139,23 @@ h1 { margin: 0; font-size: 1.6em; line-height: 1.15; }
   .cuerpo { justify-content: space-between; }
   .lleno .dato b { font-size: 1.25em; }
 }
+/* datos + formas de pago: a la izquierda los datos y debajo el total; a la derecha cómo pagar */
+.pago-datos { display: none; position: relative; min-height: 0; }
+.pago-datos img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; object-position: center top; }
+.pago-datos.dos img:first-child { bottom: 50.8%; }
+.pago-datos.dos img:last-child { top: 50.8%; }
+.cuerpo.con-pago .pago-datos { display: block; }
+@media (orientation: landscape) {
+  .cuerpo.con-pago { flex: 1; grid-template-columns: 1.35fr 1fr; grid-template-rows: 1fr auto; }
+  .cuerpo.con-pago .tarjeta { grid-column: 1; grid-row: 1; }
+  .cuerpo.con-pago .total { grid-column: 1; grid-row: 2; }
+  .cuerpo.con-pago .pago-datos { grid-column: 2; grid-row: 1 / 3; }
+  .cuerpo.con-pago .tarjeta { grid-template-columns: 1fr 1fr; }
+}
+@media (orientation: portrait) {
+  .cuerpo.con-pago { justify-content: flex-start; }
+  .cuerpo.con-pago .pago-datos { flex: 1; min-height: 22vh; }
+}
 /* cartel */
 #v_cartel { position: fixed; inset: 0; align-items: center; justify-content: center; background: var(--cartel); overflow: hidden; }
 #neon { position: absolute; left: 4vw; right: 4vw; top: 8vh; bottom: 8vh; display: flex; flex-direction: column; align-items: center;
@@ -199,6 +216,7 @@ body.pc, body.pc * { cursor: none !important; }
 <div class="lineas"><span id="t_iva_txt">IVA</span><span id="t_iva">0.00</span></div>
 <div class="grande"><em>Total a pagar</em><strong id="t_total">$ 0.00</strong></div>
 </div>
+<div class="pago-datos" id="pago_datos" aria-label="Formas de pago"></div>
 </div>
 </section>
 
@@ -279,15 +297,29 @@ body.pc, body.pc * { cursor: none !important; }
     $('t_iva').textContent = d.iva || '0.00';
     $('t_iva_txt').textContent = d.iva_txt || 'IVA';
     $('t_total').textContent = '$ ' + (d.total || '0.00');
+    pagoEnDatos();
     ver('v_datos');
     ajustarDatos();
+  }
+  // formas de pago junto a los datos (si en el panel está marcado)
+  var pagoDatosClave = '';
+  function pagoEnDatos() {
+    var c = cartel.conf(), p = c && c.pago, lista = (p && p.en_datos && p.imagenes) ? p.imagenes : [];
+    var cuerpo = document.querySelector('.cuerpo'), caja = $('pago_datos');
+    var clave = lista.map(function (im) { return im.id + '-' + im.h; }).join(',');
+    cuerpo.className = 'cuerpo' + (lista.length ? ' con-pago' : '');
+    if (clave === pagoDatosClave) return;
+    pagoDatosClave = clave; caja.innerHTML = ''; caja.className = 'pago-datos' + (lista.length === 2 ? ' dos' : '');
+    lista.forEach(function (im) { var i = new Image(); i.alt = 'Forma de pago'; i.src = urlImg(im); caja.appendChild(i); });
   }
   // las letras crecen hasta llenar la pantalla (celular, tablet, de pie o de lado) sin cortarse
   function ajustarDatos() {
     if ($('v_datos').className.indexOf('activa') < 0) return;
     var pant = document.querySelector('.pant'), lo = 13, hi = 46, mejor = lo, unas = document.querySelectorAll('.dato b.una, .total strong');
+    var cajas = document.querySelectorAll('#v_datos .tarjeta, #v_datos .total');
     function cabe() {
       if (pant.scrollHeight > pant.clientHeight + 1 || pant.scrollWidth > pant.clientWidth + 1) return false;
+      for (var c = 0; c < cajas.length; c++) if (cajas[c].scrollHeight > cajas[c].clientHeight + 1) return false;
       for (var u = 0; u < unas.length; u++) if (unas[u].scrollWidth > unas[u].clientWidth + 1) return false;
       return true;
     }
@@ -586,6 +618,7 @@ body.pc, body.pc * { cursor: none !important; }
         activo = true; empezarTurno(); raf = requestAnimationFrame(cuadro);
       },
       pausar: function () { activo = false; if (raf) cancelAnimationFrame(raf); raf = null; },
+      conf: function () { return conf; },
       redimensionar: function () { if (activo && actual && actual.tipo === 'pago') { ponerPago(); return; } if (activo && actual && actual.tipo !== 'espera') { if (actual.estilo === 'led' && rueda) { prepararCanvas(); ponerLed(actual.texto, false); } else refrescar(true); } }
     };
   })();
@@ -598,7 +631,7 @@ body.pc, body.pc * { cursor: none !important; }
       post({ accion: MODO === 'pc' ? 'estado' : 'muestra' }, function (st, j) {
         if (j.ok) {
           if (j.ahora) desfase = j.ahora - (antes + Date.now()) / 2;
-          if (j.cartel && j.cartel_v !== cartelV) { cartelV = j.cartel_v; cartel.configurar(j.cartel); }
+          if (j.cartel && j.cartel_v !== cartelV) { cartelV = j.cartel_v; cartel.configurar(j.cartel); if (faseActual !== 'vacio' && faseActual !== 'gracias') { pagoEnDatos(); ajustarDatos(); } }
           if (j.v !== version || j.fase !== faseActual) { version = j.v; faseActual = j.fase; pintar(j); }
         }
         setTimeout(consultar, MODO === 'pc' ? (j.ok ? 150 : 1000) : 4000);
@@ -623,7 +656,7 @@ body.pc, body.pc * { cursor: none !important; }
       else if (j.ok) {
         espera = 1500;
         if (j.ahora) desfase = j.ahora - (enviado + Date.now()) / 2;
-        if (j.cartel && j.cartel_v !== cartelV) { cartelV = j.cartel_v; cartel.configurar(j.cartel); }
+        if (j.cartel && j.cartel_v !== cartelV) { cartelV = j.cartel_v; cartel.configurar(j.cartel); if (faseActual !== 'vacio' && faseActual !== 'gracias' && faseActual !== 'codigo') { pagoEnDatos(); ajustarDatos(); } }
         if (j.v !== version || j.fase !== faseActual) { version = j.v; faseActual = j.fase; pintar(j); }
       } else espera = 4000;
       setTimeout(consultar, espera);

@@ -10,6 +10,8 @@
 //   pantalla    → pone en la pantalla del cliente lo que se lee de FactuSYS (fase + datos)
 //   pantalla_ver→ lo que muestra la pantalla y la respuesta del cliente
 //   pantalla_config → el cartel (hora, mensajes, formas de pago) para el monitor por cable de la PC
+//   cartel_leer / cartel_guardar / img_subir / img_borrar → editar el cartel desde el programa
+//   consulta_ruc → nombre oficial del SRI de un RUC/cédula (para revisar la lectura de un cliente nuevo)
 $config = require dirname(__DIR__) . '/config.php';
 require dirname(__DIR__) . '/lib/bootstrap.php';
 require dirname(__DIR__) . '/lib/app.php';
@@ -58,6 +60,34 @@ switch ((string)($entrada['accion'] ?? '')) {
     case 'pantalla_config':
         $cartel = pantalla_cartel_publico($pdo);
         responder(200, ['ok' => true, 'cartel' => $cartel, 'cartel_v' => substr(md5(json_encode($cartel)), 0, 10)]);
+
+    case 'cartel_leer':
+        responder(200, ['ok' => true, 'cartel' => pantalla_cartel($pdo), 'imagenes' => pantalla_imagenes($pdo),
+            'maximo' => PANTALLA_IMG_MAX]);
+
+    case 'cartel_guardar':
+        if (!is_array($entrada['cartel'] ?? null)) responder(422, ['ok' => false, 'error' => 'Falta el cartel']);
+        $cartel = pantalla_cartel_normalizar($entrada['cartel']);
+        guardar_ajuste($pdo, 'pantalla_cartel', json_encode($cartel, JSON_UNESCAPED_UNICODE));
+        responder(200, ['ok' => true, 'cartel' => $cartel]);
+
+    case 'img_subir':
+        $datos = base64_decode((string)($entrada['datos'] ?? ''), true);
+        if ($datos === false) responder(422, ['ok' => false, 'error' => 'Imagen no válida']);
+        $r = pantalla_img_guardar($pdo, $datos, (string)($entrada['nombre'] ?? ''));
+        if (is_string($r)) responder(422, ['ok' => false, 'error' => $r]);
+        $elegida = pantalla_img_elegir_si_hay_lugar($pdo, $r);
+        responder(200, ['ok' => true, 'id' => $r, 'elegida' => $elegida]);
+
+    case 'img_borrar':
+        pantalla_img_borrar($pdo, (int)($entrada['id'] ?? 0));
+        responder(200, ['ok' => true]);
+
+    case 'consulta_ruc':
+        $id = preg_replace('/\D/', '', (string)($entrada['ruc'] ?? ''));
+        if (!fs_identificacion_valida($id)) responder(422, ['ok' => false, 'error' => 'Identificación no válida']);
+        $sri = fs_consulta_sri($id);
+        responder(200, ['ok' => true, 'sri' => $sri]);
 
     case 'pantalla_ver':
         $e = pantalla_leer($pdo);

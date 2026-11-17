@@ -2,20 +2,20 @@
 // Instalador de un solo uso: copia la actualización a su lugar y se borra a sí mismo.
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
-if (!hash_equals('8481c2e812076a6d396cb05acc0781c941ea318c8012bc4bc88ca13c07ca3e4a', hash('sha256', (string)($_GET['t'] ?? '')))) { http_response_code(404); exit('{}'); }
+if (!hash_equals('f44c1a434046dfdb60acbf1bd43d5f34440fb267a0f90600191e52c380a068d9', hash('sha256', (string)($_GET['t'] ?? '')))) { http_response_code(404); exit('{}'); }
 $raiz = dirname(__DIR__);
 $archivos = [
+    'pantalla.php' => '2cdd278192d81e78d0a6baac60e1c0ee5c5ad6f861a472bf5e32317f75bc97eb',
+    'lib/app.php' => '9208bd9dcd90c9f69c6b2bb44ec46a4cfcd6b85a643e72fd7bd7f97b4c57ca8a',
+    'admin/pantalla.php' => '013b13017adcce43269c48568577c8be88f3b567a53be2172353c50c25acc6b2',
+    'api/agente.php' => 'f637b6ea9cbe4dbdea76803ddd44c79aa3f610c8998d96d8d7cece1a4284c0f7',
+];
+// versión que debe haber hoy en el sitio: si alguien la cambió, no se pisa
+$antes = [
     'pantalla.php' => '4c5b20a373556333fd523e84b4d4d7fd6b9da09cf994bf241922eecbb65bd069',
     'lib/app.php' => '12dfaf2cfa5b0437d04b8f7ed9f29b2691d63722c1483714f845b18237a8f583',
     'admin/pantalla.php' => '6ad2d12f9612768e958883b8198371697709ef6c81ca0f6864e3182b3e37c9c8',
     'api/agente.php' => 'c37b10f28cc0d86a251c455eded466c012383a0bd07fef891961fccdc5d143aa',
-];
-// versión que debe haber hoy en el sitio: si alguien la cambió, no se pisa
-$antes = [
-    'pantalla.php' => 'cc4096721f1332cf888245f4f3ba965ec5deacebf1c9c96b913a10d48e1c7bce',
-    'lib/app.php' => '59bb491b93c146d8d510a6ddd30a9faf447f201d98589eae282c9e33235c9a31',
-    'admin/pantalla.php' => 'e7bd0362f083af6261d2bb78039c9a63cd4ccc59de39be2321bd6146d8d84317',
-    'api/agente.php' => '47bc87641e11dbf25ef25c7222a2cd57b9b2e45fccdb413634dcd9b1fc26d33c',
 ];
 $respaldo = dirname($raiz) . '/respaldo_web_' . date('Ymd_His');
 $res = ['ok' => true, 'archivos' => []];
