@@ -129,3 +129,23 @@ document.querySelectorAll('table').forEach((t) => {
     if (document.visibilityState === 'visible' && !document.activeElement.matches('input, select, textarea')) location.reload();
   }, seg * 1000);
 })();
+
+// Botones para elegir archivo en español y con el estilo del portal (el control del navegador sale en inglés).
+(() => {
+  document.querySelectorAll('input[type=file]:not([data-crudo])').forEach((i) => {
+    const caja = document.createElement('span');
+    caja.className = 'archivo';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn-sm';
+    btn.textContent = i.multiple ? 'Elegir archivos' : 'Elegir archivo';
+    const nom = document.createElement('span');
+    nom.className = 'archivo-nombre muted small';
+    nom.textContent = 'Ningún archivo elegido';
+    i.classList.add('archivo-oculto');
+    i.after(caja);
+    caja.append(btn, nom);
+    btn.addEventListener('click', () => i.click());
+    i.addEventListener('change', () => { nom.textContent = i.files && i.files.length ? [...i.files].map((f) => f.name).join(', ') : 'Ningún archivo elegido'; });
+  });
+})();

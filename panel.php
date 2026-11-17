@@ -22,7 +22,7 @@ $mrr = (float)$q("SELECT COALESCE(SUM(CASE periodo WHEN 'ANUAL' THEN precio / 12
 $porPlan = ['Básico' => 0, 'Profesional' => 0, 'Completo' => 0];
 foreach ($q("SELECT plan, funciones FROM licencias WHERE estado = 'ACTIVA' AND vence >= ?", [$hoy])->fetchAll() as $x) $porPlan[categoria_plan(funciones_licencia($x))]++;
 $proximas = $q("SELECT * FROM licencias WHERE estado = 'ACTIVA' AND vence <= ? ORDER BY vence LIMIT 12", [$en7])->fetchAll();
-$actividad = $q('SELECT e.*, l.cliente FROM eventos e LEFT JOIN licencias l ON l.id = e.licencia_id ORDER BY e.id DESC LIMIT 12')->fetchAll();
+$actividad = $q('SELECT e.*, l.cliente FROM eventos e LEFT JOIN licencias l ON l.id = e.licencia_id ORDER BY e.id DESC LIMIT 6')->fetchAll();
 
 $mon = mon_resumen();
 cabecera_html('Panel', $admin, 'panel');
@@ -55,7 +55,7 @@ cabecera_html('Panel', $admin, 'panel');
     <?php foreach ($actividad as $ev): ?>
       <div class="ev"><span class="badge t-n"><?= e($ev['tipo']) ?></span> <span><?= e($ev['cliente'] ?? '') ?></span><span class="sub"><?= e($ev['detalle']) ?> · <?= e(substr($ev['creado'], 0, 16)) ?></span></div>
     <?php endforeach; ?>
-    <?php if (!$actividad): ?><div class="empty">Sin actividad todavía.</div><?php endif; ?>
+    <?php if (!$actividad): ?><div class="empty">Sin actividad todavía.</div><?php else: ?><a class="small" href="eventos.php">Ver toda la actividad →</a><?php endif; ?>
   </section>
 </div>
 <?php pie_html();

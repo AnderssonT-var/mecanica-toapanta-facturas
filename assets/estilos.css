@@ -223,3 +223,16 @@ label.fun.det { padding: 8px 10px; }
 label.fun.det.off { opacity: .45; cursor: not-allowed; }
 .det-cat[hidden], label.fun.det[hidden] { display: none !important; }
 .det-solo input { width: 16px !important; height: 16px !important; margin: 0; flex: none; }
+
+/* Elegir archivo (reemplaza al control del navegador, que sale en inglés). */
+.archivo { display: flex; align-items: center; gap: 10px; min-height: 40px; }
+.archivo-nombre { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+input.archivo-oculto { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* Formulario de licencia: módulos del plan más compactos (mismo estilo que las funciones por categoría). */
+#funciones label.fun { padding: 8px 10px; }
+#funciones label.fun small { font-size: 12px; }
+#funciones .fun-grupo { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 6px; }
+#funciones .fun-grupo > .fun-tit, #funciones .fun-grupo > .fun-inv { grid-column: 1 / -1; }
+#funciones .fun-inv { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 6px; }
+#funciones .fun-inv > .fun-sub { grid-column: 1 / -1; }

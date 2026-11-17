@@ -44,7 +44,7 @@ $opt = fn($v, $t, $act) => '<option value="' . e($v) . '"' . ($act === $v ? ' se
   <?php foreach ($filas as $l): $est = estado_licencia($l); ?>
     <tr class="click"><td class="mono"><a href="licencia.php?id=<?= (int)$l['id'] ?>"><?= e(codigo_licencia($l)) ?></a></td>
     <td><a href="licencia.php?id=<?= (int)$l['id'] ?>"><b><?= e($l['cliente']) ?></b></a><span class="sub mono"><?= e($l['ruc']) ?></span></td>
-    <td class="mono"><?= e($l['clave']) ?></td><td><?= e(plan_de($l)) ?></td><td><?= fecha_ec($l['vence']) ?></td>
+    <td class="mono"><?= e($l['clave']) ?></td><td><?php $pn = plan_de($l); $partes = explode(' + ', $pn); $sinL = sin_licencia($l); ?><span title="<?= e($pn) ?>"><b><?= e($partes[0]) ?></b><?php if (count($partes) > 1): ?> <span class="badge t-n" title="<?= e(implode(', ', array_slice($partes, 1))) ?>">+<?= count($partes) - 1 ?></span><?php endif; ?><?php if ($sinL): ?> <span class="badge t-a" title="Funciones apagadas: <?= e(implode(', ', $sinL)) ?>"><?= count($sinL) ?> apagada<?= count($sinL) === 1 ? '' : 's' ?></span><?php endif; ?></span></td><td><?= fecha_ec($l['vence']) ?></td>
     <td class="right"><?= (int)$l['equipos_activos'] ?> / <?= (int)$l['equipos_max'] ?></td><td><?= insignia($est) ?></td></tr>
   <?php endforeach; ?></tbody></table></div>
   <p class="muted small"><?= count($filas) ?> licencia(s)</p>

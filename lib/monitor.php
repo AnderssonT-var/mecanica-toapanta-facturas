@@ -188,7 +188,7 @@ function mon_conflictos_serie(int $equipoId, string $ruc, array $series): array 
     foreach (array_intersect($series, (array)$otras) as $x) {
       [$cod, $serie] = explode(':', $x);
       $avisos[] = ['tipo' => 'SERIE_COMPARTIDA', 'codDoc' => $cod, 'serie' => $serie, 'equipo' => mb_substr((string)($o['nombre'] ?: 'otro equipo'), 0, 60),
-        'mensaje' => ($nombres[$cod] ?? 'Documentos') . ' ' . $serie . ' también se emiten en «' . ($o['nombre'] ?: 'otro equipo') . '». Dos equipos con el mismo punto de emisión repiten números y el SRI rechaza uno. Asigna a este equipo otro punto de emisión (Configuración › Documentos y secuencias).'];
+        'mensaje' => ($nombres[$cod] ?? 'Documentos') . ' ' . $serie . ' también se emiten en «' . ($o['nombre'] ?: 'otro equipo') . '». Dos equipos con el mismo punto de emisión repiten números y el SRI rechaza uno. Asigna a este equipo otro punto de emisión (Configuración › Numeración).'];
       if (count($avisos) >= 10) return $avisos;
     }
   }

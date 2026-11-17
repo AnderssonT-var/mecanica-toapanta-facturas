@@ -285,3 +285,5 @@ a.doc:hover, a.fila-item:hover { background: var(--soft); }
 /* Stock en la factura web */
 .stock-ok{color:#1f7a3d;font-weight:600}
 .stock-no{color:#b42318;font-weight:700}
+
+.cli-manual { margin-top: 8px; width: 100%; }

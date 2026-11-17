@@ -37,7 +37,8 @@ if (!$sync || time() - strtotime($sync) > 1800) {
         <div class="tarjeta-cab"><h2>Cliente</h2><div class="segmentos" role="group" aria-label="Tipo de cliente"><button type="button" class="on" data-tipo-cli="ID">Con identificación</button><button type="button" data-tipo-cli="CF">Consumidor final</button></div></div>
         <div id="cli-con-id">
           <div class="busca-sug"><label class="busca"><?= icono(ICO['buscar'], 18) ?><input id="cli-buscar" placeholder="Cédula, RUC o nombre del cliente" autocomplete="off" aria-label="Buscar cliente"></label><div class="sugerencias" id="cli-sug" hidden></div></div>
-          <div class="rejilla" id="cli-datos">
+          <button type="button" class="btn btn-fantasma cli-manual" id="cli-manual">Escribir los datos del cliente a mano</button>
+          <div class="rejilla" id="cli-datos" hidden>
             <label>Tipo<select id="cli-tipo"><option value="CEDULA">Cédula</option><option value="RUC">RUC</option><option value="PASAPORTE">Pasaporte / exterior</option></select></label>
             <label>Identificación<input id="cli-id" class="mono" inputmode="numeric" maxlength="20"></label>
             <label class="ancho">Apellidos y nombres / razón social<input id="cli-nombre" maxlength="300"></label>

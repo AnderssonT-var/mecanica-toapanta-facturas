@@ -117,10 +117,27 @@
     Object.entries(campos).forEach(([k, el]) => { c[k] = el.value.trim(); });
     return c;
   }
+  // Los datos del cliente aparecen al elegirlo en la búsqueda, al tocar «escribir a mano» o al agregar el primer
+  // producto (así la pantalla empieza corta, con lo que más se usa arriba).
+  function mostrarDatosCliente() {
+    const d = $('#cli-datos'); const b = $('#cli-manual');
+    if (d) d.hidden = false;
+    if (b) b.hidden = true;
+  }
   function ponerCliente(c) {
     Object.entries(campos).forEach(([k, el]) => { if (c[k] !== undefined) el.value = c[k]; });
+    mostrarDatosCliente();
     pintarResumen();
   }
+  if ($('#cli-manual')) $('#cli-manual').addEventListener('click', () => {
+    const q = ($('#cli-buscar').value || '').trim();
+    const dig = q.replace(/\D/g, '');
+    if (/^\d{10}(\d{3})?$/.test(dig) && dig.length === q.replace(/\s/g, '').length && !campos.identificacion.value) { campos.identificacion.value = dig; campos.tipo.value = dig.length === 13 ? 'RUC' : 'CEDULA'; }
+    else if (q && !/^\d+$/.test(q) && !campos.nombre.value) campos.nombre.value = q.toUpperCase();
+    mostrarDatosCliente();
+    (campos.identificacion.value ? campos.nombre : campos.identificacion).focus();
+    pintarResumen();
+  });
   $$('[data-tipo-cli]').forEach((b) => b.addEventListener('click', () => {
     st.cf = b.dataset.tipoCli === 'CF';
     $$('[data-tipo-cli]').forEach((x) => x.classList.toggle('on', x === b));
@@ -276,6 +293,7 @@
     return '';
   }
   function pintarResumen() {
+    if (!st.cf && (st.items.length || Object.values(campos).some((el) => el.value.trim() && el !== campos.tipo))) mostrarDatosCliente();
     const t = totales();
     const err = error();
     const lineas = ordenT.filter((k) => t.por[k] !== undefined).map((k) => '<div class="kv"><span>Subtotal ' + esc(T[k].label) + '</span><span class="mono">' + dinero(t.por[k]) + '</span></div>').join('')
