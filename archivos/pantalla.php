@@ -3,6 +3,10 @@
 // valor a pagar mientras se hace la factura en FactuSYS (los lee el programa de la PC).
 // Sin factura en curso muestra un cartel (neón o LED) con los mensajes de Configuración.
 // El teléfono se autoriza una sola vez con un código de 6 dígitos (Configuración).
+// ?modo=pc     → la copia que usa el programa de la PC para el monitor por cable (HDMI):
+//                consulta su propio servidor local (127.0.0.1), sin código ni internet.
+// ?modo=muestra→ vista previa del cartel en el panel (solo el cartel, nunca datos de clientes).
+// ?img=ID      → imagen de una forma de pago (son públicas: se muestran a los clientes).
 $config = require __DIR__ . '/config.php';
 require __DIR__ . '/lib/bootstrap.php';
 require __DIR__ . '/lib/app.php';
@@ -11,6 +15,20 @@ header('X-Robots-Tag: noindex, nofollow');
 header('Cache-Control: no-store');
 $pdo = db($config);
 app_schema($pdo);
+
+if (isset($_GET['img'])) {
+    $st = $pdo->prepare('SELECT mime, huella, datos FROM pantalla_img WHERE id = :id');
+    $st->execute(['id' => (int)$_GET['img']]);
+    $f = $st->fetch();
+    if (!$f) { http_response_code(404); exit; }
+    header_remove('Cache-Control');
+    header('Content-Type: ' . $f['mime']);
+    header('Cache-Control: public, max-age=31536000, immutable');
+    header('ETag: "' . $f['huella'] . '"');
+    echo $f['datos'];
+    exit;
+}
+$modo = in_array($_GET['modo'] ?? '', ['pc', 'muestra'], true) ? $_GET['modo'] : '';
 
 function pantalla_json(int $codigo, array $datos): void {
     http_response_code($codigo);
@@ -22,6 +40,12 @@ function pantalla_json(int $codigo, array $datos): void {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $accion = (string)($_POST['accion'] ?? '');
     $token = strtolower((string)($_SERVER['HTTP_X_PANTALLA'] ?? ''));
+
+    if ($accion === 'muestra') {        // vista previa del panel: el cartel, sin datos de clientes
+        $cartel = pantalla_cartel_publico($pdo);
+        pantalla_json(200, ['ok' => true, 'aprobado' => true, 'v' => 0, 'fase' => 'vacio', 'datos' => new stdClass(),
+            'cartel' => $cartel, 'cartel_v' => substr(md5(json_encode($cartel)), 0, 10), 'ahora' => (int)round(microtime(true) * 1000)]);
+    }
 
     if ($accion === 'registrar') {
         // limpia pedidos viejos sin aprobar y limita cuántos puede haber
@@ -49,7 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pdo->prepare('UPDATE pantalla_disp SET visto = NOW() WHERE id = :id')->execute(['id' => $disp['id']]);
         }
         $e = pantalla_leer($pdo);
-        $cartel = pantalla_cartel($pdo);
+        $cartel = pantalla_cartel_publico($pdo);
         pantalla_json(200, ['ok' => true, 'aprobado' => true, 'v' => (int)$e['v'], 'fase' => $e['fase'],
             'datos' => $e['fase'] === 'vacio' ? new stdClass() : $e['datos'],
             'cartel' => $cartel, 'cartel_v' => substr(md5(json_encode($cartel)), 0, 10),
@@ -66,7 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <meta name="theme-color" content="#050506">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>Pantalla del cliente</title>
+<title><?= $modo === 'pc' ? 'Pantalla del cliente · monitor' : 'Pantalla del cliente' ?></title>
 <link rel="icon" href="assets/icono.png">
 <style>
 :root { --acento: #0d5c63; --tinta: #14212b; --suave: #5b6c75; --borde: #d3dfe0; --fondo: #edf2f4; --brillo: #ff2bd6; --cartel: #050506;
@@ -127,6 +151,18 @@ h1 { margin: 0; font-size: 1.6em; line-height: 1.15; }
 .marco { position: absolute; inset: 3.5vmin; border: max(2px, .5vmin) solid var(--brillo); border-radius: 4vmin; pointer-events: none;
   box-shadow: 0 0 1.5vmin var(--brillo), inset 0 0 1.5vmin var(--brillo); opacity: .75; transition: border-color .6s, box-shadow .6s; }
 #led { position: absolute; inset: 0; width: 100%; height: 100%; }
+/* formas de pago: la hora arriba y 1 o 2 imágenes abajo */
+#pago { position: absolute; inset: 0; display: none; flex-direction: column; transition: opacity .6s, background-color .6s; }
+#pago_reloj { flex: none; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+#pago_txt { white-space: nowrap; font-family: "Trebuchet MS", "Segoe UI", Roboto, sans-serif; font-weight: 700; color: #fff; line-height: 1;
+  text-shadow: 0 0 .03em #fff, 0 0 .08em var(--brillo), 0 0 .18em var(--brillo), 0 0 .35em var(--brillo); }
+#pago_led { position: absolute; inset: 0; width: 100%; height: 100%; }
+#pago_imgs { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; gap: 2vmin; padding: 0 1.5vmin 1.5vmin; }
+#pago_imgs.pila { flex-direction: column; }
+#pago_imgs img { display: block; max-width: 100%; max-height: 100%; min-width: 0; min-height: 0; object-fit: contain; border-radius: 1vmin; }
+#pago_imgs.doble img { max-width: calc(50% - 1vmin); }
+#pago_imgs.pila img { max-height: calc(50% - 1vmin); }
+body.pc, body.pc * { cursor: none !important; }
 .inicio { position: fixed; inset: 0; background: rgba(13,92,99,.96); color: #fff; display: flex; flex-direction: column;
   align-items: center; justify-content: center; text-align: center; gap: 10px; font-size: 1.3em; font-weight: 800; padding: 24px; z-index: 5; }
 .inicio small { font-weight: 500; font-size: .75em; opacity: .9; }
@@ -148,6 +184,7 @@ h1 { margin: 0; font-size: 1.6em; line-height: 1.15; }
 <div class="marco" id="marco"></div>
 <div id="neon"></div>
 <canvas id="led"></canvas>
+<div id="pago"><div id="pago_reloj"><canvas id="pago_led"></canvas><div id="pago_txt"></div></div><div id="pago_imgs"></div></div>
 </section>
 
 <section id="v_datos" class="vista lleno" aria-live="polite">
@@ -176,6 +213,7 @@ h1 { margin: 0; font-size: 1.6em; line-height: 1.15; }
 <script>
 (function () {
   var $ = function (id) { return document.getElementById(id); };
+  var MODO = '<?= $modo ?>';          // '' teléfono, 'pc' monitor del programa, 'muestra' vista previa del panel
   var CLAVE = 'mtv_pantalla';
   var token = '';
   try { token = localStorage.getItem(CLAVE) || ''; } catch (e) {}
@@ -189,10 +227,11 @@ h1 { margin: 0; font-size: 1.6em; line-height: 1.15; }
   }
   function post(datos, listo) {
     var x = new XMLHttpRequest();
-    x.open('POST', 'pantalla.php', true);
+    if (MODO === 'pc') x.open('GET', '/estado?v=' + version, true);     // servidor del programa, en la misma PC
+    else x.open('POST', 'pantalla.php', true);
     x.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
     if (token) x.setRequestHeader('X-Pantalla', token);
-    x.timeout = 10000;
+    x.timeout = MODO === 'pc' ? 4000 : 10000;
     x.onload = function () {
       var j = null;
       try { j = JSON.parse(x.responseText); } catch (e) {}
@@ -208,7 +247,7 @@ h1 { margin: 0; font-size: 1.6em; line-height: 1.15; }
     ['v_codigo', 'v_cartel', 'v_datos', 'v_gracias'].forEach(function (v) {
       $(v).className = $(v).className.replace(' activa', '') + (v === id ? ' activa' : '');
     });
-    document.body.className = id === 'v_cartel' ? 'oscuro' : '';
+    document.body.className = (id === 'v_cartel' ? 'oscuro' : '') + (MODO === 'pc' ? ' pc' : '');
     if (id !== 'v_datos') document.body.style.fontSize = '';
     if (id !== 'v_cartel') setTimeout(ajustarCabecera, 0);
     if (id === 'v_cartel') cartel.empezar(); else cartel.pausar();
@@ -281,21 +320,110 @@ h1 { margin: 0; font-size: 1.6em; line-height: 1.15; }
   }
   function textoFecha() { var h = ahora(); return DIAS[h.getDay()] + ' ' + h.getDate() + ' de ' + MESES[h.getMonth()]; }
 
+  // imágenes de pago: se cargan una vez y se toma el color de su borde para el fondo
+  var imagenes = {};
+  function urlImg(im) { return MODO === 'pc' ? '/img/' + im.id + '?h=' + im.h : 'pantalla.php?img=' + im.id + '&h=' + im.h; }
+  function imagen(im) {
+    var k = im.id + '-' + im.h;
+    if (imagenes[k]) return imagenes[k];
+    var r = { el: new Image(), listo: false, borde: '', w: im.w || 1, a: im.a || 1 };
+    r.el.alt = 'Forma de pago';
+    r.el.onload = function () {
+      r.listo = true; r.w = r.el.naturalWidth || r.w; r.a = r.el.naturalHeight || r.a;
+      try {
+        var c = document.createElement('canvas'); c.width = 16; c.height = 16;
+        var g = c.getContext('2d'); g.drawImage(r.el, 0, 0, 16, 16);
+        var d = g.getImageData(0, 0, 16, 16).data, s = [0, 0, 0], pts = [0, 15, 240, 255, 7, 247];
+        pts.forEach(function (p) { s[0] += d[p * 4]; s[1] += d[p * 4 + 1]; s[2] += d[p * 4 + 2]; });
+        r.borde = 'rgb(' + s.map(function (v) { return Math.round(v / pts.length); }).join(',') + ')';
+      } catch (e) {}
+      if (r.alListo) r.alListo();
+    };
+    r.el.src = urlImg(im);
+    imagenes[k] = r;
+    return r;
+  }
+
   var cartel = (function () {
     var conf = null, turnos = [], n = 0, actual = null, inicio = 0, activo = false, raf = null, mostrado = '';
     var neon = $('neon'), canvas = $('led'), ctx = canvas.getContext('2d');
     var off = document.createElement('canvas'), octx = off.getContext('2d');
     var FILAS = 16, punto = 0, cols = 0, mapa = null, anchoMapa = 0, desplaz = 0, ultimo = 0, rueda = false, dibujado = '';
 
+    var pagoEl = $('pago'), pagoImgs = $('pago_imgs'), pagoReloj = $('pago_reloj'), pagoTxt = $('pago_txt'), pagoLed = $('pago_led');
+    var pagoAlterna = false, pagoCual = 0, pagoMostrado = '';
+    function hayPago() { return !!(conf && conf.pago && conf.pago.activa && conf.pago.imagenes && conf.pago.imagenes.length); }
     function armarTurnos() {
       turnos = [];
       if (!conf) return;
-      if (conf.hora.activa || !conf.mensajes.length) {
+      if (conf.hora.activa || (!conf.mensajes.length && !hayPago())) {
         turnos.push({ tipo: 'hora', estilo: conf.hora.estilo, color: conf.hora.color, seg: conf.hora.segundos });
       }
       conf.mensajes.forEach(function (m) {
         turnos.push({ tipo: 'msg', texto: m.texto, estilo: conf.estilo, color: m.color, seg: conf.segundos_mensaje });
       });
+      if (hayPago()) turnos.push({ tipo: 'pago', estilo: conf.hora.estilo, color: conf.hora.color, seg: conf.pago.segundos });
+    }
+    // --- formas de pago: la hora en una franja arriba y las imágenes lo más grandes posible
+    function cabeEn(r, w, h) { var k = Math.min(w / r.w, h / r.a); return r.w * k * r.a * k; }
+    function ponerPago() {
+      var p = conf.pago, W = window.innerWidth, H = window.innerHeight;
+      var lista = p.imagenes.map(imagen);
+      var alto = p.reloj ? Math.round(H * (W >= H ? 0.19 : 0.13)) : 0;
+      pagoReloj.style.display = p.reloj ? '' : 'none';
+      pagoReloj.style.height = alto + 'px';
+      var libreW = W - 3 * Math.min(W, H) * 0.015, libreH = H - alto - Math.min(W, H) * 0.015;
+      var modo = 'una';
+      if (lista.length === 2) {
+        var sola = Math.min(cabeEn(lista[0], libreW, libreH), cabeEn(lista[1], libreW, libreH));
+        var lado = Math.min(cabeEn(lista[0], libreW / 2, libreH), cabeEn(lista[1], libreW / 2, libreH));
+        var pila = Math.min(cabeEn(lista[0], libreW, libreH / 2), cabeEn(lista[1], libreW, libreH / 2));
+        if (lado >= sola * 0.5 && lado >= pila) modo = 'doble';
+        else if (pila >= sola * 0.5) modo = 'pila';
+        else modo = 'turno';                       // muy chicas juntas: una y luego la otra
+      }
+      pagoAlterna = modo === 'turno';
+      pagoImgs.className = modo === 'doble' ? 'doble' : (modo === 'pila' ? 'pila' : '');
+      pagoImgs.innerHTML = '';
+      var mostrar = pagoAlterna ? [lista[pagoCual % lista.length]] : lista;
+      mostrar.forEach(function (r) { pagoImgs.appendChild(r.el); r.alListo = function () { fondoPago(mostrar[0]); }; });
+      fondoPago(mostrar[0]);
+      pagoMostrado = '';
+      relojPago();
+    }
+    function fondoPago(r) { pagoEl.style.backgroundColor = (r && r.borde) || conf.fondo; }
+    function relojPago() {
+      if (!conf.pago.reloj) return;
+      var texto = textoHora(conf.hora) + (conf.hora.fecha ? '  ·  ' + textoFecha() : '');
+      var clave = texto + '|' + window.innerWidth + 'x' + window.innerHeight;
+      if (clave === pagoMostrado) return;
+      pagoMostrado = clave;
+      var caja = pagoReloj.getBoundingClientRect();
+      if (actual.estilo === 'led') {
+        pagoTxt.style.display = 'none'; pagoLed.style.display = '';
+        var dpr = Math.min(window.devicePixelRatio || 1, 2), W = Math.floor(caja.width * dpr), H = Math.floor(caja.height * dpr);
+        pagoLed.width = W; pagoLed.height = H;
+        var r = mapaDe(texto.toUpperCase()), g = pagoLed.getContext('2d');
+        if (W * 0.95 / r.ancho < 3 * dpr) r = mapaDe(textoHora(conf.hora));    // angosta: solo la hora
+        var pt = Math.max(1.5, Math.min(H * 0.86 / FILAS, W * 0.95 / r.ancho));
+        var izq = Math.floor((W - r.ancho * pt) / 2), top = Math.floor((H - FILAS * pt) / 2), c = actual.color;
+        g.clearRect(0, 0, W, H);
+        for (var y = 0; y < FILAS; y++) for (var x = 0; x < r.ancho; x++) {
+          var on = r.mapa[y * r.ancho + x];
+          g.beginPath(); g.arc(izq + x * pt + pt / 2, top + y * pt + pt / 2, pt * 0.38, 0, 6.2832);
+          if (on) { g.fillStyle = c; g.shadowColor = c; g.shadowBlur = pt * 0.7; } else { g.fillStyle = 'rgba(255,255,255,0.08)'; g.shadowBlur = 0; }
+          g.fill();
+        }
+      } else {
+        pagoLed.style.display = 'none'; pagoTxt.style.display = '';
+        pagoTxt.textContent = (caja.width < caja.height * 5 ? textoHora(conf.hora) : texto).toUpperCase();
+        var lo = 8, hi = caja.height, mejor = lo;
+        for (var k = 0; k < 12; k++) {
+          var med = (lo + hi) / 2; pagoTxt.style.fontSize = med + 'px';
+          if (pagoTxt.scrollWidth <= caja.width * 0.94 && med <= caja.height * 0.72) { mejor = med; lo = med; } else hi = med;
+        }
+        pagoTxt.style.fontSize = mejor + 'px';
+      }
     }
     // --- neón: el texto más grande que entre, en una o varias líneas
     function ajustarNeon() {
@@ -387,10 +515,16 @@ h1 { margin: 0; font-size: 1.6em; line-height: 1.15; }
       actual = turnos[n % turnos.length]; n++;
       inicio = performance.now(); mostrado = '';
       document.documentElement.style.setProperty('--brillo', actual.color);
-      var esNeon = actual.estilo === 'neon';
+      var esPago = actual.tipo === 'pago', esNeon = actual.estilo === 'neon' && !esPago;
+      pagoEl.style.display = esPago ? 'flex' : 'none';
       neon.style.display = esNeon ? '' : 'none';
       $('marco').style.display = esNeon ? '' : 'none';
-      canvas.style.display = esNeon ? 'none' : '';
+      canvas.style.display = esNeon || esPago ? 'none' : '';
+      if (esPago) {
+        pagoEl.style.opacity = 0; pagoCual = 0; ponerPago();
+        setTimeout(function () { pagoEl.style.opacity = 1; }, 30);
+        return;
+      }
       neon.className = esNeon && actual.tipo === 'msg' ? 'parpadeo' : '';
       if (!esNeon) prepararCanvas();
       if (esNeon) neon.style.opacity = 0;
@@ -416,6 +550,11 @@ h1 { margin: 0; font-size: 1.6em; line-height: 1.15; }
           dibujarLed('');
           if (desplaz > anchoMapa) { siguiente(); }
         }
+      } else if (actual.tipo === 'pago') {
+        relojPago();
+        if (pagoAlterna && pagoCual === 0 && pasado >= actual.seg / 2) { pagoCual = 1; ponerPago(); }
+        if (pasado >= actual.seg && turnos.length > 1) siguiente();
+        else if (pasado >= actual.seg) { inicio = t; if (pagoAlterna) { pagoCual = 0; ponerPago(); } }
       } else {
         if (actual.tipo === 'hora') refrescar(false);
         var dur = actual.tipo === 'hora' ? actual.seg : actual.seg;
@@ -425,7 +564,11 @@ h1 { margin: 0; font-size: 1.6em; line-height: 1.15; }
       raf = requestAnimationFrame(cuadro);
     }
     function siguiente() {
-      if (actual && actual.estilo === 'neon') {
+      if (actual && actual.tipo === 'pago') {
+        pagoEl.style.opacity = 0;
+        actual = { tipo: 'espera', estilo: 'neon', seg: 99, color: actual.color };
+        setTimeout(function () { if (activo) empezarTurno(); }, 600);
+      } else if (actual && actual.estilo === 'neon') {
         neon.style.opacity = 0;
         var antes = actual; actual = { tipo: 'espera', estilo: 'neon', seg: 99, color: antes.color };
         setTimeout(function () { if (activo) empezarTurno(); }, 600);
@@ -434,6 +577,7 @@ h1 { margin: 0; font-size: 1.6em; line-height: 1.15; }
     return {
       configurar: function (c) {
         conf = c; document.documentElement.style.setProperty('--cartel', c.fondo);
+        if (c.pago && c.pago.imagenes) c.pago.imagenes.forEach(imagen);      // se cargan antes de su turno
         armarTurnos(); n = 0;
         if (activo) { cancelAnimationFrame(raf); empezarTurno(); raf = requestAnimationFrame(cuadro); }
       },
@@ -442,13 +586,25 @@ h1 { margin: 0; font-size: 1.6em; line-height: 1.15; }
         activo = true; empezarTurno(); raf = requestAnimationFrame(cuadro);
       },
       pausar: function () { activo = false; if (raf) cancelAnimationFrame(raf); raf = null; },
-      redimensionar: function () { if (activo && actual && actual.tipo !== 'espera') { if (actual.estilo === 'led' && rueda) { prepararCanvas(); ponerLed(actual.texto, false); } else refrescar(true); } }
+      redimensionar: function () { if (activo && actual && actual.tipo === 'pago') { ponerPago(); return; } if (activo && actual && actual.tipo !== 'espera') { if (actual.estilo === 'led' && rueda) { prepararCanvas(); ponerLed(actual.texto, false); } else refrescar(true); } }
     };
   })();
   var tRed = null;
   window.addEventListener('resize', function () { clearTimeout(tRed); tRed = setTimeout(function () { cartel.redimensionar(); ajustarDatos(); }, 200); });
 
   function consultar() {
+    if (MODO) {                       // monitor de la PC o vista previa: sin código de autorización
+      var antes = Date.now();
+      post({ accion: MODO === 'pc' ? 'estado' : 'muestra' }, function (st, j) {
+        if (j.ok) {
+          if (j.ahora) desfase = j.ahora - (antes + Date.now()) / 2;
+          if (j.cartel && j.cartel_v !== cartelV) { cartelV = j.cartel_v; cartel.configurar(j.cartel); }
+          if (j.v !== version || j.fase !== faseActual) { version = j.v; faseActual = j.fase; pintar(j); }
+        }
+        setTimeout(consultar, MODO === 'pc' ? (j.ok ? 150 : 1000) : 4000);
+      });
+      return;
+    }
     if (!token) {
       post({ accion: 'registrar' }, function (st, j) {
         if (j.token) guardarToken(j.token);
@@ -486,6 +642,7 @@ h1 { margin: 0; font-size: 1.6em; line-height: 1.15; }
     setTimeout(function () { cartel.redimensionar(); }, 500);
   }
   $('inicio').onclick = empezar;
+  if (MODO) { $('inicio').style.display = 'none'; if (MODO === 'pc') document.body.className = 'pc'; }
   document.addEventListener('visibilitychange', function () { if (!document.hidden && $('inicio').style.display === 'none') mantenerEncendida(); });
 
   consultar();
