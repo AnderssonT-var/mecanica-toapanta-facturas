@@ -5,7 +5,7 @@ declare(strict_types=1);
 if (!defined('FX_PORTAL')) { http_response_code(403); exit; }
 date_default_timezone_set('America/Guayaquil');
 
-const FX_VERSION = '1.13.0';
+const FX_VERSION = '1.14.0';
 const FX_MARCA = 'Facmit';
 
 // Nombre del producto. Los portales instalados antes del cambio de marca guardaron el nombre anterior en su
@@ -60,6 +60,38 @@ function normalizar_funciones(array $f): array {
   $f = array_values(array_intersect(array_keys(FX_FUNCIONES), array_map('strval', $f)));
   // Desde noviembre de 2026 el portal web y la nube de respaldo son funciones separadas (se cobran por separado).
   return array_values(array_intersect(array_keys(FX_FUNCIONES), $f));
+}
+
+// ---------- Funciones sueltas dentro de cada categoría ----------
+// Catálogo compartido con el programa (lib/funciones-detalle.json = desktop/src/funciones-detalle.json). Si la
+// categoría está en la licencia, sus funciones vienen encendidas salvo las de «funciones_sin».
+function fx_catalogo(): array {
+  static $c = null;
+  if ($c === null) $c = json_decode((string)file_get_contents(__DIR__ . '/funciones-detalle.json'), true) ?: ['categorias' => []];
+  return $c;
+}
+function fx_detalles(): array {
+  static $d = null;
+  if ($d === null) { $d = []; foreach (fx_catalogo()['categorias'] as $cat) foreach ($cat['funciones'] as $f) $d[$f['id']] = $f + ['categoria' => $cat['id'], 'modulo' => $cat['modulo'], 'tambienCon' => $f['tambienCon'] ?? []]; }
+  return $d;
+}
+function normalizar_sin(array $sin): array {
+  $s = array_values(array_unique(array_intersect(array_map('strval', $sin), array_keys(fx_detalles()))));
+  sort($s);
+  return $s;
+}
+function sin_licencia(array $l): array {
+  $s = json_decode((string)($l['funciones_sin'] ?? ''), true);
+  return normalizar_sin(is_array($s) ? $s : []);
+}
+function detalle_activo(array $l, string $clave): bool {
+  $d = fx_detalles()[$clave] ?? null;
+  if (!$d) return true;
+  if (in_array($clave, sin_licencia($l), true)) return false;
+  $f = funciones_licencia($l);
+  if ($d['modulo'] === '' || in_array($d['modulo'], $f, true)) return true;
+  foreach ($d['tambienCon'] as $m) if (in_array($m, $f, true)) return true;
+  return false;
 }
 
 function tiene_funcion(array $l, string $f): bool {
@@ -149,6 +181,8 @@ function db(): PDO {
     // Portales instalados antes de las funciones por licencia: se agrega la columna una sola vez.
     try { $pdo->query('SELECT funciones FROM licencias LIMIT 0'); }
     catch (PDOException $ex) { try { $pdo->exec('ALTER TABLE licencias ADD COLUMN funciones TEXT NULL'); } catch (PDOException $ex2) { /* sin tabla aún (instalación) */ } }
+    try { $pdo->query('SELECT funciones_sin FROM licencias LIMIT 0'); }
+    catch (PDOException $ex) { try { $pdo->exec('ALTER TABLE licencias ADD COLUMN funciones_sin TEXT NULL'); } catch (PDOException $ex2) { /* sin tabla aún (instalación) */ } }
     migrar_funciones_v2($pdo);
   }
   return $pdo;
@@ -320,6 +354,7 @@ function payload_licencia(array $l, string $equipo): array {
     'cliente' => $l['cliente'],
     'plan' => $l['plan'],
     'funciones' => funciones_licencia($l),
+    'sin' => sin_licencia($l),
     'planNombre' => plan_de($l),
     'fv' => FX_FUNCIONES_VERSION,
     'inicio' => $l['inicio'],

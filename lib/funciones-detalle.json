@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "nota": "Funciones que se pueden apagar una por una dentro de cada categoría. Si la categoría (módulo) está en la licencia, todas sus funciones vienen encendidas salvo las de la lista «sin». Este archivo es el mismo en el portal (lib/) y en el programa (src/): una prueba verifica que sean idénticos.",
+  "categorias": [
+    { "id": "basico", "modulo": "", "label": "Básico (siempre incluido)", "funciones": [
+      { "id": "proformas", "label": "Proformas y cotizaciones" },
+      { "id": "masiva", "label": "Facturación masiva" },
+      { "id": "ats", "label": "ATS (anexo transaccional)" },
+      { "id": "vendedores", "label": "Vendedores" },
+      { "id": "whatsapp", "label": "Envío por WhatsApp" },
+      { "id": "pantalla", "label": "Pantalla del cliente" },
+      { "id": "importar", "label": "Importar datos (Excel y FactuSYS)" }
+    ] },
+    { "id": "documentos", "modulo": "documentos", "label": "Documentos adicionales", "funciones": [
+      { "id": "nc", "label": "Devoluciones (notas de crédito parciales)" },
+      { "id": "nd", "label": "Notas de débito" },
+      { "id": "guias", "label": "Guías de remisión y transportistas" },
+      { "id": "reembolsos", "label": "Facturas de reembolso de gastos" }
+    ] },
+    { "id": "retenciones", "modulo": "retenciones", "label": "Retenciones", "funciones": [] },
+    { "id": "inventario", "modulo": "inventario", "label": "Inventario completo", "funciones": [
+      { "id": "bodegas", "label": "Varias bodegas y transferencias" },
+      { "id": "lotes", "label": "Lotes y fechas de vencimiento" },
+      { "id": "conteos", "label": "Toma física de inventario" }
+    ] },
+    { "id": "compras", "modulo": "compras", "label": "Compras", "funciones": [
+      { "id": "liquidaciones", "label": "Liquidaciones de compra" },
+      { "id": "pagar", "label": "Cuentas por pagar" }
+    ] },
+    { "id": "cartera", "modulo": "cartera", "label": "Cuentas por cobrar", "funciones": [] },
+    { "id": "pos", "modulo": "pos", "label": "Punto de venta y caja", "funciones": [] },
+    { "id": "contabilidad", "modulo": "contabilidad", "label": "Contabilidad y bancos", "funciones": [
+      { "id": "tesoreria", "label": "Bancos y tesorería (también viene con Cobros o Compras)", "tambienCon": ["cartera", "compras"] }
+    ] },
+    { "id": "nube", "modulo": "nube", "label": "Nube y varios equipos", "funciones": [] },
+    { "id": "movil", "modulo": "movil", "label": "Portal web (celular)", "funciones": [
+      { "id": "movil_nc", "label": "Notas de crédito desde el celular" }
+    ] }
+  ]
+}

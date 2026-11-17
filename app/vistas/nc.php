@@ -3,6 +3,8 @@
 // el programa (con su firma y su secuencia) en cuanto la recoge; el stock vuelve a la bodega y lote de donde salió.
 if (!defined('FX_PORTAL')) exit;
 web_exigir($ctx, 'facturar');
+if (!detalle_activo($ctx['licencia'], 'movil_nc')) throw new WebError('Tu plan no incluye notas de crédito desde el celular.');
+$conDevolucion = detalle_activo($ctx['licencia'], 'nc');
 $f = web_registro($ctx, 'comprobantes', (string)($_GET['id'] ?? ''));
 if (!$f || ($f['cod_doc'] ?? '') !== '01') throw new WebError('Elige una factura.');
 if (($f['estado'] ?? '') !== 'AUTORIZADO') throw new WebError('Solo se hace nota de crédito de una factura autorizada por el SRI.');
@@ -12,14 +14,15 @@ $d = web_json($f['data'] ?? []);
 web_cabecera($ctx, 'Nota de crédito', 'comprobantes');
 echo web_titulo('Factura ' . $f['numero'], 'Nota de crédito');
 $hayDevuelto = array_sum(array_map(fn($l) => $l['devuelto'], $saldos)) > 0;
+if (!$conDevolucion && $hayDevuelto) throw new WebError('Esta factura ya tiene devoluciones y tu plan no incluye devoluciones parciales.');
 ?>
 <form method="post" action="./?v=nc" class="columnas">
   <?= web_campo_csrf() ?><input type="hidden" name="factura" value="<?= e($f['id']) ?>"><input type="hidden" name="volver" value="v=nc&id=<?= e(urlencode($f['id'])) ?>">
   <section class="tarjeta col-ancha">
     <div class="tarjeta-cab"><h2><?= e($d['cliente']['nombre'] ?? $f['cliente_nombre'] ?? '') ?></h2><span class="badge t-n"><?= dinero($f['total']) ?></span></div>
     <div class="segmentos" role="group" aria-label="Tipo de nota de crédito" style="margin-bottom:10px">
-      <label class="seg"><input type="radio" name="tipo" value="DEVOLUCION" checked> Devolución de productos</label>
-      <?php if (!$hayDevuelto): ?><label class="seg"><input type="radio" name="tipo" value="ANULACION"> Anular toda la factura</label><?php endif; ?>
+      <?php if ($conDevolucion): ?><label class="seg"><input type="radio" name="tipo" value="DEVOLUCION" checked> Devolución de productos</label><?php endif; ?>
+      <?php if (!$hayDevuelto): ?><label class="seg"><input type="radio" name="tipo" value="ANULACION"<?= $conDevolucion ? '' : ' checked' ?>> Anular toda la factura</label><?php endif; ?>
     </div>
     <div class="tabla-items">
       <div class="ti-cab"><span>Producto</span><span class="der">Vendido</span><span class="der">Ya devuelto</span><span class="der">Devolver</span></div>

@@ -15,7 +15,7 @@ $pcActiva = $sync && time() - strtotime($sync) < 900;
 $tipo = WEB_DOCS[$c['cod_doc']] ?? 'Comprobante';
 web_cabecera($ctx, $tipo . ' ' . $c['numero'], 'comprobantes');
 $wa = 'https://wa.me/?text=' . rawurlencode($tipo . ' ' . $c['numero'] . ' de ' . ($ctx['empresa']['razonSocial'] ?? '') . ' por ' . dinero($c['total']) . '. Clave de acceso: ' . $c['clave_acceso']);
-$btnNc = ($c['cod_doc'] ?? '') === '01' && $autorizado && empty($c['anulado']) && web_puede($ctx, 'facturar') ? '<a class="btn" href="./?v=nc&id=' . e(urlencode($c['id'])) . '">Nota de crédito</a>' : '';
+$btnNc = ($c['cod_doc'] ?? '') === '01' && $autorizado && empty($c['anulado']) && web_puede($ctx, 'facturar') && detalle_activo($ctx['licencia'], 'movil_nc') ? '<a class="btn" href="./?v=nc&id=' . e(urlencode($c['id'])) . '">Nota de crédito</a>' : '';
 echo web_titulo($tipo, $c['numero'], $btnNc . '<a class="btn" href="./?v=ride&id=' . e(urlencode($c['id'])) . '" target="_blank" rel="noopener">Ver RIDE</a><a class="btn" href="./?v=xml&id=' . e(urlencode($c['id'])) . '">' . ($autorizado ? 'Descargar XML' : 'XML (sin firmar)') . '</a><a class="btn btn-icono-txt" href="' . e($wa) . '" target="_blank" rel="noopener">WhatsApp</a>');
 ?>
 <?php if ($porFirmar): ?>

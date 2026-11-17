@@ -206,3 +206,20 @@ form.en-linea { display: inline; }
 .form-parche textarea { font: inherit; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line, rgba(15, 27, 45, .15)); resize: vertical; }
 .grid-parche { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
 @media (max-width: 760px) { .parche-cuerpo { grid-template-columns: 1fr; } .parche-ver, .parche-autor { margin-left: 0; } }
+
+/* Funciones por categoría en la licencia */
+.detalles { display: flex; flex-direction: column; gap: 10px; }
+.det-filtros { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.det-filtros input[type=search] { flex: 1 1 200px; }
+.det-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { border: 1px solid var(--border); background: transparent; border-radius: 999px; padding: 4px 10px; font: inherit; font-size: 12.5px; cursor: pointer; }
+.chip.on { background: var(--navy, #0F1B2D); color: #fff; border-color: transparent; }
+.det-solo { display: inline-flex !important; flex-direction: row !important; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; }
+.det-cat { border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.det-cab { display: flex; align-items: center; gap: 10px; }
+.det-cab .det-todo { margin-left: auto; display: flex; gap: 4px; }
+.det-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 6px; }
+label.fun.det { padding: 8px 10px; }
+label.fun.det.off { opacity: .45; cursor: not-allowed; }
+.det-cat[hidden], label.fun.det[hidden] { display: none !important; }
+.det-solo input { width: 16px !important; height: 16px !important; margin: 0; flex: none; }

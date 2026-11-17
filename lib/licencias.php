@@ -46,6 +46,19 @@ function validar_datos_licencia(array $d, bool $nueva): array {
   $f = array_key_exists('funciones', $d) ? (array)$d['funciones'] : funciones_licencia(['plan' => strtoupper((string)($d['plan'] ?? 'LOCAL'))]);
   $l['funciones'] = json_encode(normalizar_funciones($f));
   $l['plan'] = plan_legado(json_decode($l['funciones'], true));
+  // Funciones sueltas: el formulario envía las encendidas (det[]); se guardan las apagadas de las categorías activas.
+  if (array_key_exists('det_form', $d)) {
+    $marcadas = array_map('strval', (array)($d['det'] ?? []));
+    $mods = json_decode($l['funciones'], true);
+    $sin = [];
+    foreach (fx_detalles() as $k => $x) {
+      $catActiva = $x['modulo'] === '' || in_array($x['modulo'], $mods, true) || array_intersect($x['tambienCon'], $mods);
+      if ($catActiva && !in_array($k, $marcadas, true)) $sin[] = $k;
+    }
+    $l['funciones_sin'] = json_encode(normalizar_sin($sin));
+  } else {
+    $l['funciones_sin'] = json_encode(normalizar_sin((array)($d['sin'] ?? [])));
+  }
   foreach (['inicio', 'vence'] as $k) {
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $l[$k]) || !checkdate((int)substr($l[$k], 5, 2), (int)substr($l[$k], 8, 2), (int)substr($l[$k], 0, 4))) {
       throw new ErrorLicencia('DATOS', 'La fecha de ' . $k . ' no es válida.');
@@ -65,9 +78,9 @@ function crear_licencia(array $datos): int {
     $r->execute([$clave]);
     if (!$r->fetchColumn()) break;
   }
-  $d->prepare('INSERT INTO licencias (clave, cliente, ruc, rucs, email, telefono, plan, funciones, inicio, vence, gracia, empresas, equipos_max, usuarios, puntos, precio, periodo, estado, notas, creado, actualizado)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    ->execute([$clave, $l['cliente'], $l['ruc'], $l['rucs'], $l['email'], $l['telefono'], $l['plan'], $l['funciones'], $l['inicio'], $l['vence'], $l['gracia'],
+  $d->prepare('INSERT INTO licencias (clave, cliente, ruc, rucs, email, telefono, plan, funciones, funciones_sin, inicio, vence, gracia, empresas, equipos_max, usuarios, puntos, precio, periodo, estado, notas, creado, actualizado)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    ->execute([$clave, $l['cliente'], $l['ruc'], $l['rucs'], $l['email'], $l['telefono'], $l['plan'], $l['funciones'], $l['funciones_sin'], $l['inicio'], $l['vence'], $l['gracia'],
       $l['empresas'], $l['equipos_max'], $l['usuarios'], $l['puntos'], $l['precio'], $l['periodo'], 'ACTIVA', $l['notas'], ahora(), ahora()]);
   $id = (int)$d->lastInsertId();
   registrar_evento($id, 'CREADA', 'Plan ' . nombre_plan(json_decode($l['funciones'], true)) . ' hasta ' . $l['vence']);
@@ -78,13 +91,15 @@ function actualizar_licencia(int $id, array $datos): void {
   $ant = licencia_por_id($id);
   if (!$ant) throw new ErrorLicencia('NO_EXISTE', 'La licencia no existe.');
   $l = validar_datos_licencia($datos, false);
-  db()->prepare('UPDATE licencias SET cliente = ?, ruc = ?, rucs = ?, email = ?, telefono = ?, plan = ?, funciones = ?, inicio = ?, vence = ?, gracia = ?, empresas = ?,
+  db()->prepare('UPDATE licencias SET cliente = ?, ruc = ?, rucs = ?, email = ?, telefono = ?, plan = ?, funciones = ?, funciones_sin = ?, inicio = ?, vence = ?, gracia = ?, empresas = ?,
     equipos_max = ?, usuarios = ?, puntos = ?, precio = ?, periodo = ?, notas = ?, actualizado = ? WHERE id = ?')
-    ->execute([$l['cliente'], $l['ruc'], $l['rucs'], $l['email'], $l['telefono'], $l['plan'], $l['funciones'], $l['inicio'], $l['vence'], $l['gracia'], $l['empresas'],
+    ->execute([$l['cliente'], $l['ruc'], $l['rucs'], $l['email'], $l['telefono'], $l['plan'], $l['funciones'], $l['funciones_sin'], $l['inicio'], $l['vence'], $l['gracia'], $l['empresas'],
       $l['equipos_max'], $l['usuarios'], $l['puntos'], $l['precio'], $l['periodo'], $l['notas'], ahora(), $id]);
   $cambios = [];
   $pa = plan_de($ant); $pn = nombre_plan(json_decode($l['funciones'], true));
   if ($pa !== $pn) $cambios[] = 'plan: ' . $pa . ' → ' . $pn;
+  $sa = sin_licencia($ant); $sn = json_decode($l['funciones_sin'], true);
+  if ($sa !== $sn) $cambios[] = 'funciones apagadas: ' . ($sn ? implode(', ', $sn) : 'ninguna');
   foreach (['vence', 'ruc', 'equipos_max', 'empresas'] as $k) if ((string)$ant[$k] !== (string)$l[$k]) $cambios[] = $k . ': ' . $ant[$k] . ' → ' . $l[$k];
   registrar_evento($id, 'EDITADA', $cambios ? implode('; ', $cambios) : 'Datos actualizados');
 }

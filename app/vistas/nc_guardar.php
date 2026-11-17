@@ -6,6 +6,8 @@ if (!$f || ($f['cod_doc'] ?? '') !== '01' || ($f['estado'] ?? '') !== 'AUTORIZAD
 $motivo = trim(emi_txt($_POST['motivo'] ?? ''));
 if (mb_strlen($motivo) < 3) throw new WebError('Escribe el motivo de la nota de crédito.');
 $tipo = ($_POST['tipo'] ?? '') === 'ANULACION' ? 'ANULACION' : 'DEVOLUCION';
+if (!detalle_activo($ctx['licencia'], 'movil_nc')) throw new WebError('Tu plan no incluye notas de crédito desde el celular.');
+if ($tipo === 'DEVOLUCION' && !detalle_activo($ctx['licencia'], 'nc')) throw new WebError('Tu plan no incluye devoluciones parciales: solo puedes anular toda la factura.');
 $saldos = web_nc_saldos($ctx, $f);
 $items = [];
 $total = 0.0;

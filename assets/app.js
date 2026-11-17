@@ -77,6 +77,49 @@ document.querySelectorAll('table').forEach((t) => {
   pintar();
 })();
 
+// Funciones por categoría (licencia): filtros, «todo / nada» y categorías deshabilitadas si su módulo no está marcado.
+(() => {
+  const caja = document.getElementById('detalles');
+  if (!caja) return;
+  const modulos = () => [...document.querySelectorAll('#funciones input[name="funciones[]"]:checked')].map((c) => c.value).filter(Boolean);
+  let cat = '';
+  function pintar() {
+    const m = modulos();
+    const q = (document.getElementById('det-buscar').value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const soloApagadas = document.getElementById('det-apagadas').checked;
+    caja.querySelectorAll('.det-cat').forEach((c) => {
+      const activa = !c.dataset.modulo || m.includes(c.dataset.modulo);
+      let visibles = 0;
+      c.querySelectorAll('label.det').forEach((l) => {
+        const tambien = (l.dataset.tambien || '').split(',').filter(Boolean);
+        const on = activa || tambien.some((x) => m.includes(x));
+        const i = l.querySelector('input');
+        i.disabled = !on;
+        l.classList.toggle('off', !on);
+        const txt = l.textContent.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        const ver = (!q || txt.includes(q)) && (!soloApagadas || (on && !i.checked));
+        l.hidden = !ver;
+        if (ver) visibles++;
+      });
+      const total = c.querySelectorAll('label.det').length;
+      const enc = [...c.querySelectorAll('label.det input')].filter((i) => !i.disabled && i.checked).length;
+      c.querySelector('.det-estado').textContent = c.querySelector('label.det input:not(:disabled)') ? enc + ' de ' + total + ' encendidas' : 'categoría no incluida en el plan';
+      c.hidden = (cat && c.dataset.cat !== cat) || !visibles;
+    });
+  }
+  caja.addEventListener('click', (e) => {
+    const chip = e.target.closest('[data-cat].chip');
+    if (chip) { cat = chip.dataset.cat; caja.querySelectorAll('.chip').forEach((b) => b.classList.toggle('on', b === chip)); pintar(); return; }
+    const todo = e.target.closest('[data-det-todo]');
+    if (todo) { todo.closest('.det-cat').querySelectorAll('label.det input:not(:disabled)').forEach((i) => { i.checked = todo.dataset.detTodo === '1'; }); pintar(); }
+  });
+  caja.addEventListener('input', pintar);
+  caja.addEventListener('change', pintar);
+  const f = document.getElementById('funciones');
+  if (f) { f.addEventListener('change', pintar); f.addEventListener('click', () => setTimeout(pintar, 0)); }
+  pintar();
+})();
+
 // Monitor: la lista de equipos se recarga sola cada minuto mientras está a la vista (sin interrumpir si escribes un filtro).
 (() => {
   const el = document.querySelector('[data-recargar]');

@@ -109,6 +109,28 @@ $in = fn($k, $label, $extra = '') => '<label>' . $label . '<input name="' . $k .
         <div class="row"><span class="muted small">Atajos:</span><button type="button" class="btn btn-sm" data-preset="">Básico</button><button type="button" class="btn btn-sm" data-preset="documentos,retenciones,inventario,compras,cartera,pos">Profesional</button><button type="button" class="btn btn-sm" data-preset="documentos,retenciones,inventario,compras,cartera,pos,nube,movil">Completo</button></div>
         <div class="precio-sug" id="precio-sugerido" data-precios="<?= e(json_encode(['basico' => (float)ajuste('precio_basico', '0'), 'profesional' => (float)ajuste('precio_profesional', '0'), 'completo' => (float)ajuste('precio_completo', '0'), 'extra' => array_combine(array_keys(FX_FUNCIONES), array_map(fn($k) => (float)ajuste('precio_extra_' . $k, '0'), array_keys(FX_FUNCIONES)))])) ?>"></div>
       </fieldset>
+      <?php
+        // Funciones sueltas por categoría: marcadas = encendidas. Las de una categoría apagada se muestran deshabilitadas.
+        $sinSel = $form ? array_values(array_diff(array_keys(fx_detalles()), array_map('strval', (array)($form['det'] ?? [])))) : sin_licencia($v);
+      ?>
+      <fieldset class="span2 detalles" id="detalles">
+        <legend>Funciones por categoría</legend>
+        <p class="muted small">Dentro de cada categoría activa puedes apagar funciones sueltas. Lo apagado no aparece en el programa ni en el celular, y el programa lo bloquea aunque alguien lo intente forzar. Las categorías nuevas vienen con todo encendido.</p>
+        <input type="hidden" name="det_form" value="1">
+        <div class="det-filtros"><input type="search" id="det-buscar" placeholder="Buscar función…" aria-label="Buscar función">
+          <div class="det-chips" role="group" aria-label="Filtrar por categoría"><button type="button" class="chip on" data-cat="">Todas</button><?php foreach (fx_catalogo()['categorias'] as $cat) if ($cat['funciones']): ?><button type="button" class="chip" data-cat="<?= e($cat['id']) ?>"><?= e($cat['label']) ?></button><?php endif; ?></div>
+          <label class="det-solo"><input type="checkbox" id="det-apagadas"> Solo apagadas</label></div>
+        <?php foreach (fx_catalogo()['categorias'] as $cat) if ($cat['funciones']): ?>
+          <div class="det-cat" data-cat="<?= e($cat['id']) ?>" data-modulo="<?= e($cat['modulo']) ?>">
+            <div class="det-cab"><b><?= e($cat['label']) ?></b><span class="det-estado muted small"></span><span class="det-todo"><button type="button" class="btn btn-sm btn-ghost" data-det-todo="1">Todo</button><button type="button" class="btn btn-sm btn-ghost" data-det-todo="0">Nada</button></span></div>
+            <div class="det-lista">
+            <?php foreach ($cat['funciones'] as $fx): ?>
+              <label class="fun det" data-tambien="<?= e(implode(',', $fx['tambienCon'] ?? [])) ?>"><input type="checkbox" name="det[]" value="<?= e($fx['id']) ?>"<?= in_array($fx['id'], $sinSel, true) ? '' : ' checked' ?>><span><b><?= e($fx['label']) ?></b></span></label>
+            <?php endforeach; ?>
+            </div>
+          </div>
+        <?php endif; ?>
+      </fieldset>
       <label class="span2">Notas internas<textarea name="notas" rows="3"><?= e($v['notas'] ?? '') ?></textarea></label>
     </div>
     <div class="row"><button class="btn btn-dark"><?= $l ? 'Guardar cambios' : 'Crear licencia' ?></button><a class="btn btn-ghost" href="licencias.php">Cancelar</a></div>
