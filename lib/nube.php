@@ -4,11 +4,11 @@
 declare(strict_types=1);
 if (!defined('FX_PORTAL')) { http_response_code(403); exit; }
 
-const NUBE_TABLAS = ['clientes', 'productos', 'comprobantes', 'catalogo', 'proformas', 'pedidos', 'movimientos', 'compras', 'abonos', 'cajas', 'caja_movimientos', 'bodegas', 'pagos', 'bancos', 'banco_movimientos', 'conciliaciones', 'saldos_iniciales', 'asientos', 'conteos'];
-const NUBE_TABLAS_DESDE_PROGRAMA = ['clientes', 'productos', 'comprobantes', 'catalogo', 'proformas', 'pedidos', 'movimientos', 'compras', 'abonos', 'cajas', 'caja_movimientos', 'bodegas', 'pagos', 'bancos', 'banco_movimientos', 'conciliaciones', 'saldos_iniciales', 'asientos', 'conteos'];
+const NUBE_TABLAS = ['clientes', 'productos', 'comprobantes', 'catalogo', 'proformas', 'pedidos', 'movimientos', 'compras', 'abonos', 'cajas', 'caja_movimientos', 'bodegas', 'pagos', 'bancos', 'banco_movimientos', 'conciliaciones', 'saldos_iniciales', 'asientos', 'conteos', 'existencias'];
+const NUBE_TABLAS_DESDE_PROGRAMA = ['clientes', 'productos', 'comprobantes', 'catalogo', 'proformas', 'pedidos', 'movimientos', 'compras', 'abonos', 'cajas', 'caja_movimientos', 'bodegas', 'pagos', 'bancos', 'banco_movimientos', 'conciliaciones', 'saldos_iniciales', 'asientos', 'conteos', 'existencias'];
 const NUBE_LOTE_PULL = 1000;
 // Solo portal web (sin la nube de respaldo): lo único que se guarda es lo que el portal necesita.
-const NUBE_TABLAS_PORTAL = ['clientes', 'productos', 'catalogo', 'pedidos', 'comprobantes'];
+const NUBE_TABLAS_PORTAL = ['clientes', 'productos', 'catalogo', 'pedidos', 'comprobantes', 'existencias'];
 const NUBE_RESPALDOS = 10;
 
 class ErrorNube extends RuntimeException {
@@ -136,7 +136,8 @@ function nube_indices(string $tabla, array $r): array {
     case 'proformas': $c = is_string($r['cliente'] ?? null) ? json_decode($r['cliente'], true) : ($r['cliente'] ?? []);
       return [$fecha($r['fecha'] ?? ''), 'PR', (string)($r['numero'] ?? ''), (string)($r['estado'] ?? ''), (float)((is_string($r['totales'] ?? null) ? json_decode($r['totales'], true) : ($r['totales'] ?? []))['importeTotal'] ?? 0),
         $txt($r['numero'] ?? '', $c['nombre'] ?? '', $c['identificacion'] ?? '')];
-    case 'pedidos': return [$fecha($r['creado'] ?? ''), 'PED', '', (string)($r['estado'] ?? ''), (float)($r['total'] ?? 0), $txt($r['cliente']['nombre'] ?? '', $r['cliente']['identificacion'] ?? '')];
+    case 'existencias': return [null, mb_substr((string)($r['estab'] ?? ''), 0, 20), mb_substr(mb_strtolower((string)($r['codigo'] ?? '')), 0, 20), '', (float)($r['stock'] ?? 0), $txt($r['codigo'] ?? '')];
+    case 'pedidos': return [$fecha($r['creado'] ?? ''), ($r['tipo'] ?? '') === 'NC' ? 'NC' : 'PED', '', (string)($r['estado'] ?? ''), (float)($r['total'] ?? 0), $txt($r['cliente']['nombre'] ?? '', $r['cliente']['identificacion'] ?? '')];
     case 'compras': return [$fecha($r['fecha'] ?? ''), (string)($r['cod_doc'] ?? ''), mb_substr((string)($r['numero'] ?? ''), 0, 20), (string)($r['estado'] ?? ''), (float)($r['total'] ?? 0),
       $txt($r['numero'] ?? '', $r['proveedor_nombre'] ?? '', $r['proveedor_id'] ?? '')];
     case 'abonos': return [$fecha($r['fecha'] ?? ''), mb_substr((string)($r['tipo'] ?? ''), 0, 20), '', '', (float)($r['valor'] ?? 0), $txt($r['cliente_id'] ?? '', $r['referencia'] ?? '')];

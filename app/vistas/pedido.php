@@ -7,14 +7,16 @@ $estado = $p['estado'] ?? 'PENDIENTE';
 $esperando = in_array($estado, ['PENDIENTE', 'EN PROCESO'], true) || ($comp && !in_array($comp['estado'], ['AUTORIZADO', 'DEVUELTA', 'NO AUTORIZADO', 'INVALIDO'], true));
 $sync = $ctx['empresa']['_ultima_sync'] ?? null;
 $programaActivo = $sync && time() - strtotime($sync) < 900;
-web_cabecera($ctx, 'Factura web', 'comprobantes');
+$esNc = ($p['tipo'] ?? '') === 'NC';
+$doc = $esNc ? 'Nota de crédito' : 'Factura';
+web_cabecera($ctx, $esNc ? 'Nota de crédito web' : 'Factura web', 'comprobantes');
 $pasos = [
-  ['Factura enviada a la nube', true, web_hace($p['creado'] ?? '')],
+  [$doc . ' enviada a la nube', true, web_hace($p['creado'] ?? '')],
   ['Tu programa la tomó y la firmó', in_array($estado, ['EN PROCESO', 'EMITIDA'], true), $estado === 'EN PROCESO' ? 'procesando…' : ''],
   ['Enviada al SRI', $estado === 'EMITIDA', $p['numero'] ?? ''],
   ['Autorizada por el SRI', $comp && $comp['estado'] === 'AUTORIZADO', $comp ? (WEB_ESTADOS[$comp['estado']][0] ?? $comp['estado']) : ''],
 ];
-echo web_titulo('Factura hecha en la web', $estado === 'EMITIDA' && $comp ? 'Factura ' . $comp['numero'] : ($estado === 'ERROR' ? 'No se pudo emitir' : ($estado === 'CANCELADO' ? 'Cancelada' : 'Emitiendo factura…')));
+echo web_titulo($esNc ? 'Nota de crédito de la factura ' . ($p['facturaNumero'] ?? '') : 'Factura hecha en la web', $estado === 'EMITIDA' && $comp ? $doc . ' ' . $comp['numero'] : ($estado === 'ERROR' ? 'No se pudo emitir' : ($estado === 'CANCELADO' ? 'Cancelada' : ($esNc ? 'Emitiendo nota de crédito…' : 'Emitiendo factura…'))));
 ?>
 <div class="columnas">
   <section class="tarjeta col-ancha">
@@ -24,7 +26,7 @@ echo web_titulo('Factura hecha en la web', $estado === 'EMITIDA' && $comp ? 'Fac
         <div class="paso <?= $ok ? 'ok' : ($actual ? 'actual' : '') ?>"><span class="paso-p"><?= $ok ? icono('M5 12l5 5L20 7', 16) : ($i + 1) ?></span><span><b><?= e($t) ?></b><?php if ($det): ?><small><?= e($det) ?></small><?php endif; ?></span></div>
       <?php endforeach; ?>
     </div>
-    <?php if ($estado === 'ERROR'): ?><div class="aviso t-r"><?= e($p['mensaje'] ?: 'El programa no pudo emitir la factura.') ?> Revisa los datos y vuelve a intentarlo, o hazla desde el programa.</div>
+    <?php if ($estado === 'ERROR'): ?><div class="aviso t-r"><?= e($p['mensaje'] ?: 'El programa no pudo emitir ' . ($esNc ? 'la nota de crédito.' : 'la factura.')) ?> Revisa los datos y vuelve a intentarlo, o hazla desde el programa.</div>
     <?php elseif ($estado === 'CANCELADO'): ?><div class="aviso t-n">Cancelaste esta factura antes de que se emitiera.</div>
     <?php elseif ($estado === 'PENDIENTE' && !$programaActivo): ?><div class="aviso t-a">Tu programa no está conectado ahora. La factura se emitirá en cuanto lo abras en tu computadora.</div><?php endif; ?>
     <div class="kv"><span>Cliente</span><b><?= e($p['cliente']['nombre'] ?? '') ?></b></div>
@@ -32,7 +34,7 @@ echo web_titulo('Factura hecha en la web', $estado === 'EMITIDA' && $comp ? 'Fac
     <div class="kv"><span>Total</span><b class="mono"><?= dinero($p['total'] ?? 0) ?></b></div>
     <div class="kv"><span>Hecha por</span><b><?= e(($p['usuarioNombre'] ?? '') ?: ($p['usuario'] ?? '')) ?></b></div>
     <div class="fila">
-      <?php if ($comp): ?><a class="btn btn-primario" href="./?v=comprobante&id=<?= e(urlencode($comp['id'])) ?>">Ver factura</a><a class="btn" href="./?v=ride&id=<?= e(urlencode($comp['id'])) ?>" target="_blank" rel="noopener">RIDE</a><?php endif; ?>
+      <?php if ($comp): ?><a class="btn btn-primario" href="./?v=comprobante&id=<?= e(urlencode($comp['id'])) ?>">Ver <?= $esNc ? 'nota de crédito' : 'factura' ?></a><a class="btn" href="./?v=ride&id=<?= e(urlencode($comp['id'])) ?>" target="_blank" rel="noopener">RIDE</a><?php endif; ?>
       <?php if ($estado === 'PENDIENTE' && web_puede($ctx, 'facturar')): ?>
         <form method="post" action="./?v=pedido_cancelar"><?= web_campo_csrf() ?><input type="hidden" name="id" value="<?= e($p['id']) ?>"><input type="hidden" name="volver" value="v=pedido&id=<?= e($p['id']) ?>"><button class="btn btn-peligro" data-confirmar="¿Cancelar esta factura? Todavía no se ha emitido.">Cancelar</button></form>
       <?php endif; ?>
@@ -41,6 +43,7 @@ echo web_titulo('Factura hecha en la web', $estado === 'EMITIDA' && $comp ? 'Fac
   </section>
   <section class="tarjeta col-angosta">
     <h2>Detalle</h2>
+    <?php if ($esNc): ?><div class="kv"><span>Motivo</span><b><?= e($p['motivo'] ?? '') ?></b></div><?php if (($p['tipoNc'] ?? '') === 'ANULACION'): ?><div class="kv"><span>Tipo</span><b>Anulación de toda la factura</b></div><?php endif; ?><?php endif; ?>
     <?php foreach (($p['items'] ?? []) as $it): ?><div class="kv"><span><?= e(rtrim(rtrim(number_format((float)$it['cantidad'], 2, '.', ''), '0'), '.')) ?> × <?= e($it['descripcion']) ?></span><b class="mono"><?= dinero((float)$it['cantidad'] * (float)$it['precioUnitario'] * (1 - (float)($it['descuentoPct'] ?? 0) / 100)) ?></b></div><?php endforeach; ?>
     <p class="muted pequeno">Valores sin IVA. El total incluye impuestos.</p>
   </section>

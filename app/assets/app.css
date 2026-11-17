@@ -281,3 +281,7 @@ a.doc:hover, a.fila-item:hover { background: var(--soft); }
 /* Aviso del filtro antierror de caracteres */
 .aviso-caracter { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 90; max-width: calc(100vw - 32px); padding: 10px 16px; border-radius: 12px; background: #0f1b2d; color: #fff; font-size: 13px; box-shadow: 0 10px 30px rgba(15, 27, 45, .25); animation: aviso-car .2s ease-out; }
 @keyframes aviso-car { from { opacity: 0; transform: translate(-50%, 8px); } }
+
+/* Stock en la factura web */
+.stock-ok{color:#1f7a3d;font-weight:600}
+.stock-no{color:#b42318;font-weight:700}

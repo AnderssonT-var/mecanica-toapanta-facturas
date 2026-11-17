@@ -4,6 +4,7 @@ $q = trim((string)($_GET['q'] ?? ''));
 $pagina = max(1, (int)($_GET['p'] ?? 1));
 $porPagina = 60;
 [$filas, $total] = web_lista($ctx, 'productos', ['q' => $q], $porPagina, ($pagina - 1) * $porPagina);
+$stock = web_stock($ctx, array_map(fn($r) => $r['codigo'], $filas));
 $editar = (string)($_GET['editar'] ?? '');
 $actual = $editar === 'nuevo' ? ['tarifa' => '4', 'precio' => ''] : ($editar !== '' ? web_registro($ctx, 'productos', $editar) : null);
 $puedeEditar = web_puede($ctx, 'editar');
@@ -34,7 +35,7 @@ if ($actual !== null && $puedeEditar): ?>
   <?php foreach ($filas as $p): ?>
     <<?= $puedeEditar ? 'a href="./?v=productos&editar=' . e(urlencode($p['id'])) . ($q ? '&q=' . e(urlencode($q)) : '') . '"' : 'div' ?> class="fila-item">
       <span class="fi-info"><b><?= e($p['descripcion']) ?></b><small><span class="mono"><?= e($p['codigo']) ?></span><?= $p['linea'] ? ' · ' . e($p['linea']) : '' ?></small></span>
-      <span class="fi-der"><b class="mono"><?= (float)$p['precio'] > 0 ? dinero($p['precio']) : '<span class="muted">sin precio</span>' ?></b><span class="badge t-n">IVA <?= e($tarifas[$p['tarifa']]['label'] ?? $p['tarifa']) ?></span></span>
+      <span class="fi-der"><b class="mono"><?= (float)$p['precio'] > 0 ? dinero($p['precio']) : '<span class="muted">sin precio</span>' ?></b><span class="badge t-n">IVA <?= e($tarifas[$p['tarifa']]['label'] ?? $p['tarifa']) ?></span><?php $sk = $stock[mb_strtolower($p['codigo'])] ?? null; if ($sk !== null): ?><span class="badge <?= $sk <= 0 ? 't-r' : 't-g' ?>">Stock <?= e(rtrim(rtrim(number_format($sk, 2, '.', ''), '0'), '.')) ?></span><?php endif; ?></span>
     </<?= $puedeEditar ? 'a' : 'div' ?>>
   <?php endforeach; ?>
   </div>

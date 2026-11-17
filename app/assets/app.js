@@ -176,10 +176,14 @@
     (c) => { ponerCliente(c); $('#cli-buscar').value = ''; guardarBorrador(); });
 
   // ----- Productos -----
+  // Cantidad total pedida de un código en la factura (puede estar en varias líneas).
+  function pedidoDe(codigo) { return codigo ? st.items.filter((x) => x.codigo === codigo).reduce((a, x) => a + (Number(x.cantidad) || 0), 0) : 0; }
+  function cantTxt(n) { return String(Math.round(Number(n) * 100) / 100); }
+
   function agregarLinea(p, enfocarPrecio) {
     const igual = st.items.find((i) => i.codigo && i.codigo === p.codigo && i.descripcion === p.descripcion);
     if (igual) igual.cantidad = String((Number(igual.cantidad) || 0) + 1);
-    else st.items.push({ codigo: p.codigo || '', codigoAux: p.codigo_aux || '', descripcion: p.descripcion || '', cantidad: '1', precioUnitario: Number(p.precio) > 0 ? String(p.precio) : '', descuentoPct: '0', tarifa: T[p.tarifa] ? String(p.tarifa) : cfg.tarifaDefecto });
+    else st.items.push({ codigo: p.codigo || '', codigoAux: p.codigo_aux || '', descripcion: p.descripcion || '', cantidad: '1', precioUnitario: Number(p.precio) > 0 ? String(p.precio) : '', descuentoPct: '0', tarifa: T[p.tarifa] ? String(p.tarifa) : cfg.tarifaDefecto, stock: p.stock === null || p.stock === undefined ? null : Number(p.stock) });
     pintarLineas();
     const i = igual ? st.items.indexOf(igual) : st.items.length - 1;
     const fila = $('[data-fila="' + i + '"]');
@@ -189,7 +193,7 @@
     if (!st.items[i].descripcion) { const d = $('[data-i="' + i + '"][data-k="descripcion"]'); if (d) d.focus(); }
   }
   buscador($('#prod-buscar'), $('#prod-sug'), 'productos',
-    (p) => '<b>' + esc(p.descripcion) + '</b><small><span class="mono">' + esc(p.codigo) + '</span> · IVA ' + esc((T[p.tarifa] || { label: p.tarifa }).label) + '</small><span class="sug-der mono">' + (p.precio > 0 ? dinero(p.precio) : 'sin precio') + '</span>',
+    (p) => '<b>' + esc(p.descripcion) + '</b><small><span class="mono">' + esc(p.codigo) + '</span> · IVA ' + esc((T[p.tarifa] || { label: p.tarifa }).label) + (p.stock !== null && p.stock !== undefined ? ' · <b class="' + (p.stock > 0 ? 'stock-ok' : 'stock-no') + '">stock ' + cantTxt(p.stock) + '</b>' : '') + '</small><span class="sug-der mono">' + (p.precio > 0 ? dinero(p.precio) : 'sin precio') + '</span>',
     (p) => { agregarLinea(p); $('#prod-buscar').value = ''; });
 
   function pintarRapidos() {
@@ -197,7 +201,8 @@
     if (!cfg.rapidos.length) { el.hidden = true; return; }
     el.innerHTML = '<span class="rap-tit">Más vendidos</span><div class="rap-pista">' + cfg.rapidos.map((p, i) => {
       const n = st.items.filter((x) => x.codigo === p.codigo && x.descripcion === p.descripcion).reduce((a, x) => a + (Number(x.cantidad) || 0), 0);
-      return '<button type="button" class="rap' + (n ? ' on' : '') + '" data-rap="' + i + '">' + (n ? '<span class="rap-n">' + n + '</span>' : '+ ') + esc(p.descripcion) + '</button>';
+      const sk = p.stock !== null && p.stock !== undefined ? ' <small class="' + (p.stock - n > 0 ? 'stock-ok' : 'stock-no') + '">(' + cantTxt(p.stock - n) + ')</small>' : '';
+      return '<button type="button" class="rap' + (n ? ' on' : '') + '" data-rap="' + i + '">' + (n ? '<span class="rap-n">' + n + '</span>' : '+ ') + esc(p.descripcion) + sk + '</button>';
     }).join('') + '</div>';
   }
   $('#rapidos').addEventListener('click', (e) => { const b = e.target.closest('[data-rap]'); if (b) agregarLinea(cfg.rapidos[Number(b.dataset.rap)]); });
@@ -209,7 +214,7 @@
       el.innerHTML = '<div class="vacio">Toca un producto de "Más vendidos" o búscalo arriba.</div>';
     } else {
       el.innerHTML = st.items.map((it, i) => '<div class="linea" data-fila="' + i + '">'
-        + '<div class="l-desc"><input data-i="' + i + '" data-k="descripcion" value="' + esc(it.descripcion) + '" placeholder="Descripción" aria-label="Descripción"><small class="mono">' + esc(it.codigo || 'Línea libre') + '</small></div>'
+        + '<div class="l-desc"><input data-i="' + i + '" data-k="descripcion" value="' + esc(it.descripcion) + '" placeholder="Descripción" aria-label="Descripción"><small class="mono">' + esc(it.codigo || 'Línea libre') + '</small>' + (it.stock !== null && it.stock !== undefined ? '<small class="' + (pedidoDe(it.codigo) > it.stock ? 'stock-no' : 'stock-ok') + '" id="stk-' + i + '">Stock ' + cantTxt(it.stock) + (pedidoDe(it.codigo) > it.stock ? ' · no alcanza' : '') + '</small>' : '') + '</div>'
         + '<div class="l-cant"><button type="button" data-menos="' + i + '" aria-label="Menos">−</button><input data-i="' + i + '" data-k="cantidad" type="number" min="0" step="any" inputmode="decimal" value="' + esc(it.cantidad) + '" aria-label="Cantidad"><button type="button" data-mas="' + i + '" aria-label="Más">+</button></div>'
         + '<label class="l-precio' + (Number(it.precioUnitario) > 0 ? '' : ' falta') + '"><span>$</span><input data-i="' + i + '" data-k="precioUnitario" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" value="' + esc(it.precioUnitario) + '" aria-label="Precio sin IVA"></label>'
         + (T[it.tarifa] && T[it.tarifa].pct > 0 ? '<button type="button" class="l-coniva" data-coniva="' + i + '" title="El precio que escribiste ya incluye IVA">Incluye IVA</button>' : '<span class="l-coniva-vacio"></span>')
@@ -229,6 +234,7 @@
     const s = $('#sub-' + el.dataset.i);
     if (s) s.textContent = dinero(subtotal(it));
     if (el.dataset.k === 'precioUnitario') el.parentElement.classList.toggle('falta', !(Number(el.value) > 0));
+    if (el.dataset.k === 'cantidad') st.items.forEach((x, j) => { const k = $('#stk-' + j); if (k && x.stock !== null && x.stock !== undefined) { const no = pedidoDe(x.codigo) > x.stock; k.className = no ? 'stock-no' : 'stock-ok'; k.textContent = 'Stock ' + cantTxt(x.stock) + (no ? ' · no alcanza' : ''); } });
     pintarResumen();
     guardarBorrador();
   });
@@ -264,6 +270,7 @@
     if (!st.items.length) return 'Agrega al menos un producto.';
     if (st.items.some((i) => !String(i.descripcion).trim())) return 'Cada línea necesita una descripción.';
     if (st.items.some((i) => !(Number(i.precioUnitario) > 0))) return 'Hay productos sin precio.';
+    if (cfg.bloquearSinStock) { const f = st.items.find((i) => i.stock !== null && i.stock !== undefined && pedidoDe(i.codigo) > i.stock + 1e-9); if (f) return 'No hay stock suficiente de ' + (f.descripcion || f.codigo) + ' (hay ' + cantTxt(Math.max(0, f.stock)) + ').'; }
     if (t.total <= 0) return 'El total debe ser mayor a cero.';
     if (st.cf && t.total > cfg.limiteCF) return 'Ventas mayores a $' + cfg.limiteCF + ' deben identificar al cliente.';
     return '';

@@ -185,6 +185,109 @@ function web_guardar(array $ctx, string $tabla, array $r): array {
   return $r;
 }
 
+// ---------- Inventario en el portal ----------
+// Ajustes del inventario que decide el programa (viajan en el catálogo «invcfg»).
+function web_cfg_inventario(array $ctx): array {
+  [$f] = web_lista($ctx, 'catalogo', ['tipo' => 'invcfg'], 5);
+  foreach ($f as $r) if (($r['clave'] ?? '') === 'config' && empty($r['deleted'])) return web_json($r['datos'] ?? []) + ['bloquearSinStock' => false];
+  return ['bloquearSinStock' => false];
+}
+
+// Establecimiento de la serie web (sin reservar una serie nueva).
+function web_estab_web(array $ctx): string {
+  $q = db()->prepare('SELECT serie FROM nube_series WHERE licencia_id = ? AND perfil = ? AND equipo = ?');
+  $q->execute([$ctx['lic'], $ctx['perfil'], EMI_EQUIPO_WEB]);
+  $s = (string)($q->fetchColumn() ?: '');
+  if (preg_match('/^(\d{3})-\d{3}$/', $s, $m)) return $m[1];
+  return preg_match('/^\d{3}$/', (string)($ctx['empresa']['estab'] ?? '')) ? $ctx['empresa']['estab'] : '001';
+}
+
+// Stock disponible para vender desde la web, por código (en minúsculas). Es lo que reportó el programa para la bodega
+// de la que salen las ventas web, menos lo vendido en la web que el programa todavía no recoge. Los productos sin
+// control de stock no aparecen.
+function web_stock(array $ctx, ?array $codigos = null): array {
+  $base = 'FROM nube_registros WHERE licencia_id = ? AND perfil = ? AND tabla = ? AND borrado = 0';
+  $estab = web_estab_web($ctx);
+  $q = db()->prepare("SELECT 1 $base AND tipo = ? LIMIT 1");
+  $q->execute([$ctx['lic'], $ctx['perfil'], 'existencias', $estab]);
+  $usaEstab = (bool)$q->fetchColumn();
+  $p = [$ctx['lic'], $ctx['perfil'], 'existencias'];
+  $filtro = '';
+  if ($codigos !== null) {
+    $codigos = array_values(array_unique(array_filter(array_map(fn($c) => mb_strtolower(trim((string)$c)), $codigos), 'strlen')));
+    if (!$codigos) return [];
+    $filtro = ' AND numero IN (' . implode(',', array_fill(0, count($codigos), '?')) . ')';
+    foreach ($codigos as $c) $p[] = mb_substr($c, 0, 20);
+  }
+  $q = db()->prepare("SELECT datos $base$filtro");
+  $q->execute($p);
+  $stock = [];
+  foreach ($q->fetchAll(PDO::FETCH_COLUMN) as $j) {
+    $r = json_decode($j, true) ?: [];
+    if (!empty($r['deleted'])) continue;
+    $c = mb_strtolower((string)($r['codigo'] ?? ''));
+    if ($codigos !== null && !in_array($c, $codigos, true)) continue;
+    if (!isset($stock[$c])) $stock[$c] = 0.0;
+    $deEsta = $usaEstab ? (string)($r['estab'] ?? '') === $estab : (string)($r['bodega_id'] ?? '') === '';
+    if ($deEsta) $stock[$c] += (float)($r['stock'] ?? 0);
+  }
+  if (!$stock) return [];
+  // Lo vendido en la web que el programa aún no descuenta (facturas por firmar y pedidos pendientes).
+  $q = db()->prepare("SELECT datos $base AND ((tipo = '01' AND estado = 'WEB') OR (estado IN ('PENDIENTE', 'EN PROCESO')))");
+  foreach (['comprobantes', 'pedidos'] as $t) {
+    $q->execute([$ctx['lic'], $ctx['perfil'], $t]);
+    foreach ($q->fetchAll(PDO::FETCH_COLUMN) as $j) {
+      $r = json_decode($j, true) ?: [];
+      if (($r['tipo'] ?? '') === 'NC') continue;
+      $items = $t === 'comprobantes' ? (web_json($r['data'] ?? [])['items'] ?? []) : ($r['items'] ?? []);
+      foreach ($items as $it) { $c = mb_strtolower(trim((string)($it['codigo'] ?? ''))); if (isset($stock[$c])) $stock[$c] -= (float)($it['cantidad'] ?? 0); }
+    }
+  }
+  return array_map(fn($v) => round($v, 6), $stock);
+}
+
+// Con «No vender sin stock» activado en el programa, una venta web no puede dejar un producto en negativo.
+function web_exigir_stock(array $ctx, array $items): void {
+  if (empty(web_cfg_inventario($ctx)['bloquearSinStock'])) return;
+  $pedido = [];
+  foreach ($items as $it) { $c = mb_strtolower(trim((string)($it['codigo'] ?? ''))); if ($c !== '') $pedido[$c] = ($pedido[$c] ?? 0) + (float)($it['cantidad'] ?? 0); }
+  $stock = web_stock($ctx, array_keys($pedido));
+  $faltan = [];
+  foreach ($pedido as $c => $q) if (isset($stock[$c]) && $q > $stock[$c] + 1e-9) {
+    $d = ''; foreach ($items as $it) if (mb_strtolower(trim((string)($it['codigo'] ?? ''))) === $c) { $d = (string)($it['descripcion'] ?? $c); break; }
+    $faltan[] = $d . ' (pides ' . rtrim(rtrim(number_format($q, 2, '.', ''), '0'), '.') . ', hay ' . rtrim(rtrim(number_format(max(0, $stock[$c]), 2, '.', ''), '0'), '.') . ')';
+  }
+  if ($faltan) throw new WebError('No hay stock suficiente: ' . implode('; ', array_slice($faltan, 0, 4)) . '.');
+}
+
+// Por cada línea de una factura: vendido, ya devuelto (notas de crédito válidas y las pedidas que aún no se
+// emiten) y lo que queda por devolver.
+function web_nc_saldos(array $ctx, array $f): array {
+  $d = web_json($f['data'] ?? []);
+  $saldos = [];
+  foreach (($d['items'] ?? []) as $i => $it) $saldos[$i] = ['codigo' => (string)($it['codigo'] ?? ''), 'descripcion' => (string)($it['descripcion'] ?? ''), 'cantidad' => (float)($it['cantidad'] ?? 0), 'devuelto' => 0.0];
+  $q = db()->prepare("SELECT datos FROM nube_registros WHERE licencia_id = ? AND perfil = ? AND tabla = 'comprobantes' AND tipo = '04' AND borrado = 0 AND fecha >= ? AND estado NOT IN ('DEVUELTA', 'NO AUTORIZADO', 'INVALIDO')");
+  $q->execute([$ctx['lic'], $ctx['perfil'], substr((string)($f['fecha'] ?? '0000'), 0, 10)]);
+  foreach ($q->fetchAll(PDO::FETCH_COLUMN) as $j) {
+    $nc = json_decode($j, true) ?: [];
+    $nd = web_json($nc['data'] ?? []);
+    if (($nd['facturaId'] ?? ($nc['referencia'] ?? '')) !== $f['id']) continue;
+    foreach (($nd['items'] ?? []) as $it) { $k = (int)($it['indiceOrigen'] ?? -1); if (isset($saldos[$k])) $saldos[$k]['devuelto'] += (float)($it['cantidad'] ?? 0); }
+  }
+  $q = db()->prepare("SELECT datos FROM nube_registros WHERE licencia_id = ? AND perfil = ? AND tabla = 'pedidos' AND tipo = 'NC' AND borrado = 0 AND estado IN ('PENDIENTE', 'EN PROCESO')");
+  $q->execute([$ctx['lic'], $ctx['perfil']]);
+  foreach ($q->fetchAll(PDO::FETCH_COLUMN) as $j) {
+    $p = json_decode($j, true) ?: [];
+    if (($p['facturaId'] ?? '') !== $f['id']) continue;
+    if (($p['tipoNc'] ?? '') === 'ANULACION') { foreach ($saldos as &$s) $s['devuelto'] = $s['cantidad']; unset($s); continue; }
+    foreach (($p['items'] ?? []) as $it) { $k = (int)($it['indice'] ?? -1); if (isset($saldos[$k])) $saldos[$k]['devuelto'] += (float)($it['cantidad'] ?? 0); }
+  }
+  foreach ($saldos as &$s) $s['saldo'] = max(0, round($s['cantidad'] - $s['devuelto'], 6));
+  unset($s);
+  return $saldos;
+}
+function web_cant($n): string { return rtrim(rtrim(number_format((float)$n, 2, '.', ''), '0'), '.') ?: '0'; }
+
 function web_resumen(array $ctx): array {
   $mesIni = date('Y-m-01');
   $q = fn(string $sql, array $p = []) => (function () use ($sql, $p, $ctx) {

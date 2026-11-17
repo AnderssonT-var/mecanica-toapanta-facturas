@@ -17,9 +17,10 @@ foreach ($catalogo as $p) $porCodigo[$p['codigo']] = $p;
 $rapidos = [];
 foreach (array_keys($cuenta) as $cod) { if (isset($porCodigo[$cod])) $rapidos[] = $porCodigo[$cod]; if (count($rapidos) >= 12) break; }
 foreach ($catalogo as $p) { if (count($rapidos) >= 12) break; if (!in_array($p, $rapidos, true)) $rapidos[] = $p; }
-$rapidos = array_map(fn($p) => ['id' => $p['id'], 'codigo' => $p['codigo'], 'codigo_aux' => $p['codigo_aux'] ?? '', 'descripcion' => $p['descripcion'], 'precio' => (float)$p['precio'], 'tarifa' => (string)$p['tarifa']], $rapidos);
+$stockRap = web_stock($ctx, array_map(fn($p) => $p['codigo'], $rapidos));
+$rapidos = array_map(fn($p) => ['id' => $p['id'], 'codigo' => $p['codigo'], 'codigo_aux' => $p['codigo_aux'] ?? '', 'descripcion' => $p['descripcion'], 'precio' => (float)$p['precio'], 'tarifa' => (string)$p['tarifa'], 'stock' => $stockRap[mb_strtolower($p['codigo'])] ?? null], $rapidos);
 $emp = $ctx['empresa'];
-$config = ['tarifas' => $tarifas, 'rapidos' => $rapidos, 'formaPago' => $emp['formaPagoDefecto'] ?? '20', 'limiteCF' => 50, 'tarifaDefecto' => isset($tarifas['4']) ? '4' : (string)array_key_first($tarifas)];
+$config = ['tarifas' => $tarifas, 'rapidos' => $rapidos, 'bloquearSinStock' => !empty(web_cfg_inventario($ctx)['bloquearSinStock']), 'formaPago' => $emp['formaPagoDefecto'] ?? '20', 'limiteCF' => 50, 'tarifaDefecto' => isset($tarifas['4']) ? '4' : (string)array_key_first($tarifas)];
 $sync = $emp['_ultima_sync'] ?? null;
 web_cabecera($ctx, 'Nueva factura', 'facturar');
 echo web_titulo('Ventas', 'Nueva factura');

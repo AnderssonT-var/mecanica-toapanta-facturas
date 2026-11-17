@@ -7,6 +7,7 @@ if (!is_array($in)) throw new WebError('No se recibió la factura. Intenta de nu
 $tarifas = web_tarifas($ctx);
 $cli = emi_validar_cliente(is_array($in['cliente'] ?? null) ? $in['cliente'] : []);
 $items = emi_validar_items((array)($in['items'] ?? []), $tarifas);
+web_exigir_stock($ctx, $items);
 $forma = array_key_exists((string)($in['formaPago'] ?? ''), WEB_FORMAS_PAGO) ? (string)$in['formaPago'] : '20';
 $dias = min(3650, max(0, (int)($in['diasCredito'] ?? 0)));
 // La factura se emite aquí mismo en la nube: número, clave de acceso, XML y RIDE quedan listos aunque la

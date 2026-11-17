@@ -50,6 +50,7 @@ try {
         case 'productos': require __DIR__ . '/vistas/productos_guardar.php'; exit;
         case 'facturar': require __DIR__ . '/vistas/facturar_guardar.php'; exit;
         case 'pedido_cancelar': require __DIR__ . '/vistas/pedido_cancelar.php'; exit;
+        case 'nc': require __DIR__ . '/vistas/nc_guardar.php'; exit;
         case 'whatsapp':
           web_exigir($ctx, 'facturar');
           if (($_POST['accion'] ?? '') === 'quitar') {
@@ -75,7 +76,7 @@ try {
   if ($v === 'ride') { require __DIR__ . '/vistas/ride.php'; exit; }
   if ($v === 'buscar') { require __DIR__ . '/vistas/buscar.php'; exit; }
 
-  $vistas = ['inicio', 'comprobantes', 'comprobante', 'clientes', 'productos', 'facturar', 'pedido', 'whatsapp'];
+  $vistas = ['inicio', 'comprobantes', 'comprobante', 'clientes', 'productos', 'facturar', 'pedido', 'whatsapp', 'nc'];
   if (!in_array($v, $vistas, true)) $v = 'inicio';
   require __DIR__ . '/vistas/' . $v . '.php';
 } catch (WebError $ex) {
