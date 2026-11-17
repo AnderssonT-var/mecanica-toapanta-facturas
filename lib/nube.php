@@ -4,8 +4,8 @@
 declare(strict_types=1);
 if (!defined('FX_PORTAL')) { http_response_code(403); exit; }
 
-const NUBE_TABLAS = ['clientes', 'productos', 'comprobantes', 'catalogo', 'proformas', 'pedidos', 'movimientos', 'compras', 'abonos', 'cajas', 'caja_movimientos', 'bodegas', 'pagos', 'bancos', 'banco_movimientos', 'conciliaciones', 'saldos_iniciales', 'asientos'];
-const NUBE_TABLAS_DESDE_PROGRAMA = ['clientes', 'productos', 'comprobantes', 'catalogo', 'proformas', 'pedidos', 'movimientos', 'compras', 'abonos', 'cajas', 'caja_movimientos', 'bodegas', 'pagos', 'bancos', 'banco_movimientos', 'conciliaciones', 'saldos_iniciales', 'asientos'];
+const NUBE_TABLAS = ['clientes', 'productos', 'comprobantes', 'catalogo', 'proformas', 'pedidos', 'movimientos', 'compras', 'abonos', 'cajas', 'caja_movimientos', 'bodegas', 'pagos', 'bancos', 'banco_movimientos', 'conciliaciones', 'saldos_iniciales', 'asientos', 'conteos'];
+const NUBE_TABLAS_DESDE_PROGRAMA = ['clientes', 'productos', 'comprobantes', 'catalogo', 'proformas', 'pedidos', 'movimientos', 'compras', 'abonos', 'cajas', 'caja_movimientos', 'bodegas', 'pagos', 'bancos', 'banco_movimientos', 'conciliaciones', 'saldos_iniciales', 'asientos', 'conteos'];
 const NUBE_LOTE_PULL = 1000;
 // Solo portal web (sin la nube de respaldo): lo único que se guarda es lo que el portal necesita.
 const NUBE_TABLAS_PORTAL = ['clientes', 'productos', 'catalogo', 'pedidos', 'comprobantes'];
