@@ -38,6 +38,18 @@ APP = "Monitor de Facturas"
 SUBTITULO = "Mecánica Toapanta"
 VELOCIDADES = [("Normal", 1.0), ("Lenta", 1.5), ("Muy lenta", 2.0), ("Extremadamente lenta", 3.0)]
 VERDE, ROJO, GRIS, AMBAR = "#1f9d55", "#c53030", "#718096", "#b7791f"
+# tiempos del envío por WhatsApp (segundos): sección, clave, etiqueta, ayuda, recomendado, mínimo, máximo
+TIEMPOS = [
+    ("escritorio", "espera_abrir_app", "Abrir WhatsApp", "si WhatsApp estaba cerrado", 90, 10, 600),
+    ("escritorio", "espera_abrir_chat", "Abrir el chat", "tras buscar el número", 12, 2, 120),
+    ("escritorio", "espera_adjunto", "Adjuntar el PDF", "vista previa del documento", 10, 2, 120),
+    ("escritorio", "espera_pegar_texto", "Pegar el mensaje", "antes de Enviar", 3, 1, 60),
+    ("escritorio", "espera_envio", "Después de enviar", "para que el mensaje salga", 10, 2, 120),
+    ("escritorio", "esperar_inactividad", "PC sin usar", "sin tocar teclado ni mouse", 4, 0, 60),
+    ("general", "intervalo_segundos", "Revisar la carpeta cada", "busca facturas nuevas", 5, 1, 300),
+    ("general", "espera_archivo_listo", "PDF terminado", "que termine de guardarse", 3, 1, 60),
+]
+POR_FACTURA = ("espera_abrir_chat", "espera_adjunto", "espera_pegar_texto", "espera_envio")
 RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 RUN_NOMBRE = "MonitorFacturasToapanta"
 LINK_PRUEBA = "https://mecanicatoapantavelez.com (mensaje de prueba)"
@@ -375,13 +387,37 @@ class App(PestanaMovil, PestanaPantalla):
                         variable=self.var_adjuntar).grid(row=r, column=1, sticky="w", pady=(4, 0))
         r += 1
 
+        titulo("Tiempos del envío")
+        ttk.Label(t, text="Segundos que espera el programa en cada paso del envío por WhatsApp. Si un mensaje sale "
+                          "incompleto o sin el PDF, sube el tiempo de ese paso.", style="Suave.TLabel",
+                  wraplength=560, justify="left").grid(row=r, column=0, columnspan=3, sticky="w", pady=(0, 6))
+        r += 1
+        self.vars_tiempo = {}
+        for sec, clave, etiqueta, ayuda, recomendado, minimo, maximo in TIEMPOS:
+            ttk.Label(t, text=etiqueta).grid(row=r, column=0, sticky="w", padx=(0, 12), pady=3)
+            var = tk.StringVar()
+            self.vars_tiempo[(sec, clave)] = var
+            fila_t = ttk.Frame(t)
+            fila_t.grid(row=r, column=1, columnspan=2, sticky="w", pady=3)
+            ttk.Spinbox(fila_t, from_=minimo, to=maximo, increment=1, textvariable=var, width=6).pack(side="left")
+            ttk.Label(fila_t, text=f"seg  ·  {ayuda}", style="Suave.TLabel").pack(side="left", padx=(8, 0))
+            var.trace_add("write", lambda *a: self._total_envio())
+            r += 1
+        fila_t = ttk.Frame(t)
+        fila_t.grid(row=r, column=0, columnspan=3, sticky="ew", pady=(8, 0))
+        self.lbl_total_envio = ttk.Label(fila_t, text="", style="Suave.TLabel")
+        self.lbl_total_envio.pack(side="left")
+        ttk.Button(fila_t, text="Valores recomendados", command=self._tiempos_recomendados).pack(side="right")
+        r += 1
+
         titulo("Esta computadora")
         ttk.Label(t, text="Velocidad de la PC").grid(row=r, column=0, sticky="w", padx=(0, 12), pady=2)
         self.var_velocidad = tk.StringVar()
+        self.var_velocidad.trace_add("write", lambda *x: self._total_envio())
         ttk.Combobox(t, textvariable=self.var_velocidad, state="readonly", width=24,
                      values=[n for n, _ in VELOCIDADES]).grid(row=r, column=1, sticky="w", pady=2)
         r += 1
-        ttk.Label(t, text="Si los mensajes salen incompletos, elige una velocidad más lenta.",
+        ttk.Label(t, text="Multiplica todos los tiempos del envío: si la PC va lenta, elige una más lenta.",
                   style="Suave.TLabel").grid(row=r, column=1, columnspan=2, sticky="w")
         r += 1
         self.var_arranque = tk.BooleanVar()
@@ -431,6 +467,10 @@ class App(PestanaMovil, PestanaPantalla):
         factor = c.getfloat("escritorio", "factor_lentitud", fallback=1.0)
         nombre = min(VELOCIDADES, key=lambda v: abs(v[1] - factor))[0]
         self.var_velocidad.set(nombre)
+        for sec, clave, _e, _a, recomendado, _mn, _mx in TIEMPOS:
+            v = c.getfloat(sec, clave, fallback=recomendado)
+            self.vars_tiempo[(sec, clave)].set(str(int(v)) if v == int(v) else str(v))
+        self._total_envio()
         self.var_arranque.set(arranque_activo())
         self.var_auto.set(c.getboolean("general", "iniciar_automaticamente", fallback=True))
         self._vista_previa()
@@ -459,6 +499,15 @@ class App(PestanaMovil, PestanaPantalla):
         c.set("mensaje", "plantilla", self._plantilla_actual())
         c.set("escritorio", "adjuntar_pdf", "si" if self.var_adjuntar.get() else "no")
         c.set("escritorio", "factor_lentitud", str(dict(VELOCIDADES).get(self.var_velocidad.get(), 1.0)))
+        for sec, clave, etiqueta, _a, _rec, minimo, maximo in TIEMPOS:
+            try:
+                v = float(self.vars_tiempo[(sec, clave)].get().replace(",", "."))
+            except ValueError:
+                messagebox.showwarning(APP, f"Revisa el tiempo de «{etiqueta}»: debe ser un número de segundos.")
+                self.pestanas.select(self.tab_config)
+                return
+            v = min(max(v, minimo), maximo)
+            c.set(sec, clave, str(int(v)) if v == int(v) else str(v))
         c.set("general", "iniciar_automaticamente", "si" if self.var_auto.get() else "no")
 
         problemas = core.problemas_config(c)
@@ -480,6 +529,21 @@ class App(PestanaMovil, PestanaPantalla):
             if messagebox.askyesno(APP, "¿Empezar a enviar facturas ahora?"):
                 self.iniciar()
                 self.pestanas.select(self.tab_inicio)
+
+    def _total_envio(self):
+        """Cuánto tarda más o menos cada factura con los tiempos de ahora."""
+        try:
+            factor = dict(VELOCIDADES).get(self.var_velocidad.get(), 1.0)
+            total = sum(float(self.vars_tiempo[("escritorio", k)].get().replace(",", ".") or 0) for k in POR_FACTURA)
+            self.lbl_total_envio.configure(
+                text=f"Cada factura tarda unos {round(total * factor + 3)} segundos en enviarse"
+                     + (f" (con la velocidad «{self.var_velocidad.get()}»)." if factor != 1 else "."))
+        except (ValueError, AttributeError, tk.TclError):
+            pass
+
+    def _tiempos_recomendados(self):
+        for sec, clave, _e, _a, recomendado, _mn, _mx in TIEMPOS:
+            self.vars_tiempo[(sec, clave)].set(str(recomendado))
 
     def generar_clave(self):
         if self.var_clave.get().strip() and not messagebox.askyesno(
