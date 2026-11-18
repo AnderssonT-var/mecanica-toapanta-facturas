@@ -17,7 +17,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       foreach (array_merge(['basico', 'profesional', 'completo'], array_map(fn($k) => 'extra_' . $k, array_keys(FX_FUNCIONES))) as $k) {
         fijar_ajuste('precio_' . $k, (string)round(max(0, (float)str_replace(',', '.', (string)($_POST[$k] ?? 0))), 2));
       }
-      aviso('Precios de referencia guardados.');
+      fijar_ajuste('meses_pago_anual', (string)max(1, min(12, (int)($_POST['meses_pago_anual'] ?? 10))));
+      aviso('Precios guardados. Ya se ven en facmit.com y en el precio sugerido de cada licencia.');
     } elseif ($accion === 'soporte') {
       $email = trim((string)($_POST['soporte_email'] ?? ''));
       if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) throw new RuntimeException('El correo de soporte no es válido.');
@@ -96,17 +97,18 @@ cabecera_html('Ajustes', $admin, 'ajustes');
         </div>
         <button class="btn btn-dark">Guardar</button></form>
     </section>
-    <section class="card"><h2>Planes y precios de referencia (por mes, USD)</h2>
-      <p class="muted">Al crear o editar una licencia, el portal suma estos valores según las funciones marcadas y te sugiere el precio. Puedes cobrar otro valor en cada licencia.</p>
+    <section class="card"><h2>Planes y precios (por mes, USD, sin IVA)</h2>
+      <?php $pm = precios_mensuales(); ?>
+      <p class="muted">Estos precios se publican en <a href="https://facmit.com/#precios" target="_blank" rel="noopener">facmit.com</a> y sugieren el precio de cada licencia según las funciones marcadas. Si los cambias aquí, la página cambia sola. En cada licencia puedes cobrar otro valor.</p>
       <form method="post" class="form"><?= campo_csrf() ?><input type="hidden" name="accion" value="precios">
         <div class="g2">
-          <label>Básico<input type="number" step="0.01" min="0" name="basico" value="<?= e(ajuste('precio_basico', '0')) ?>"></label>
-          <label>Profesional<input type="number" step="0.01" min="0" name="profesional" value="<?= e(ajuste('precio_profesional', '0')) ?>"></label>
-          <label>Completo<input type="number" step="0.01" min="0" name="completo" value="<?= e(ajuste('precio_completo', '0')) ?>"></label>
-          <span></span>
-          <?php foreach (FX_FUNCIONES as $k => $fx): ?><label>Extra · <?= e($fx['label']) ?><input type="number" step="0.01" min="0" name="extra_<?= $k ?>" value="<?= e(ajuste('precio_extra_' . $k, '0')) ?>"></label><?php endforeach; ?>
+          <label>Básico<input type="number" step="0.01" min="0" name="basico" value="<?= e($pm['basico']) ?>"></label>
+          <label>Profesional<input type="number" step="0.01" min="0" name="profesional" value="<?= e($pm['profesional']) ?>"></label>
+          <label>Completo<input type="number" step="0.01" min="0" name="completo" value="<?= e($pm['completo']) ?>"></label>
+          <label>Meses que se cobran en el pago anual<input type="number" step="1" min="1" max="12" name="meses_pago_anual" value="<?= e(meses_pago_anual()) ?>"></label>
+          <?php foreach (FX_FUNCIONES as $k => $fx): ?><label>Extra · <?= e($fx['label']) ?><input type="number" step="0.01" min="0" name="extra_<?= $k ?>" value="<?= e($pm['extra'][$k]) ?>"></label><?php endforeach; ?>
         </div>
-        <span class="muted small">Los extras se suman al Básico (o al Profesional, para Nube y Celular). "Facturar desde el celular" ya incluye la nube.</span>
+        <span class="muted small">Profesional = Básico + las 6 funciones de negocio. Completo = Profesional + Nube + Portal web. Los extras se suman a cada plan; Contabilidad se suma también al Completo.</span>
         <button class="btn btn-dark">Guardar precios</button></form>
     </section>
     <section class="card"><h2>Soporte (se muestra en el programa)</h2>

@@ -107,7 +107,7 @@ $in = fn($k, $label, $extra = '') => '<label>' . $label . '<input name="' . $k .
         <?php foreach (FX_FUNCIONES as $k => $fx) if ($fx['grupo'] === 'extra'): ?><label class="fun"><input type="checkbox" name="funciones[]" value="<?= $k ?>"<?= in_array($k, $fsel, true) ? ' checked' : '' ?>><span><b><?= e($fx['label']) ?></b><small><?= e($fx['desc']) ?></small></span></label><?php endif; ?>
         </div>
         <div class="row"><span class="muted small">Atajos:</span><button type="button" class="btn btn-sm" data-preset="">Básico</button><button type="button" class="btn btn-sm" data-preset="documentos,retenciones,inventario,compras,cartera,pos">Profesional</button><button type="button" class="btn btn-sm" data-preset="documentos,retenciones,inventario,compras,cartera,pos,nube,movil">Completo</button></div>
-        <div class="precio-sug" id="precio-sugerido" data-precios="<?= e(json_encode(['basico' => (float)ajuste('precio_basico', '0'), 'profesional' => (float)ajuste('precio_profesional', '0'), 'completo' => (float)ajuste('precio_completo', '0'), 'extra' => array_combine(array_keys(FX_FUNCIONES), array_map(fn($k) => (float)ajuste('precio_extra_' . $k, '0'), array_keys(FX_FUNCIONES)))])) ?>"></div>
+        <div class="precio-sug" id="precio-sugerido" data-precios="<?= e(json_encode(precios_mensuales() + ['mesesAnual' => meses_pago_anual()])) ?>"></div>
       </fieldset>
       <?php
         // Funciones sueltas por categoría: marcadas = encendidas. Las de una categoría apagada se muestran deshabilitadas.

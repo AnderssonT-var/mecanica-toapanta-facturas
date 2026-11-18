@@ -5,7 +5,7 @@ declare(strict_types=1);
 if (!defined('FX_PORTAL')) { http_response_code(403); exit; }
 date_default_timezone_set('America/Guayaquil');
 
-const FX_VERSION = '1.15.0';
+const FX_VERSION = '1.16.0';
 const FX_MARCA = 'Facmit';
 
 // Nombre del producto. Los portales instalados antes del cambio de marca guardaron el nombre anterior en su
@@ -124,13 +124,44 @@ function plan_legado(array $f): string {
 
 function plan_de(array $l): string { return nombre_plan(funciones_licencia($l)); }
 
-// Precio sugerido por periodo mensual según los precios de referencia de Ajustes.
+// ---------- Precios: una sola fuente ----------
+// Ajustes › Planes y precios guarda el precio MENSUAL de cada plan y de cada función extra. De aquí salen el precio
+// sugerido de cada licencia, la página facmit.com (lee esta función) y api.php?a=precios: si cambias un precio en
+// el portal, cambia en todas partes. Lo que nunca se configuró usa estos valores de referencia.
+const FX_PRECIOS_BASE = [
+  'basico' => 9, 'profesional' => 19.9, 'completo' => 24.9,
+  'extra' => ['documentos' => 2, 'retenciones' => 2, 'inventario' => 4, 'compras' => 3, 'cartera' => 3, 'pos' => 5, 'nube' => 5, 'contabilidad' => 5, 'movil' => 3],
+];
+// En el pago anual se cobran estos meses (por defecto 10: usas 12 y pagas 10).
+function meses_pago_anual(): int { return max(1, min(12, (int)ajuste('meses_pago_anual', '10'))); }
+
+function precio_ref(string $k, float $base): float {
+  $v = trim((string)ajuste('precio_' . $k, ''));
+  return $v === '' || !is_numeric($v) ? $base : round(max(0, (float)$v), 2);
+}
+
+// Precios mensuales vigentes, sin IVA, en dólares.
+function precios_mensuales(): array {
+  $extra = [];
+  foreach (array_keys(FX_FUNCIONES) as $k) $extra[$k] = precio_ref('extra_' . $k, (float)(FX_PRECIOS_BASE['extra'][$k] ?? 0));
+  return ['basico' => precio_ref('basico', FX_PRECIOS_BASE['basico']), 'profesional' => precio_ref('profesional', FX_PRECIOS_BASE['profesional']), 'completo' => precio_ref('completo', FX_PRECIOS_BASE['completo']), 'extra' => $extra];
+}
+
+// Lo que se publica: precios, meses del pago anual, funciones (nombre y descripción) y cuáles forman el Profesional.
+function precios_publicos(): array {
+  $f = [];
+  foreach (FX_FUNCIONES as $k => $x) $f[$k] = ['nombre' => $x['label'], 'desc' => $x['desc'], 'grupo' => $x['grupo']];
+  return ['moneda' => 'USD', 'iva' => 'no incluido', 'mensual' => precios_mensuales(), 'mesesAnual' => meses_pago_anual(), 'pro' => FX_PRO, 'completo' => array_merge(FX_PRO, ['nube', 'movil']), 'funciones' => $f, 'basico' => FX_BASICO];
+}
+
+// Precio sugerido por mes según las funciones marcadas (la misma regla que la página).
 function precio_sugerido(array $f): float {
-  $p = fn($k) => (float)ajuste('precio_' . $k, '0');
+  $m = precios_mensuales();
+  $f = normalizar_funciones($f);
   $cat = categoria_plan($f);
-  if ($cat === 'Completo') { $t = $p('completo'); foreach (array_diff($f, FX_PRO, ['nube', 'movil']) as $x) $t += $p('extra_' . $x); return round($t, 2); }
-  $total = $cat === 'Profesional' ? $p('profesional') : $p('basico');
-  foreach (array_diff($f, $cat === 'Profesional' ? FX_PRO : []) as $x) $total += $p('extra_' . $x);
+  if ($cat === 'Completo') { $t = $m['completo']; foreach (array_diff($f, FX_PRO, ['nube', 'movil']) as $x) $t += $m['extra'][$x]; return round($t, 2); }
+  $total = $cat === 'Profesional' ? $m['profesional'] : $m['basico'];
+  foreach (array_diff($f, $cat === 'Profesional' ? FX_PRO : []) as $x) $total += $m['extra'][$x];
   return round($total, 2);
 }
 

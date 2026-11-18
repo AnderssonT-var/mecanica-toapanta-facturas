@@ -5,6 +5,7 @@
 //   POST api.php?a=desactivar  {clave, equipo}                          → libera el equipo
 //   POST api.php?a=latido      {clave, equipo, estado, errores}         → monitor de usuarios y errores
 //   GET  api.php?a=salud                                                 → estado del servicio
+//   GET  api.php?a=precios                                               → precios públicos (los de Ajustes)
 declare(strict_types=1);
 define('FX_PORTAL', true);
 require __DIR__ . '/lib/nucleo.php';
@@ -28,6 +29,11 @@ if (!is_file(__DIR__ . '/config.php')) responder(503, ['ok' => false, 'codigo' =
 $accion = (string)($_GET['a'] ?? '');
 try {
   if ($accion === 'salud') responder(200, ['ok' => true, 'fechaServidor' => hoy(), 'version' => FX_VERSION, 'llavePublica' => trim(llave_publica_pem())]);
+  if ($accion === 'precios') {
+    header('Cache-Control: public, max-age=300');
+    header('Access-Control-Allow-Origin: *');
+    responder(200, ['ok' => true] + precios_publicos());
+  }
   if ($_SERVER['REQUEST_METHOD'] !== 'POST') responder(405, ['ok' => false, 'codigo' => 'METODO', 'error' => 'Método no permitido.']);
 
   $ip = ip_cliente();

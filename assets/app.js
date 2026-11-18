@@ -61,7 +61,7 @@ document.querySelectorAll('table').forEach((t) => {
     const p = precio(f, n);
     ps.innerHTML = p > 0 ? 'Precio sugerido: <b>$' + p.toFixed(2) + ' al mes</b> <button type="button" class="btn btn-sm" id="usar-precio">Usar</button>' : '<span class="muted small">Define los precios de referencia en Ajustes para ver un precio sugerido.</span>';
     const b = document.getElementById('usar-precio');
-    if (b) b.onclick = () => { const i = document.querySelector('input[name=precio]'); const per = (document.querySelector('select[name=periodo]') || {}).value; const m = { TRIMESTRAL: 3, SEMESTRAL: 6, ANUAL: 12 }[per] || 1; i.value = (p * m).toFixed(2); };
+    if (b) b.onclick = () => { const i = document.querySelector('input[name=precio]'); const per = (document.querySelector('select[name=periodo]') || {}).value; const m = { TRIMESTRAL: 3, SEMESTRAL: 6, ANUAL: precios.mesesAnual || 12 }[per] || 1; i.value = (p * m).toFixed(2); };
   }
   caja.addEventListener('change', (e) => {
     const c = e.target;
