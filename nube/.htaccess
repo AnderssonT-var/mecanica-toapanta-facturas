@@ -3,6 +3,9 @@ Options -Indexes
 DirectoryIndex index.php
 <IfModule mod_rewrite.c>
   RewriteEngine On
+  # El dominio anterior quedó cerrado: la nube vive solo en facmit.com.
+  RewriteCond %{HTTP_HOST} (^|\.)mecanicatoapantavelez\.com$ [NC]
+  RewriteRule ^(.*)$ https://facmit.com/licencias/nube/$1 [R=301,L,QSA]
   RewriteRule ^datos(/|$) - [F,L]
   RewriteCond %{HTTP:Authorization} .
   RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
