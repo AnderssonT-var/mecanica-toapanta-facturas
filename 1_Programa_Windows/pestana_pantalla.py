@@ -38,7 +38,7 @@ class PestanaPantalla:
         win = lienzo.create_window((0, 0), window=externo, anchor="nw")
         externo.bind("<Configure>", lambda e: lienzo.configure(scrollregion=lienzo.bbox("all")))
         lienzo.bind("<Configure>", lambda e: lienzo.itemconfigure(win, width=e.width))
-        f = estilo.tarjeta(externo, padding=(16, 12))       # cada sección va en una tarjeta
+        f = estilo.tarjeta(externo, padding=(10, 6))       # cada sección va en una tarjeta
         f.grid(row=0, column=0, sticky="ew")
         f.columnconfigure(1, weight=1)
 
@@ -50,7 +50,7 @@ class PestanaPantalla:
 
         def titulo(texto, ayuda=""):
             nonlocal r, f
-            f = estilo.tarjeta(externo, padding=(16, 12))
+            f = estilo.tarjeta(externo, padding=(10, 6))
             f.grid(row=r + 1, column=0, sticky="ew", pady=(10, 0))
             f.columnconfigure(1, weight=1)
             r += 1
@@ -87,7 +87,7 @@ class PestanaPantalla:
         ttk.Button(fila, text="Cerrar", command=self._cerrar_monitor).pack(side="left", padx=8)
         # vista en vivo de lo que se ve en el monitor del cliente
         vivo = ttk.Frame(f); vivo.grid(row=r, column=0, columnspan=3, sticky="w", pady=(6, 6)); r += 1
-        self.lbl_vivo = tk.Label(vivo, bg="#050506", fg="#8aa0a8", width=48, height=12, text="Vista en vivo del monitor",
+        self.lbl_vivo = tk.Label(vivo, bg=estilo.TARJETA, fg="#8aa0a8", width=48, height=12, text="Vista en vivo del monitor", bd=0,
                                  cursor="hand2", font=(self.fuente[0], 9))
         self.lbl_vivo.pack(side="left")
         self.lbl_vivo.bind("<Button-1>", lambda e: self._vivo_grande())
@@ -157,6 +157,7 @@ class PestanaPantalla:
                 from PIL import Image, ImageGrab
                 img = ImageGrab.grab(bbox=(m["x"], m["y"], m["x"] + m["w"], m["y"] + m["h"]), all_screens=True)
                 img.thumbnail(tam, Image.BILINEAR)
+                img = estilo.redondear(img, 14 if not grande else 18, estilo.TARJETA if not grande else "#050506")
         except Exception as e:  # noqa: BLE001
             texto, img = f"No se pudo ver el monitor:\n{e}", None
 
@@ -165,7 +166,16 @@ class PestanaPantalla:
             try:
                 destino = self.lbl_vivo_g if grande else self.lbl_vivo
                 if img is None:
-                    destino.configure(image="", text=texto, width=48 if not grande else 90, height=12 if not grande else 25)
+                    from PIL import Image, ImageTk
+                    w, h = tam
+                    base = estilo.redondear(Image.new("RGB", (w, h), "#0b0f14"), 14 if not grande else 18,
+                                            estilo.TARJETA if not grande else "#050506")
+                    foto = ImageTk.PhotoImage(base)
+                    destino.configure(image=foto, text=texto, compound="center", width=w, height=h)
+                    if grande:
+                        self._vivo_foto_g = foto
+                    else:
+                        self._vivo_foto = foto
                     return
                 from PIL import ImageTk
                 foto = ImageTk.PhotoImage(img)

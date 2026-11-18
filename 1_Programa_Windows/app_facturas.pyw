@@ -207,7 +207,7 @@ class App(PestanaMovil, PestanaPantalla):
     def _construir_inicio(self):
         t = self.tab_inicio
         # estado y botón principal
-        est = estilo.tarjeta(t, padding=(18, 14))
+        est = estilo.tarjeta(t, padding=(12, 8))
         est.pack(fill="x")
         self.punto = tk.Canvas(est, width=16, height=16, highlightthickness=0, bg=estilo.TARJETA)
         self.root.after(400, self._pintar_estado)
@@ -235,14 +235,14 @@ class App(PestanaMovil, PestanaPantalla):
         fila.pack(fill="x", pady=(10, 0))
         fila.columnconfigure(0, weight=1)
         fila.columnconfigure(1, weight=1)
-        acc = estilo.tarjeta(fila, "Carpetas", padding=(16, 12))
+        acc = estilo.tarjeta(fila, "Carpetas", padding=(10, 6))
         acc.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
         botones = ttk.Frame(acc)
         botones.pack(anchor="w", pady=(6, 0))
         ttk.Button(botones, text="Facturas", command=lambda: self._abrir(self.cfg.get("carpetas", "entrada"))).pack(side="left")
         ttk.Button(botones, text="Enviadas", command=lambda: self._abrir(self.cfg.get("carpetas", "enviadas"))).pack(side="left", padx=6)
         ttk.Button(botones, text="Con error", command=lambda: self._abrir(self.cfg.get("carpetas", "errores"))).pack(side="left")
-        prueba = estilo.tarjeta(fila, "Probar el envío", padding=(16, 12))
+        prueba = estilo.tarjeta(fila, "Probar el envío", padding=(10, 6))
         prueba.grid(row=0, column=1, sticky="nsew", padx=(5, 0))
         linea = ttk.Frame(prueba)
         linea.pack(anchor="w", pady=(6, 0))
@@ -253,7 +253,7 @@ class App(PestanaMovil, PestanaPantalla):
         self.btn_prueba.pack(side="left", padx=6)
 
         # actividad
-        act = estilo.tarjeta(t, "Actividad", padding=(16, 12))
+        act = estilo.tarjeta(t, "Actividad", padding=(10, 6))
         act.pack(fill="both", expand=True, pady=(10, 0))
         marco = ttk.Frame(act)
         marco.pack(fill="both", expand=True, pady=(6, 0))
@@ -274,7 +274,7 @@ class App(PestanaMovil, PestanaPantalla):
         ttk.Button(pie, text="Salir del programa", command=self.salir).pack(side="right")
 
     def _contador(self, padre, texto, col=0):
-        f = estilo.tarjeta(padre, padding=(16, 10))
+        f = estilo.tarjeta(padre, padding=(10, 4))
         f.grid(row=0, column=col, sticky="ew", padx=(0 if col == 0 else 5, 0 if col == 2 else 5))
         var = tk.StringVar(value="0")
         ttk.Label(f, textvariable=var, style="Numero.TLabel").pack(anchor="w")
@@ -314,7 +314,7 @@ class App(PestanaMovil, PestanaPantalla):
         def titulo(texto):
             # cada sección va en su propia tarjeta
             nonlocal r, t
-            t = estilo.tarjeta(externo, padding=(16, 12))
+            t = estilo.tarjeta(externo, padding=(10, 6))
             t.grid(row=r, column=0, sticky="ew", pady=(0 if r == 0 else 10, 0))
             t.columnconfigure(1, weight=1)
             r += 1
@@ -357,7 +357,7 @@ class App(PestanaMovil, PestanaPantalla):
         ttk.Entry(t, textvariable=self.var_negocio).grid(row=r, column=1, sticky="ew", pady=2)
         r += 1
         ttk.Label(t, text="Mensaje").grid(row=r, column=0, sticky="nw", padx=(0, 12), pady=2)
-        self.txt_plantilla = tk.Text(t, height=4, wrap="word", relief="flat", borderwidth=0,
+        self.txt_plantilla = tk.Text(t, height=4, width=40, wrap="word", relief="flat", borderwidth=0,
                                      font=self.fuente, padx=8, pady=6, bg="#ffffff", fg=estilo.TEXTO,
                                      highlightthickness=1, highlightbackground=estilo.BORDE,
                                      highlightcolor=estilo.ACENTO)
@@ -398,7 +398,7 @@ class App(PestanaMovil, PestanaPantalla):
         cols = ("fecha", "telefono", "archivo", "estado", "detalle")
         nombres = ("Fecha", "Teléfono", "Archivo", "Estado", "Detalle")
         anchos = (150, 115, 170, 75, 260)
-        tarjeta = estilo.tarjeta(t, padding=(8, 8))
+        tarjeta = estilo.tarjeta(t, padding=(2, 2))
         tarjeta.pack(fill="both", expand=True)
         marco = ttk.Frame(tarjeta)
         marco.pack(fill="both", expand=True)

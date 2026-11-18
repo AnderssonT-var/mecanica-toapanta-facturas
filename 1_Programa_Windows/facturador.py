@@ -46,7 +46,7 @@ from dbf_lector import leer_dbf
 
 log = logging.getLogger("facturas")
 
-VERSION = "3.9"
+VERSION = "4.0"
 ESTADO_FILE = core.DATA_DIR / "facturador.json"
 TRABAJO_DIR = core.DATA_DIR / "facturador"
 ITEM_POR_DEFECTO = "00038"
