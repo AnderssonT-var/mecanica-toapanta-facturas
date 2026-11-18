@@ -6,6 +6,7 @@ import threading
 import tkinter as tk
 from tkinter import messagebox, ttk
 
+import estilo_w11 as estilo
 import monitor_facturas as core
 import monitor_hdmi as hdmi
 import pantalla_cliente as pc
@@ -27,15 +28,18 @@ class PestanaPantalla:
         self.lector_prueba = None
         self.ventanas_espera: dict[str, tuple] = {}
 
-        lienzo = tk.Canvas(tab, highlightthickness=0, bg=self.root.cget("bg"))
+        lienzo = tk.Canvas(tab, highlightthickness=0, bg=estilo.fondo(self.root))
         barra = ttk.Scrollbar(tab, orient="vertical", command=lienzo.yview)
         lienzo.configure(yscrollcommand=barra.set)
         barra.pack(side="right", fill="y")
         lienzo.pack(side="left", fill="both", expand=True)
-        f = ttk.Frame(lienzo, padding=(0, 0, 12, 0))
-        win = lienzo.create_window((0, 0), window=f, anchor="nw")
-        f.bind("<Configure>", lambda e: lienzo.configure(scrollregion=lienzo.bbox("all")))
+        externo = ttk.Frame(lienzo, padding=(0, 0, 12, 0), style="Fondo.TFrame")
+        externo.columnconfigure(0, weight=1)
+        win = lienzo.create_window((0, 0), window=externo, anchor="nw")
+        externo.bind("<Configure>", lambda e: lienzo.configure(scrollregion=lienzo.bbox("all")))
         lienzo.bind("<Configure>", lambda e: lienzo.itemconfigure(win, width=e.width))
+        f = estilo.tarjeta(externo, padding=(16, 12))       # cada sección va en una tarjeta
+        f.grid(row=0, column=0, sticky="ew")
         f.columnconfigure(1, weight=1)
 
         def rueda(e):
@@ -45,15 +49,19 @@ class PestanaPantalla:
         r = 0
 
         def titulo(texto, ayuda=""):
-            nonlocal r
-            ttk.Label(f, text=texto, font=(self.fuente[0], 11, "bold")).grid(row=r, column=0, columnspan=3, sticky="w", pady=(10, 2)); r += 1
+            nonlocal r, f
+            f = estilo.tarjeta(externo, padding=(16, 12))
+            f.grid(row=r + 1, column=0, sticky="ew", pady=(10, 0))
+            f.columnconfigure(1, weight=1)
+            r += 1
+            ttk.Label(f, text=texto, style="Seccion.TLabel").grid(row=r, column=0, columnspan=3, sticky="w", pady=(0, 2)); r += 1
             if ayuda:
-                ttk.Label(f, text=ayuda, style="Suave.TLabel", wraplength=680, justify="left").grid(row=r, column=0, columnspan=3, sticky="w"); r += 1
+                ttk.Label(f, text=ayuda, style="Suave.TLabel", wraplength=620, justify="left").grid(row=r, column=0, columnspan=3, sticky="w", pady=(0, 6)); r += 1
 
         ttk.Label(f, text="Mientras haces la factura en FactuSYS, un monitor conectado a esta PC (o un teléfono en el "
                           "mostrador) le muestra al cliente sus datos y el total. Sin factura en curso muestra el cartel: "
                           "hora, mensajes y formas de pago; eso se cambia en el panel de la página → Pantalla del cliente.",
-                  wraplength=680, justify="left").grid(
+                  wraplength=620, justify="left").grid(
             row=r, column=0, columnspan=3, sticky="w"); r += 1
 
         self.var_pant_activa = tk.BooleanVar()
@@ -71,7 +79,7 @@ class PestanaPantalla:
             row=r, column=0, columnspan=3, sticky="w"); r += 1
         fila = ttk.Frame(f); fila.grid(row=r, column=0, columnspan=3, sticky="w", pady=4); r += 1
         ttk.Label(fila, text="Monitor:").pack(side="left")
-        self.cmb_monitor = ttk.Combobox(fila, textvariable=self.var_monitor, state="readonly", width=46)
+        self.cmb_monitor = ttk.Combobox(fila, textvariable=self.var_monitor, state="readonly", width=36)
         self.cmb_monitor.pack(side="left", padx=6)
         ttk.Button(fila, text="Buscar monitores", command=self._llenar_monitores).pack(side="left")
         fila = ttk.Frame(f); fila.grid(row=r, column=0, columnspan=3, sticky="w", pady=(2, 4)); r += 1
@@ -101,7 +109,7 @@ class PestanaPantalla:
         fila = ttk.Frame(f); fila.grid(row=r, column=0, columnspan=3, sticky="w", pady=4); r += 1
         ttk.Button(fila, text="Marcar campos", command=self._marcar_campos).pack(side="left")
         ttk.Button(fila, text="Probar lectura", command=lambda: self._probar_lectura(None)).pack(side="left", padx=8)
-        self.lbl_campos = ttk.Label(f, text="", style="Suave.TLabel", wraplength=680, justify="left")
+        self.lbl_campos = ttk.Label(f, text="", style="Suave.TLabel", wraplength=620, justify="left")
         self.lbl_campos.grid(row=r, column=0, columnspan=3, sticky="w"); r += 1
 
         titulo("3. Cartel, mensajes y formas de pago",
@@ -113,7 +121,7 @@ class PestanaPantalla:
         titulo("4. Guardar")
         fila = ttk.Frame(f); fila.grid(row=r, column=0, columnspan=3, sticky="w", pady=4); r += 1
         ttk.Button(fila, text="Guardar", style="Grande.TButton", command=self.guardar_pantalla).pack(side="left")
-        self.lbl_pant = ttk.Label(f, text="", foreground=GRIS, wraplength=680, justify="left")
+        self.lbl_pant = ttk.Label(f, text="", foreground=GRIS, wraplength=620, justify="left")
         self.lbl_pant.grid(row=r, column=0, columnspan=3, sticky="w", pady=(8, 0)); r += 1
         self._cargar_pantalla()
         self.root.after(2000, self._pintar_pantalla)

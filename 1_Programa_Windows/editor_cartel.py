@@ -82,7 +82,7 @@ class EditorCartel:
         ttk.Button(pie, text="Guardar", style="Grande.TButton", command=self.guardar).pack(side="right")
         ttk.Button(pie, text="Cerrar", command=self.v.destroy).pack(side="right", padx=8)
 
-        lienzo = tk.Canvas(self.v, highlightthickness=0, bg=app.root.cget("bg"))
+        lienzo = tk.Canvas(self.v, highlightthickness=0, bg="#fafafa")
         barra = ttk.Scrollbar(self.v, orient="vertical", command=lienzo.yview)
         lienzo.configure(yscrollcommand=barra.set)
         barra.pack(side="right", fill="y")

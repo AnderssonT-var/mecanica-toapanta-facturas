@@ -22,6 +22,8 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
+import estilo_w11 as estilo
+import facturador as fz
 import monitor_facturas as core
 from pestana_movil import PestanaMovil
 from pestana_pantalla import PestanaPantalla
@@ -154,8 +156,8 @@ class App(PestanaMovil, PestanaPantalla):
 
         self.root = tk.Tk()
         self.root.title(f"{APP} — {SUBTITULO}")
-        self.root.geometry("780x600")
-        self.root.minsize(680, 520)
+        self.root.geometry("1000x680")
+        self.root.minsize(860, 560)
         self.root.protocol("WM_DELETE_WINDOW", self.cerrar_ventana)
         self._estilos()
         self._construir()
@@ -176,45 +178,26 @@ class App(PestanaMovil, PestanaPantalla):
     # ----- apariencia -----------------------------------------------------
 
     def _estilos(self):
-        st = ttk.Style(self.root)
-        if "vista" in st.theme_names():
-            st.theme_use("vista")
-        elif "clam" in st.theme_names():
-            st.theme_use("clam")
-        base = ("Segoe UI", 10) if sys.platform == "win32" else ("DejaVu Sans", 10)
-        self.fuente = base
-        from tkinter import font as tkfont
-        for nombre in ("TkDefaultFont", "TkTextFont", "TkMenuFont", "TkHeadingFont"):
-            try:
-                tkfont.nametofont(nombre).configure(family=base[0], size=base[1])
-            except tk.TclError:
-                pass
-        st.configure(".", font=base)
-        st.configure("Titulo.TLabel", font=(base[0], 15, "bold"))
-        st.configure("Estado.TLabel", font=(base[0], 13, "bold"))
-        st.configure("Numero.TLabel", font=(base[0], 20, "bold"))
-        st.configure("Suave.TLabel", foreground=GRIS)
-        st.configure("Grande.TButton", font=(base[0], 11, "bold"), padding=(18, 8))
-        st.configure("Treeview", rowheight=24)
+        global VERDE, ROJO, GRIS, AMBAR
+        self.fuente = estilo.aplicar(self.root)
+        VERDE, ROJO, GRIS, AMBAR = estilo.VERDE, estilo.ROJO, estilo.SUAVE, estilo.AMBAR
 
     def _construir(self):
-        cab = ttk.Frame(self.root, padding=(16, 12, 16, 4))
-        cab.pack(fill="x")
-        ttk.Label(cab, text=APP, style="Titulo.TLabel").pack(side="left")
-        ttk.Label(cab, text=f"  {SUBTITULO}", style="Suave.TLabel").pack(side="left", pady=(5, 0))
-
-        self.pestanas = ttk.Notebook(self.root)
-        self.pestanas.pack(fill="both", expand=True, padx=12, pady=(4, 12))
-        self.tab_inicio = ttk.Frame(self.pestanas, padding=14)
-        self.tab_config = ttk.Frame(self.pestanas, padding=14)
-        self.tab_hist = ttk.Frame(self.pestanas, padding=14)
-        self.tab_movil = ttk.Frame(self.pestanas, padding=14)
-        self.tab_pantalla = ttk.Frame(self.pestanas, padding=14)
-        self.pestanas.add(self.tab_inicio, text="  Inicio  ")
-        self.pestanas.add(self.tab_config, text="  Configuración  ")
-        self.pestanas.add(self.tab_pantalla, text="  Pantalla del cliente  ")
+        self.pestanas = estilo.Navegacion(self.root, APP, SUBTITULO)
+        self.pestanas.pack(fill="both", expand=True)
+        cont = self.pestanas.contenido
+        self.tab_inicio = ttk.Frame(cont, style="Fondo.TFrame", padding=(8, 4, 8, 0))
+        self.tab_config = ttk.Frame(cont, style="Fondo.TFrame", padding=(8, 4, 0, 0))
+        self.tab_hist = ttk.Frame(cont, style="Fondo.TFrame", padding=(8, 4, 8, 0))
+        self.tab_movil = ttk.Frame(cont, style="Fondo.TFrame", padding=(8, 4, 8, 0))
+        self.tab_pantalla = ttk.Frame(cont, style="Fondo.TFrame", padding=(8, 4, 0, 0))
+        self.pestanas.add(self.tab_inicio, text="Inicio", icono="inicio")
+        self.pestanas.add(self.tab_pantalla, text="Pantalla del cliente", icono="pantalla")
+        self.pestanas.add(self.tab_hist, text="Historial", icono="historial")
+        self.pestanas.add(self.tab_config, text="Configuración", icono="config")
         # La facturación desde el celular está en pausa: su pestaña no se muestra y no se inicia.
-        self.pestanas.add(self.tab_hist, text="  Historial  ")
+        tk.Label(self.pestanas.pie_lateral, text=f"Versión {fz.VERSION}" if hasattr(fz, "VERSION") else "",
+                 bg=estilo.LATERAL, fg=estilo.SUAVE, font=(self.fuente[0], 9)).pack(anchor="w")
         self._construir_inicio()
         self._construir_config()
         self._construir_movil(self.tab_movil)
@@ -223,47 +206,60 @@ class App(PestanaMovil, PestanaPantalla):
 
     def _construir_inicio(self):
         t = self.tab_inicio
-        fila = ttk.Frame(t)
-        fila.pack(fill="x")
-        self.punto = tk.Canvas(fila, width=18, height=18, highlightthickness=0, bg=self.root.cget("bg"))
-        self.punto.pack(side="left", padx=(0, 8))
-        cuadro = ttk.Frame(fila)
+        # estado y botón principal
+        est = estilo.tarjeta(t, padding=(18, 14))
+        est.pack(fill="x")
+        self.punto = tk.Canvas(est, width=16, height=16, highlightthickness=0, bg=estilo.TARJETA)
+        self.root.after(400, self._pintar_estado)
+        self.punto.pack(side="left", padx=(0, 12))
+        cuadro = ttk.Frame(est)
         cuadro.pack(side="left", fill="x", expand=True)
         self.lbl_estado = ttk.Label(cuadro, text="Detenido", style="Estado.TLabel")
         self.lbl_estado.pack(anchor="w")
         self.lbl_detalle = ttk.Label(cuadro, text="", style="Suave.TLabel")
         self.lbl_detalle.pack(anchor="w")
-        self.btn_marcha = ttk.Button(fila, text="Iniciar", style="Grande.TButton", command=self.alternar)
+        self.btn_marcha = ttk.Button(est, text="Iniciar", style="Grande.TButton", command=self.alternar)
         self.btn_marcha.pack(side="right")
 
-        nums = ttk.Frame(t, padding=(0, 14, 0, 6))
-        nums.pack(fill="x")
-        self.num_enviadas = self._contador(nums, "Enviadas hoy")
-        self.num_errores = self._contador(nums, "Con error hoy")
-        self.num_espera = self._contador(nums, "En la carpeta")
+        # contadores en tarjetas
+        nums = ttk.Frame(t, style="Fondo.TFrame")
+        nums.pack(fill="x", pady=(10, 0))
+        for c in range(3):
+            nums.columnconfigure(c, weight=1, uniform="n")
+        self.num_enviadas = self._contador(nums, "Enviadas hoy", 0)
+        self.num_errores = self._contador(nums, "Con error hoy", 1)
+        self.num_espera = self._contador(nums, "En la carpeta", 2)
 
-        acc = ttk.Frame(t)
-        acc.pack(fill="x", pady=(4, 8))
-        ttk.Button(acc, text="Abrir carpeta de facturas",
-                   command=lambda: self._abrir(self.cfg.get("carpetas", "entrada"))).pack(side="left")
-        ttk.Button(acc, text="Ver enviadas",
-                   command=lambda: self._abrir(self.cfg.get("carpetas", "enviadas"))).pack(side="left", padx=6)
-        ttk.Button(acc, text="Ver con error",
-                   command=lambda: self._abrir(self.cfg.get("carpetas", "errores"))).pack(side="left")
-
-        prueba = ttk.LabelFrame(t, text=" Probar el envío ", padding=10)
-        prueba.pack(fill="x", pady=(4, 8))
-        ttk.Label(prueba, text="Celular:").pack(side="left")
+        # carpetas y prueba
+        fila = ttk.Frame(t, style="Fondo.TFrame")
+        fila.pack(fill="x", pady=(10, 0))
+        fila.columnconfigure(0, weight=1)
+        fila.columnconfigure(1, weight=1)
+        acc = estilo.tarjeta(fila, "Carpetas", padding=(16, 12))
+        acc.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
+        botones = ttk.Frame(acc)
+        botones.pack(anchor="w", pady=(6, 0))
+        ttk.Button(botones, text="Facturas", command=lambda: self._abrir(self.cfg.get("carpetas", "entrada"))).pack(side="left")
+        ttk.Button(botones, text="Enviadas", command=lambda: self._abrir(self.cfg.get("carpetas", "enviadas"))).pack(side="left", padx=6)
+        ttk.Button(botones, text="Con error", command=lambda: self._abrir(self.cfg.get("carpetas", "errores"))).pack(side="left")
+        prueba = estilo.tarjeta(fila, "Probar el envío", padding=(16, 12))
+        prueba.grid(row=0, column=1, sticky="nsew", padx=(5, 0))
+        linea = ttk.Frame(prueba)
+        linea.pack(anchor="w", pady=(6, 0))
         self.var_tel_prueba = tk.StringVar()
-        ttk.Entry(prueba, textvariable=self.var_tel_prueba, width=16).pack(side="left", padx=6)
-        self.btn_prueba = ttk.Button(prueba, text="Enviar mensaje de prueba", command=self.probar)
-        self.btn_prueba.pack(side="left")
+        e = ttk.Entry(linea, textvariable=self.var_tel_prueba, width=14)
+        e.pack(side="left")
+        self.btn_prueba = ttk.Button(linea, text="Enviar prueba", command=self.probar)
+        self.btn_prueba.pack(side="left", padx=6)
 
-        ttk.Label(t, text="Actividad", style="Suave.TLabel").pack(anchor="w", pady=(6, 2))
-        marco = ttk.Frame(t)
-        marco.pack(fill="both", expand=True)
-        self.txt_log = tk.Text(marco, height=8, wrap="word", state="disabled", relief="flat",
-                               bg="#f7f7f7", padx=8, pady=6, font=(self.fuente[0], 9))
+        # actividad
+        act = estilo.tarjeta(t, "Actividad", padding=(16, 12))
+        act.pack(fill="both", expand=True, pady=(10, 0))
+        marco = ttk.Frame(act)
+        marco.pack(fill="both", expand=True, pady=(6, 0))
+        self.txt_log = tk.Text(marco, height=6, wrap="word", state="disabled", relief="flat", borderwidth=0,
+                               bg=estilo.TARJETA, fg=estilo.TEXTO, padx=2, pady=2, font=(self.fuente[0], 9),
+                               highlightthickness=0)
         barra = ttk.Scrollbar(marco, command=self.txt_log.yview)
         self.txt_log.configure(yscrollcommand=barra.set)
         self.txt_log.pack(side="left", fill="both", expand=True)
@@ -272,34 +268,35 @@ class App(PestanaMovil, PestanaPantalla):
         self.txt_log.tag_configure("error", foreground=ROJO)
         self.txt_log.tag_configure("ok", foreground=VERDE)
 
-        pie = ttk.Frame(t)
-        pie.pack(fill="x", pady=(8, 0))
-        ttk.Label(pie, text="Al cerrar esta ventana el programa sigue trabajando junto al reloj.",
-                  style="Suave.TLabel").pack(side="left")
+        pie = ttk.Frame(t, style="Fondo.TFrame")
+        pie.pack(fill="x", pady=(10, 4))
+        estilo.nota(pie, "Al cerrar esta ventana el programa sigue trabajando junto al reloj.").pack(side="left")
         ttk.Button(pie, text="Salir del programa", command=self.salir).pack(side="right")
 
-    def _contador(self, padre, texto):
-        f = ttk.Frame(padre, padding=(0, 0, 36, 0))
-        f.pack(side="left")
+    def _contador(self, padre, texto, col=0):
+        f = estilo.tarjeta(padre, padding=(16, 10))
+        f.grid(row=0, column=col, sticky="ew", padx=(0 if col == 0 else 5, 0 if col == 2 else 5))
         var = tk.StringVar(value="0")
         ttk.Label(f, textvariable=var, style="Numero.TLabel").pack(anchor="w")
         ttk.Label(f, text=texto, style="Suave.TLabel").pack(anchor="w")
         return var
 
     def _construir_config(self):
-        pie = ttk.Frame(self.tab_config)
-        pie.pack(side="bottom", fill="x", pady=(8, 0))
+        pie = ttk.Frame(self.tab_config, style="Fondo.TFrame")
+        pie.pack(side="bottom", fill="x", pady=(10, 0), padx=(0, 12))
         ttk.Button(pie, text="Guardar", style="Grande.TButton", command=self.guardar).pack(side="right")
-        ttk.Label(pie, text="Los cambios se aplican al presionar Guardar.", style="Suave.TLabel").pack(side="left")
+        estilo.nota(pie, "Los cambios se aplican al presionar Guardar.").pack(side="left")
 
-        lienzo = tk.Canvas(self.tab_config, highlightthickness=0, bg=self.root.cget("bg"))
+        lienzo = tk.Canvas(self.tab_config, highlightthickness=0, bg=estilo.fondo(self.root))
         barra = ttk.Scrollbar(self.tab_config, orient="vertical", command=lienzo.yview)
         lienzo.configure(yscrollcommand=barra.set)
         barra.pack(side="right", fill="y")
         lienzo.pack(side="left", fill="both", expand=True)
-        t = ttk.Frame(lienzo, padding=(0, 0, 12, 0))
-        ventana = lienzo.create_window((0, 0), window=t, anchor="nw")
-        t.bind("<Configure>", lambda e: lienzo.configure(scrollregion=lienzo.bbox("all")))
+        externo = ttk.Frame(lienzo, padding=(0, 0, 12, 0), style="Fondo.TFrame")
+        externo.columnconfigure(0, weight=1)
+        t = externo
+        ventana = lienzo.create_window((0, 0), window=externo, anchor="nw")
+        externo.bind("<Configure>", lambda e: lienzo.configure(scrollregion=lienzo.bbox("all")))
         lienzo.bind("<Configure>", lambda e: lienzo.itemconfigure(ventana, width=e.width))
 
         def rueda(e):
@@ -315,9 +312,13 @@ class App(PestanaMovil, PestanaPantalla):
         r = 0
 
         def titulo(texto):
-            nonlocal r
-            ttk.Label(t, text=texto, font=(self.fuente[0], 10, "bold")).grid(
-                row=r, column=0, columnspan=3, sticky="w", pady=(10 if r else 0, 4))
+            # cada sección va en su propia tarjeta
+            nonlocal r, t
+            t = estilo.tarjeta(externo, padding=(16, 12))
+            t.grid(row=r, column=0, sticky="ew", pady=(0 if r == 0 else 10, 0))
+            t.columnconfigure(1, weight=1)
+            r += 1
+            ttk.Label(t, text=texto, style="Seccion.TLabel").grid(row=r, column=0, columnspan=3, sticky="w", pady=(0, 6))
             r += 1
 
         def carpeta(etiqueta, var):
@@ -335,7 +336,7 @@ class App(PestanaMovil, PestanaPantalla):
         carpeta("Facturas con error", self.var_errores)
 
         titulo("Conexión con la página")
-        ttk.Label(t, text="Clave de subida").grid(row=r, column=0, sticky="w", pady=2)
+        ttk.Label(t, text="Clave de subida").grid(row=r, column=0, sticky="w", padx=(0, 12), pady=2)
         self.var_clave = tk.StringVar()
         self.ent_clave = ttk.Entry(t, textvariable=self.var_clave, show="•")
         self.ent_clave.grid(row=r, column=1, sticky="ew", pady=2)
@@ -351,13 +352,15 @@ class App(PestanaMovil, PestanaPantalla):
         r += 1
 
         titulo("Mensaje de WhatsApp")
-        ttk.Label(t, text="Negocio").grid(row=r, column=0, sticky="w", pady=2)
+        ttk.Label(t, text="Negocio").grid(row=r, column=0, sticky="w", padx=(0, 12), pady=2)
         self.var_negocio = tk.StringVar()
         ttk.Entry(t, textvariable=self.var_negocio).grid(row=r, column=1, sticky="ew", pady=2)
         r += 1
-        ttk.Label(t, text="Mensaje").grid(row=r, column=0, sticky="nw", pady=2)
-        self.txt_plantilla = tk.Text(t, height=4, wrap="word", relief="solid", borderwidth=1,
-                                     font=self.fuente, padx=6, pady=4)
+        ttk.Label(t, text="Mensaje").grid(row=r, column=0, sticky="nw", padx=(0, 12), pady=2)
+        self.txt_plantilla = tk.Text(t, height=4, wrap="word", relief="flat", borderwidth=0,
+                                     font=self.fuente, padx=8, pady=6, bg="#ffffff", fg=estilo.TEXTO,
+                                     highlightthickness=1, highlightbackground=estilo.BORDE,
+                                     highlightcolor=estilo.ACENTO)
         self.txt_plantilla.grid(row=r, column=1, columnspan=2, sticky="ew", pady=2)
         self.txt_plantilla.bind("<KeyRelease>", lambda e: self._vista_previa())
         r += 1
@@ -373,7 +376,7 @@ class App(PestanaMovil, PestanaPantalla):
         r += 1
 
         titulo("Esta computadora")
-        ttk.Label(t, text="Velocidad de la PC").grid(row=r, column=0, sticky="w", pady=2)
+        ttk.Label(t, text="Velocidad de la PC").grid(row=r, column=0, sticky="w", padx=(0, 12), pady=2)
         self.var_velocidad = tk.StringVar()
         ttk.Combobox(t, textvariable=self.var_velocidad, state="readonly", width=24,
                      values=[n for n, _ in VELOCIDADES]).grid(row=r, column=1, sticky="w", pady=2)
@@ -395,7 +398,9 @@ class App(PestanaMovil, PestanaPantalla):
         cols = ("fecha", "telefono", "archivo", "estado", "detalle")
         nombres = ("Fecha", "Teléfono", "Archivo", "Estado", "Detalle")
         anchos = (150, 115, 170, 75, 260)
-        marco = ttk.Frame(t)
+        tarjeta = estilo.tarjeta(t, padding=(8, 8))
+        tarjeta.pack(fill="both", expand=True)
+        marco = ttk.Frame(tarjeta)
         marco.pack(fill="both", expand=True)
         self.tabla = ttk.Treeview(marco, columns=cols, show="headings")
         for c, n, a in zip(cols, nombres, anchos):
@@ -406,8 +411,8 @@ class App(PestanaMovil, PestanaPantalla):
         self.tabla.pack(side="left", fill="both", expand=True)
         barra.pack(side="right", fill="y")
         self.tabla.tag_configure("ERROR", foreground=ROJO)
-        pie = ttk.Frame(t)
-        pie.pack(fill="x", pady=(8, 0))
+        pie = ttk.Frame(t, style="Fondo.TFrame")
+        pie.pack(fill="x", pady=(10, 0))
         ttk.Button(pie, text="Actualizar", command=self._cargar_historial).pack(side="left")
         ttk.Button(pie, text="Abrir en Excel", command=lambda: self._abrir(core.HISTORY_FILE)).pack(side="left", padx=6)
 
@@ -641,7 +646,7 @@ class App(PestanaMovil, PestanaPantalla):
         activo = self._corriendo() and not (self.monitor and self.monitor.detener.is_set())
         color = VERDE if activo else ROJO
         self.punto.delete("all")
-        self.punto.create_oval(2, 2, 16, 16, fill=color, outline=color)
+        self.punto.create_oval(2, 2, 14, 14, fill=color, outline=color)
         self.lbl_estado.configure(text="Trabajando" if activo else "Detenido")
         self.lbl_detalle.configure(
             text=f"Vigilando {self.cfg.get('carpetas', 'entrada')}" if activo

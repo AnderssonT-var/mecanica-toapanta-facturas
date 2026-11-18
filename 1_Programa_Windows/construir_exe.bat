@@ -31,7 +31,7 @@ rem para convertir PDF de formas de pago en el programa (si no se instala, se us
   --name "MonitorFacturas" --icon icono.ico ^
   --hidden-import pystray._win32 ^
   --hidden-import ride_pdf --hidden-import reportlab.graphics.barcode.code128 ^
-  --hidden-import pantalla_cliente --hidden-import pestana_pantalla --hidden-import monitor_hdmi --hidden-import editor_cartel --collect-all pypdfium2 --collect-all pypdfium2_raw ^
+  --hidden-import pantalla_cliente --hidden-import pestana_pantalla --hidden-import monitor_hdmi --hidden-import editor_cartel --collect-all pypdfium2 --collect-all pypdfium2_raw --collect-data sv_ttk --hidden-import estilo_w11 ^
   --hidden-import PIL.ImageGrab --hidden-import PIL.ImageTk ^
   --collect-submodules reportlab.graphics.barcode ^
   app_facturas.pyw
