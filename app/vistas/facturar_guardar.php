@@ -11,7 +11,8 @@ web_exigir_stock($ctx, $items);
 $forma = array_key_exists((string)($in['formaPago'] ?? ''), WEB_FORMAS_PAGO) ? (string)$in['formaPago'] : '20';
 $dias = min(3650, max(0, (int)($in['diasCredito'] ?? 0)));
 // La factura se emite aquí mismo en la nube: número, clave de acceso, XML y RIDE quedan listos aunque la
-// computadora esté apagada. El programa la firma y la envía al SRI en cuanto se enciende.
+// computadora esté apagada. El programa la firma y la envía al SRI en cuanto se enciende (debe ser el mismo día).
 $c = emi_emitir_factura($ctx, $cli, $items, $forma, $dias, mb_substr(trim((string)($in['observacion'] ?? '')), 0, 300));
+web_avisar_dueno($ctx); // si la PC de la tienda está apagada, el dueño se entera por correo (máx. 2 al día)
 web_aviso('Factura ' . $c['numero'] . ' emitida. El RIDE y el XML ya están listos.');
 web_ir('v=comprobante&id=' . urlencode($c['id']));

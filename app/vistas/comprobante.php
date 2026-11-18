@@ -21,7 +21,7 @@ echo web_titulo($tipo, $c['numero'], $btnNc . '<a class="btn" href="./?v=ride&id
 <?php if ($porFirmar): ?>
 <div class="aviso <?= $pcActiva ? 't-b' : 't-a' ?>" role="status"><?= $pcActiva
   ? 'Factura emitida en la web. Tu programa la está firmando y enviando al SRI; esta página se actualiza sola.'
-  : 'Factura emitida en la web con su número, RIDE y XML. Tu computadora está apagada o sin internet' . ($sync ? ' (último contacto ' . e(web_hace($sync)) . ')' : '') . ': se firmará y se autorizará en el SRI en cuanto enciendas el programa.' ?></div>
+  : 'Factura emitida en la web con su número, RIDE y XML. Tu computadora está apagada o sin internet' . ($sync ? ' (último contacto ' . e(web_hace($sync)) . ')' : '') . ': se firmará y se autorizará en el SRI en cuanto enciendas el programa. Debe ser hoy: el SRI solo acepta facturas transmitidas el día de su emisión.' ?></div>
 <?php endif; ?>
 <div class="columnas"<?= $porFirmar ? ' data-recargar="15"' : '' ?>>
   <section class="tarjeta col-ancha">

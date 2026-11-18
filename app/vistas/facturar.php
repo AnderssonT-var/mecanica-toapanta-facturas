@@ -24,9 +24,7 @@ $config = ['tarifas' => $tarifas, 'rapidos' => $rapidos, 'bloquearSinStock' => !
 $sync = $emp['_ultima_sync'] ?? null;
 web_cabecera($ctx, 'Nueva factura', 'facturar');
 echo web_titulo('Ventas', 'Nueva factura');
-if (!$sync || time() - strtotime($sync) > 1800) {
-  echo '<div class="aviso t-n">Tu computadora no está conectada ' . ($sync ? 'desde ' . e(web_hace($sync)) : 'todavía') . '. No pasa nada: la factura se emite aquí con su número, RIDE y XML, y se autoriza en el SRI en cuanto enciendas el programa.</div>';
-}
+echo web_aviso_dia($ctx, true);
 ?>
 <form id="facturar" class="facturar" method="post" action="./?v=facturar">
   <?= web_campo_csrf() ?><input type="hidden" name="pedido" id="pedido-json"><input type="hidden" name="volver" value="v=facturar">

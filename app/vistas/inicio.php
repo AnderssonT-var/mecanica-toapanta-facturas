@@ -10,6 +10,8 @@ $nombre = trim(explode(' ', (string)($ctx['usuario']['nombre'] ?: ''))[0]);
 web_cabecera($ctx, 'Inicio', 'inicio');
 echo web_titulo(fecha_ec(hoy()), $saludo . ($nombre ? ', ' . $nombre : ''), web_puede($ctx, 'facturar') ? '<a class="btn btn-primario" href="./?v=facturar">' . icono(ICO['facturar'], 18) . 'Nueva factura</a>' : '');
 
+echo web_aviso_dia($ctx);
+web_avisar_dueno($ctx);
 if (!$sync) {
   echo '<section class="tarjeta destacada"><h2>Conecta tu programa</h2><p class="muted">Todavía no llegan datos de tu programa de escritorio. Ábrelo en tu computadora y entra a <b>Nube y respaldos › Sincronizar ahora</b>. Desde ese momento, todo lo que hagas allá aparece aquí.</p></section>';
 }

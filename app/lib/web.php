@@ -11,8 +11,12 @@ const WEB_DOCS = ['01' => 'Factura', '03' => 'Liquidación de compra', '04' => '
 const WEB_ESTADOS = [
   'GENERADO' => ['Generado', 'n'], 'FIRMADO' => ['Firmado', 'b'], 'PENDIENTE' => ['Pendiente de envío', 'a'], 'RECIBIDA' => ['Recibida', 'b'],
   'INVALIDO' => ['Error de estructura', 'r'], 'EN PROCESO' => ['En proceso', 'a'], 'AUTORIZADO' => ['Autorizado', 'g'], 'DEVUELTA' => ['Devuelta', 'r'],
-  'NO AUTORIZADO' => ['No autorizado', 'r'],
+  'NO AUTORIZADO' => ['No autorizado', 'r'], 'WEB' => ['Por firmar en la PC', 'a'],
 ];
+// Transmisión el mismo día (Res. NAC-DGERCGC25-00000017, desde el 1/1/2026): lo que no llegó al SRI el día de su
+// emisión ya no se acepta y se vuelve a emitir con la fecha de hoy (desde el programa, con el mismo número).
+const WEB_POR_AUTORIZAR = ['GENERADO', 'FIRMADO', 'PENDIENTE', 'RECIBIDA', 'EN PROCESO', 'WEB'];
+const WEB_SIN_LLEGAR = ['GENERADO', 'FIRMADO', 'PENDIENTE', 'WEB'];
 const WEB_FORMAS_PAGO = ['01' => 'Sin utilización del sistema financiero', '16' => 'Tarjeta de débito', '19' => 'Tarjeta de crédito', '20' => 'Otros con utilización del sistema financiero'];
 const WEB_TARIFAS = ['0' => ['pct' => 0, 'label' => '0%'], '2' => ['pct' => 12, 'label' => '12%'], '3' => ['pct' => 14, 'label' => '14%'], '4' => ['pct' => 15, 'label' => '15%'],
   '5' => ['pct' => 5, 'label' => '5%'], '6' => ['pct' => 0, 'label' => 'No objeto'], '7' => ['pct' => 0, 'label' => 'Exento'], '8' => ['pct' => 8, 'label' => '8%'], '10' => ['pct' => 13, 'label' => '13%']];
@@ -363,7 +367,16 @@ function web_hace(?string $f): string {
   if ($s < 86400) return 'hace ' . round($s / 3600) . ' h';
   return 'hace ' . round($s / 86400) . ' días';
 }
+function web_vencido(array $c): bool {
+  if (!empty($c['anulado'])) return false;
+  if (($c['estado'] ?? '') === 'DEVUELTA') {
+    foreach (web_json($c['mensajes'] ?? []) as $m) if ((string)($m['identificador'] ?? '') === '65') return true;
+    return false;
+  }
+  return in_array($c['estado'] ?? '', WEB_SIN_LLEGAR, true) && substr((string)($c['fecha'] ?? ''), 0, 10) < date('Y-m-d');
+}
 function web_estado(array $c): string {
+  if (web_vencido($c)) return '<span class="badge t-r" title="No llegó al SRI el día de su emisión: vuélvela a emitir desde el programa">Vencida · no llegó al SRI</span>';
   $e = WEB_ESTADOS[$c['estado'] ?? ''] ?? [$c['estado'] ?? '—', 'n'];
   return '<span class="badge t-' . $e[1] . '">' . e($e[0]) . '</span>' . (!empty($c['anulado']) ? ' <span class="badge t-r">Anulada</span>' : '');
 }
@@ -443,4 +456,73 @@ function web_paginacion(int $total, int $pagina, int $porPagina, array $q): stri
   return '<div class="paginas"><span class="muted">' . number_format($total) . ' en total · página ' . $pagina . ' de ' . $paginas . '</span><span class="fila">'
     . ($pagina > 1 ? '<a class="btn btn-sm" href="' . e($url($pagina - 1)) . '">Anterior</a>' : '')
     . ($pagina < $paginas ? '<a class="btn btn-sm" href="' . e($url($pagina + 1)) . '">Siguiente</a>' : '') . '</span></div>';
+}
+
+
+// ---------- Lo del día y la computadora de la tienda ----------
+function web_por_autorizar(array $ctx): array {
+  $base = "FROM nube_registros WHERE licencia_id = ? AND perfil = ? AND borrado = 0 AND tabla = 'comprobantes'";
+  $in = fn(array $l) => "('" . implode("','", $l) . "')";
+  $r = db()->prepare("SELECT COUNT(*) $base AND estado IN " . $in(WEB_POR_AUTORIZAR) . " AND fecha = ?");
+  $r->execute([$ctx['lic'], $ctx['perfil'], date('Y-m-d')]);
+  $hoy = (int)$r->fetchColumn();
+  $r = db()->prepare("SELECT COUNT(*) $base AND ((estado IN " . $in(WEB_SIN_LLEGAR) . " AND fecha < ?) OR (estado = 'DEVUELTA' AND datos LIKE ?))");
+  $r->execute([$ctx['lic'], $ctx['perfil'], date('Y-m-d'), '%"identificador":"65"%']);
+  return ['hoy' => $hoy, 'vencidos' => (int)$r->fetchColumn()];
+}
+
+// Minutos desde que la computadora de la tienda se conectó por última vez (null = nunca).
+function web_pc_minutos(array $ctx): ?int {
+  $sync = $ctx['empresa']['_ultima_sync'] ?? null;
+  return $sync ? (int)floor((time() - strtotime($sync)) / 60) : null;
+}
+
+// Aviso del día para el inicio y para facturar: vencidas, y facturas de hoy esperando la PC (cada vez más visible).
+function web_aviso_dia(array $ctx, bool $alFacturar = false): string {
+  $pa = web_por_autorizar($ctx);
+  $min = web_pc_minutos($ctx);
+  $apagada = $min === null || $min > 30;
+  $h = (int)date('G');
+  $html = '';
+  if ($pa['vencidos']) {
+    $html .= '<div class="aviso t-r" role="alert"><b>' . ($pa['vencidos'] === 1 ? 'Una factura no llegó' : $pa['vencidos'] . ' facturas no llegaron') . ' al SRI el día de su emisión.</b> El SRI solo acepta comprobantes del mismo día. Ábrelas en el programa de la tienda y pulsa «Emitir con fecha de hoy» (mismo número; el cliente recibe la autorizada por correo).</div>';
+  }
+  if ($apagada) {
+    $desde = $min === null ? 'todavía no se conecta' : 'no se conecta desde ' . web_hace($ctx['empresa']['_ultima_sync'] ?? null);
+    if ($pa['hoy'] && $h >= 15) {
+      $tono = $h >= 19 ? 't-r' : 't-a';
+      $html .= '<div class="aviso ' . $tono . '" role="alert"><b>La computadora de la tienda ' . e($desde) . '.</b> Hay ' . $pa['hoy'] . ' ' . ($pa['hoy'] === 1 ? 'factura' : 'facturas') . ' de hoy esperando que se encienda para autorizarse en el SRI. '
+        . ($h >= 22 ? 'Quedan minutos: si no se autorizan antes de la medianoche, habrá que volver a emitirlas.' : 'Deben autorizarse antes de la medianoche: pide que la enciendan hoy.') . '</div>';
+    } elseif ($alFacturar) {
+      $html .= '<div class="aviso t-n">La computadora de la tienda ' . e($desde) . '. La factura se emite aquí con su número, RIDE y XML, y se autoriza en el SRI en cuanto se encienda el programa. <b>Debe encenderse hoy</b>: el SRI solo acepta facturas del mismo día.</div>';
+    } elseif ($pa['hoy']) {
+      $html .= '<div class="aviso t-n">La computadora de la tienda ' . e($desde) . '. ' . $pa['hoy'] . ' ' . ($pa['hoy'] === 1 ? 'factura de hoy espera' : 'facturas de hoy esperan') . ' que se encienda para autorizarse.</div>';
+    }
+  }
+  return $html;
+}
+
+// Aviso al dueño por correo: facturas de hoy esperando la PC apagada. Como mucho dos veces al día (antes y después
+// de las 18:00) por empresa, y solo si la PC lleva más de 30 minutos sin conectarse.
+function web_avisar_dueno(array $ctx): bool {
+  try {
+    $min = web_pc_minutos($ctx);
+    if ($min !== null && $min <= 30) return false;
+    $pa = web_por_autorizar($ctx);
+    if (!$pa['hoy']) return false;
+    $clave = 'aviso_pc:' . $ctx['lic'] . ':' . $ctx['perfil'] . ':' . date('Y-m-d') . ':' . ((int)date('G') >= 18 ? 'tarde' : 'dia');
+    if (ajuste($clave, '') !== '') return false;
+    $para = (string)($ctx['licencia']['email'] ?? '');
+    if (!filter_var($para, FILTER_VALIDATE_EMAIL)) $para = (string)($ctx['empresa']['email'] ?? '');
+    if (!filter_var($para, FILTER_VALIDATE_EMAIL)) return false;
+    fijar_ajuste($clave, date('c'));
+    $negocio = (string)($ctx['empresa']['nombreComercial'] ?? '') ?: (string)($ctx['empresa']['razonSocial'] ?? $ctx['perfil']);
+    $marca = fx_marca();
+    $txt = "Hola,\n\nEn el portal de " . $marca . " de " . $negocio . " hay " . $pa['hoy'] . ($pa['hoy'] === 1 ? " factura" : " facturas") . " de hoy esperando que se encienda la computadora de la tienda para autorizarse en el SRI.\n\n"
+      . "La computadora " . ($min === null ? "todavía no se ha conectado" : "no se conecta desde hace " . ($min >= 90 ? round($min / 60) . " horas" : $min . " minutos")) . ".\n\n"
+      . "Desde 2026 el SRI solo acepta comprobantes del mismo día: enciende el programa antes de la medianoche. Si no alcanzas, mañana el programa te ofrecerá volver a emitirlas con la fecha del día (mismo número).\n";
+    $host = preg_replace('/[^a-z0-9.-]/i', '', (string)($_SERVER['HTTP_HOST'] ?? 'localhost'));
+    return (bool)@mail($para, '=?UTF-8?B?' . base64_encode('Facturas de hoy esperan tu computadora · ' . $negocio) . '?=', $txt,
+      "From: avisos@" . preg_replace('/^www\./', '', $host) . "\r\nContent-Type: text/plain; charset=UTF-8\r\n");
+  } catch (Throwable $e) { return false; }
 }
