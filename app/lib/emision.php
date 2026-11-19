@@ -497,8 +497,8 @@ function emi_emitir_factura(array $ctx, array $cli, array $items, string $formaP
   // La PC acepta facturas web en su propio punto solo si así lo eligió el administrador (y las renumera si chocan).
   $compartida = $serie === emi_serie_pc($ctx);
   $campos = [
-    ['nombre' => 'Dirección', 'valor' => $cli['direccion']], ['nombre' => 'Teléfono', 'valor' => $cli['telefono']], ['nombre' => 'Email', 'valor' => $cli['email']],
-    ['nombre' => 'Condición', 'valor' => $diasCredito > 0 ? 'Crédito ' . $diasCredito . ' días' : 'Contado'],
+    // Igual que el programa: solo correo del cliente, comentario y RUC del proveedor del sistema.
+    ['nombre' => 'Email', 'valor' => $cli['email']],
     ['nombre' => 'Vendedor', 'valor' => ''], ['nombre' => 'Proforma', 'valor' => ''], ['nombre' => 'Observación', 'valor' => $observacion],
   ];
   if (!empty($e['proveedor']['nombre']) && !empty($e['proveedor']['valor'])) $campos[] = ['nombre' => (string)$e['proveedor']['nombre'], 'valor' => (string)$e['proveedor']['valor']];
