@@ -337,3 +337,5 @@ a.doc:hover, a.fila-item:hover { background: var(--soft); }
 .wa-der { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
 .sub-titulo { font: 700 18px var(--display); margin: 8px 0 12px; }
 @media (max-width: 600px) { .fila-wa { grid-template-columns: 30px minmax(0, 1fr) auto; gap: 10px; } .wa-ico { width: 30px; height: 30px; } .wa-cuerpo small { white-space: normal; } }
+.puntos-usuarios { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 4px; font-size: 13px; }
+.puntos-usuarios li { display: flex; gap: 10px; justify-content: space-between; border-top: 1px solid var(--border); padding-top: 4px; }

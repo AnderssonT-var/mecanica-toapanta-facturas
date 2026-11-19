@@ -201,8 +201,8 @@ function web_cfg_inventario(array $ctx): array {
 
 // Establecimiento de la serie web (sin reservar una serie nueva).
 function web_estab_web(array $ctx): string {
-  $q = db()->prepare('SELECT serie FROM nube_series WHERE licencia_id = ? AND perfil = ? AND equipo = ?');
-  $q->execute([$ctx['lic'], $ctx['perfil'], EMI_EQUIPO_WEB]);
+  $q = db()->prepare('SELECT serie FROM nube_series WHERE licencia_id = ? AND perfil = ? AND equipo IN (?, ?)');
+  $q->execute([$ctx['lic'], $ctx['perfil'], emi_equipo_usuario($ctx), EMI_EQUIPO_WEB]);
   $s = (string)($q->fetchColumn() ?: '');
   if (preg_match('/^(\d{3})-\d{3}$/', $s, $m)) return $m[1];
   return preg_match('/^\d{3}$/', (string)($ctx['empresa']['estab'] ?? '')) ? $ctx['empresa']['estab'] : '001';

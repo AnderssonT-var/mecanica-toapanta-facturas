@@ -252,7 +252,9 @@ try {
       $d = api_datos_facturar($ctx);
       [$prods] = web_lista($ctx, 'productos', [], 3000);
       [$clis] = web_lista($ctx, 'clientes', [], 1500);
-      api_salida($d + ['productos' => web_productos_salida($ctx, $prods), 'clientes' => array_map('web_cliente_salida', $clis), 'generado' => web_ahora_iso()]);
+      $e = emi_empresa($ctx);
+      api_salida($d + ['productos' => web_productos_salida($ctx, $prods), 'clientes' => array_map('web_cliente_salida', $clis), 'generado' => web_ahora_iso(),
+        'ruc' => $ctx['perfil'], 'ambiente' => (string)$e['ambiente']]);
     }
     case 'punto_cambiar': {
       if (!$post) api_error('Usa POST.', 405);

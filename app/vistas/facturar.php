@@ -51,26 +51,14 @@ echo web_aviso_dia($ctx, true);
       <section class="tarjeta resumen-fac" id="resumen"></section>
       <?php $pu = emi_punto_info($ctx); ?>
       <section class="tarjeta punto-web">
-        <div class="tarjeta-cab"><h2>Punto de emisión</h2><span class="chip mono"><?= e($pu['serie'] ?: '—') ?></span></div>
-        <p class="muted pequeno">La web y la app del celular facturan con el mismo punto: <b><?= e($pu['nombre']) ?></b>.</p>
-        <?php if ($pu['puedeCambiar']): ?><button type="button" class="btn btn-fantasma" data-abrir-dialogo="punto-dlg">Cambiar</button><?php endif; ?>
+        <div class="tarjeta-cab"><h2>Tu punto de emisión</h2><span class="chip mono"><?= e($pu['serie'] ?: '—') ?></span></div>
+        <p class="muted pequeno">Es tuyo, como una caja: lo usas aquí y en la app del celular. Cada usuario tiene el suyo y la computadora usa los suyos, así los números nunca se cruzan.</p>
+        <?php if (!empty($pu['usuarios']) && count($pu['usuarios']) > 1): ?>
+        <ul class="puntos-usuarios"><?php foreach ($pu['usuarios'] as $x): ?><li><span class="mono"><?= e($x['serie']) ?></span><span><?= e($x['nombre']) ?></span></li><?php endforeach; ?></ul>
+        <?php endif; ?>
       </section>
     </aside>
   </div>
   <div class="barra-total"><span><small>Total</small><b class="mono" id="total-movil">$0.00</b></span><button class="btn btn-primario btn-lg" id="enviar-movil" type="submit">Emitir factura</button></div>
 </form>
-<?php if ($pu['puedeCambiar']): ?>
-<dialog id="punto-dlg" class="dialogo">
-  <form method="post" action="./?v=punto">
-    <?= web_campo_csrf() ?>
-    <h2>¿Con qué punto facturan la web y la app?</h2>
-    <label class="opcion-punto"><input type="radio" name="modo" value="PORTAL" <?= $pu['modo'] === 'PORTAL' ? 'checked' : '' ?>>
-      <span><b>Punto propio del portal <?= $pu['seriePortal'] ? '<span class="sin-partir">(' . e($pu['seriePortal']) . ')</span>' : '' ?></b><small>Recomendado si varias personas facturan al mismo tiempo (vendedores, otro local). La computadora sigue con el suyo y los números nunca se cruzan.</small></span></label>
-    <label class="opcion-punto"><input type="radio" name="modo" value="PC" <?= $pu['modo'] === 'PC' ? 'checked' : '' ?> <?= $pu['seriePC'] ? '' : 'disabled' ?>>
-      <span><b>El mismo de la computadora <?= $pu['seriePC'] ? '<span class="sin-partir">(' . e($pu['seriePC']) . ')</span>' : '' ?></b><small>Para cuando una sola persona factura: todas las facturas salen con una sola numeración. Si alguna vez la computadora y el celular facturan a la vez sin internet, la computadora le da a la factura del celular el siguiente número libre antes de enviarla al SRI.</small></span></label>
-    <p class="muted pequeno">Pide al SRI el punto propio del portal si todavía no lo tienes registrado. El cambio vale para las próximas facturas.</p>
-    <div class="acciones"><button type="button" class="btn btn-fantasma" data-cerrar-dialogo>Cancelar</button><button class="btn btn-primario">Guardar</button></div>
-  </form>
-</dialog>
-<?php endif; ?>
 <?php web_pie();
