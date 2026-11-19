@@ -330,3 +330,11 @@
   void csrf;
   pintarLineas();
 })();
+
+// Diálogos (la política de seguridad no permite onclick en el HTML).
+document.addEventListener('click', (ev) => {
+  const abrir = ev.target.closest('[data-abrir-dialogo]');
+  if (abrir) { const d = document.getElementById(abrir.dataset.abrirDialogo); if (d && d.showModal) d.showModal(); return; }
+  const cerrar = ev.target.closest('[data-cerrar-dialogo]');
+  if (cerrar) { const d = cerrar.closest('dialog'); if (d) d.close(); }
+});

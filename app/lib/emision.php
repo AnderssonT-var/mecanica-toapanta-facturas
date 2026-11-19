@@ -282,13 +282,165 @@ function emi_serie_web(array $ctx): string {
   throw new WebError('No se pudo apartar el punto de emisión de la web. Intenta de nuevo.');
 }
 
+// ---------- Punto de emisión de la web y la app ----------
+// La web y la app comparten siempre el mismo punto. Por defecto es uno propio del portal (001-002…); si factura una
+// sola persona, el administrador puede elegir el punto de la computadora: el portal toma el número siguiente al último
+// que reportó la PC y la PC salta los números que dio el portal. Si alguna vez chocan, la PC renumera la factura web.
+const EMI_MODOS_PUNTO = ['PORTAL' => 'Punto propio del portal', 'PC' => 'El mismo punto de la computadora'];
+
+function emi_ajuste(array $ctx, string $clave, string $defecto = ''): string {
+  emi_esquema();
+  $q = db()->prepare('SELECT valor FROM nube_ajustes WHERE licencia_id = ? AND perfil = ? AND clave = ?');
+  $q->execute([$ctx['lic'], $ctx['perfil'], $clave]);
+  $v = $q->fetchColumn();
+  return $v === false ? $defecto : (string)$v;
+}
+
+function emi_fijar_ajuste(array $ctx, string $clave, string $valor): void {
+  emi_esquema();
+  $d = db();
+  $d->prepare('DELETE FROM nube_ajustes WHERE licencia_id = ? AND perfil = ? AND clave = ?')->execute([$ctx['lic'], $ctx['perfil'], $clave]);
+  $d->prepare('INSERT INTO nube_ajustes (licencia_id, perfil, clave, valor, actualizado) VALUES (?, ?, ?, ?, ?)')->execute([$ctx['lic'], $ctx['perfil'], $clave, $valor, ahora()]);
+}
+
+// Punto de facturas que usa el programa de la PC (lo reporta al sincronizar). '' si todavía no lo reporta.
+function emi_serie_pc(array $ctx): string {
+  $sig = (string)($ctx['empresa']['siguienteFactura'] ?? '');
+  if (preg_match('/^(\d{3}-\d{3})-\d{9}$/', $sig, $m)) return $m[1];
+  $e = (string)($ctx['empresa']['estab'] ?? ''); $p = (string)($ctx['empresa']['ptoEmi'] ?? '');
+  return preg_match('/^\d{3}$/', $e) && preg_match('/^\d{3}$/', $p) ? $e . '-' . $p : '';
+}
+
+// Último número que la PC ya usó en esa serie (según su «siguiente factura» reportada).
+function emi_ultimo_pc(array $ctx, string $serie, string $codDoc): int {
+  if ($codDoc !== '01') return 0;
+  $sig = (string)($ctx['empresa']['siguienteFactura'] ?? '');
+  return preg_match('/^(\d{3}-\d{3})-(\d{9})$/', $sig, $m) && $m[1] === $serie ? max(0, (int)$m[2] - 1) : 0;
+}
+
+function emi_modo_punto(array $ctx): string {
+  $m = emi_ajuste($ctx, 'modo_punto', 'PORTAL');
+  return isset(EMI_MODOS_PUNTO[$m]) ? $m : 'PORTAL';
+}
+
+// Serie con la que salen ahora las facturas de la web y de la app.
+function emi_serie_activa(array $ctx): string {
+  if (emi_modo_punto($ctx) === 'PC') {
+    $s = emi_serie_pc($ctx);
+    if ($s === '') throw new WebError('Todavía no llega el punto de emisión de la computadora. Abre el programa y pulsa «Sincronizar ahora».');
+    return $s;
+  }
+  return emi_serie_web($ctx);
+}
+
+function emi_punto_info(array $ctx): array {
+  $modo = emi_modo_punto($ctx);
+  $pc = emi_serie_pc($ctx);
+  try { $portal = emi_serie_web($ctx); } catch (Throwable $e) { $portal = ''; }
+  return ['modo' => $modo, 'nombre' => EMI_MODOS_PUNTO[$modo], 'serie' => $modo === 'PC' ? $pc : $portal, 'seriePortal' => $portal, 'seriePC' => $pc,
+    'puedeCambiar' => ($ctx['usuario']['rol'] ?? '') === 'ADMIN' && $ctx['bloqueo'] === ''];
+}
+
+function emi_cambiar_punto(array $ctx, string $modo): array {
+  if (($ctx['usuario']['rol'] ?? '') !== 'ADMIN') throw new WebError('Solo un usuario administrador puede cambiar el punto de emisión.');
+  if (!isset(EMI_MODOS_PUNTO[$modo])) throw new WebError('Elige un punto de emisión.');
+  if ($modo === 'PC' && emi_serie_pc($ctx) === '') throw new WebError('Todavía no llega el punto de emisión de la computadora. Abre el programa y pulsa «Sincronizar ahora».');
+  if ($modo !== emi_modo_punto($ctx)) {
+    emi_fijar_ajuste($ctx, 'modo_punto', $modo);
+    registrar_evento($ctx['lic'], 'PUNTO_WEB', 'Web y app facturan con: ' . EMI_MODOS_PUNTO[$modo] . ' (' . ($modo === 'PC' ? emi_serie_pc($ctx) : emi_serie_web($ctx)) . ') · RUC ' . $ctx['perfil'] . ' · ' . ($ctx['usuario']['usuario'] ?? ''));
+  }
+  return emi_punto_info($ctx);
+}
+
+// ---------- Números reservados para facturar sin internet ----------
+// Mientras tiene conexión, cada teléfono reserva un bloque de números de la serie activa. Sin internet arma la factura
+// con uno de esos números y su clave de acceso, y la envía al volver la señal. Los números que no use quedan sin usar
+// (en la facturación electrónica no hace falta anularlos).
+const EMI_RESERVA_MAX = 30;
+
+function emi_reservar(array $ctx, string $dispositivo, int $cantidad): array {
+  web_exigir($ctx, 'facturar');
+  if (!preg_match('/^[a-f0-9-]{36}$/', $dispositivo)) throw new WebError('Identificador de equipo no válido.');
+  $cantidad = max(1, min(EMI_RESERVA_MAX, $cantidad));
+  emi_esquema();
+  $e = emi_empresa($ctx);
+  $serie = emi_serie_activa($ctx);
+  $d = db();
+  // Freno: un mismo teléfono no puede acaparar números (máximo 3 bloques sin usar en 24 h).
+  $q = $d->prepare('SELECT COUNT(*) FROM nube_reservas WHERE licencia_id = ? AND perfil = ? AND dispositivo = ? AND creado > ?');
+  $q->execute([$ctx['lic'], $ctx['perfil'], $dispositivo, date('Y-m-d H:i:s', time() - 86400)]);
+  if ((int)$q->fetchColumn() >= 6) throw new WebError('Este teléfono ya reservó varios bloques de números hoy. Usa los que tiene antes de pedir más.');
+  $d->beginTransaction();
+  try {
+    $desde = emi_tomar_secuencial($ctx, $serie, '01');
+    $hasta = min(999999999, $desde + $cantidad - 1);
+    $d->prepare("UPDATE nube_secuencias SET ultimo = ? WHERE licencia_id = ? AND perfil = ? AND serie = ? AND cod_doc = '01'")->execute([$hasta, $ctx['lic'], $ctx['perfil'], $serie]);
+    $d->prepare('INSERT INTO nube_reservas (licencia_id, perfil, dispositivo, usuario_id, serie, desde, hasta, creado) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      ->execute([$ctx['lic'], $ctx['perfil'], $dispositivo, (int)$ctx['usuario']['id'], $serie, $desde, $hasta, ahora()]);
+    $d->commit();
+  } catch (Throwable $ex) {
+    if ($d->inTransaction()) $d->rollBack();
+    throw $ex;
+  }
+  return ['perfil' => $ctx['perfil'], 'ruc' => $ctx['perfil'], 'ambiente' => (string)$e['ambiente'], 'serie' => $serie, 'desde' => $desde, 'hasta' => $hasta, 'modo' => emi_modo_punto($ctx)];
+}
+
+// ¿Ese número fue reservado por ese teléfono?
+function emi_reserva_valida(array $ctx, string $dispositivo, string $serie, int $sec): bool {
+  emi_esquema();
+  $q = db()->prepare('SELECT COUNT(*) FROM nube_reservas WHERE licencia_id = ? AND perfil = ? AND dispositivo = ? AND serie = ? AND desde <= ? AND hasta >= ?');
+  $q->execute([$ctx['lic'], $ctx['perfil'], $dispositivo, $serie, $sec, $sec]);
+  return (int)$q->fetchColumn() > 0;
+}
+
+// Factura hecha sin internet en el teléfono. Se acepta una sola vez (por su id) y solo con un número reservado por ese
+// teléfono; la fecha es la del día en que se hizo (hasta 7 días atrás). Si llega otro día, el programa la verá «vencida»
+// y se reemite con la fecha de hoy y el mismo número.
+function emi_facturar_offline(array $ctx, array $in): array {
+  web_exigir($ctx, 'facturar');
+  $id = (string)($in['offlineId'] ?? '');
+  if (!preg_match('/^[a-f0-9-]{36}$/', $id)) throw new WebError('Identificador de la factura no válido.');
+  $q = db()->prepare("SELECT datos FROM nube_registros WHERE licencia_id = ? AND perfil = ? AND tabla = 'comprobantes' AND id = ?");
+  $q->execute([$ctx['lic'], $ctx['perfil'], $id]);
+  if ($j = $q->fetchColumn()) return json_decode((string)$j, true) ?: ['id' => $id]; // ya llegó (reintento): misma respuesta
+  $disp = (string)($in['dispositivo'] ?? '');
+  $numero = (string)($in['numero'] ?? '');
+  $fecha = (string)($in['fecha'] ?? '');
+  $clave = (string)($in['clave'] ?? '');
+  if (!preg_match('/^(\d{3}-\d{3})-(\d{9})$/', $numero, $m)) throw new WebError('El número de la factura no es válido.');
+  [, $serie, $secTxt] = $m;
+  $sec = (int)$secTxt;
+  if (!emi_reserva_valida($ctx, $disp, $serie, $sec)) throw new WebError('El número ' . $numero . ' no fue reservado por este teléfono.');
+  if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha) || $fecha > date('Y-m-d', time() + 86400) || $fecha < date('Y-m-d', time() - 7 * 86400)) throw new WebError('La fecha de la factura no es válida.');
+  if (!preg_match('/^\d{49}$/', $clave)) throw new WebError('La clave de acceso no es válida.');
+  $e = emi_empresa($ctx);
+  [$estab, $pto] = explode('-', $serie);
+  if (emi_clave($fecha, '01', $ctx['perfil'], (string)$e['ambiente'], $estab, $pto, $sec, substr($clave, 39, 8)) !== $clave) throw new WebError('La clave de acceso no corresponde a esta empresa (RUC, ambiente, fecha o número).');
+  $q = db()->prepare("SELECT COUNT(*) FROM nube_registros WHERE licencia_id = ? AND perfil = ? AND tabla = 'comprobantes' AND tipo = '01' AND numero = ?");
+  $q->execute([$ctx['lic'], $ctx['perfil'], $numero]);
+  if ((int)$q->fetchColumn() > 0) throw new WebError('Ya existe otra factura con el número ' . $numero . '.');
+  $tarifas = web_tarifas($ctx);
+  $cli = emi_validar_cliente(is_array($in['cliente'] ?? null) ? $in['cliente'] : []);
+  $items = emi_validar_items(is_array($in['items'] ?? null) ? $in['items'] : [], $tarifas);
+  $forma = array_key_exists((string)($in['formaPago'] ?? ''), WEB_FORMAS_PAGO) ? (string)$in['formaPago'] : '20';
+  $dias = min(3650, max(0, (int)($in['diasCredito'] ?? 0)));
+  // La venta ya se hizo: no se bloquea por stock (el programa la descuenta al recibirla).
+  return emi_emitir_factura($ctx, $cli, $items, $forma, $dias, web_txt_in($in, 'observacion'), 'App sin internet',
+    ['id' => $id, 'serie' => $serie, 'sec' => $sec, 'fecha' => $fecha, 'clave' => $clave, 'creado' => web_txt_in($in, 'creado', 40)]);
+}
+
 function emi_esquema(): void {
   static $listo = false;
   if ($listo) return;
   if (fx_config()['db']['driver'] === 'sqlite') {
     db()->exec('CREATE TABLE IF NOT EXISTS nube_secuencias (licencia_id INTEGER NOT NULL, perfil TEXT NOT NULL, serie TEXT NOT NULL, cod_doc TEXT NOT NULL, ultimo INTEGER NOT NULL, PRIMARY KEY (licencia_id, perfil, serie, cod_doc))');
+    db()->exec('CREATE TABLE IF NOT EXISTS nube_ajustes (licencia_id INTEGER NOT NULL, perfil TEXT NOT NULL, clave TEXT NOT NULL, valor TEXT NOT NULL, actualizado TEXT NOT NULL, PRIMARY KEY (licencia_id, perfil, clave))');
+    db()->exec('CREATE TABLE IF NOT EXISTS nube_reservas (id INTEGER PRIMARY KEY AUTOINCREMENT, licencia_id INTEGER NOT NULL, perfil TEXT NOT NULL, dispositivo TEXT NOT NULL, usuario_id INTEGER NOT NULL, serie TEXT NOT NULL, desde INTEGER NOT NULL, hasta INTEGER NOT NULL, creado TEXT NOT NULL)');
+    db()->exec('CREATE INDEX IF NOT EXISTS ix_nube_reservas ON nube_reservas (licencia_id, perfil, dispositivo)');
   } else {
     db()->exec('CREATE TABLE IF NOT EXISTS nube_secuencias (licencia_id INT UNSIGNED NOT NULL, perfil CHAR(13) NOT NULL, serie CHAR(7) NOT NULL, cod_doc CHAR(2) NOT NULL, ultimo INT UNSIGNED NOT NULL, PRIMARY KEY (licencia_id, perfil, serie, cod_doc)) ENGINE=InnoDB');
+    db()->exec('CREATE TABLE IF NOT EXISTS nube_ajustes (licencia_id INT UNSIGNED NOT NULL, perfil CHAR(13) NOT NULL, clave VARCHAR(40) NOT NULL, valor VARCHAR(255) NOT NULL, actualizado DATETIME NOT NULL, PRIMARY KEY (licencia_id, perfil, clave)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
+    db()->exec('CREATE TABLE IF NOT EXISTS nube_reservas (id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, licencia_id INT UNSIGNED NOT NULL, perfil CHAR(13) NOT NULL, dispositivo CHAR(36) NOT NULL, usuario_id INT UNSIGNED NOT NULL, serie CHAR(7) NOT NULL, desde INT UNSIGNED NOT NULL, hasta INT UNSIGNED NOT NULL, creado DATETIME NOT NULL, KEY (licencia_id, perfil, dispositivo)) ENGINE=InnoDB');
   }
   $listo = true;
 }
@@ -308,7 +460,7 @@ function emi_tomar_secuencial(array $ctx, string $serie, string $codDoc): int {
   $q = $d->prepare("SELECT MAX(CAST(SUBSTR(numero, 9) AS UNSIGNED)) FROM nube_registros WHERE licencia_id = ? AND perfil = ? AND tabla = 'comprobantes' AND tipo = ? AND SUBSTR(numero, 1, 7) = ?");
   if (!$mysql) $q = $d->prepare("SELECT MAX(CAST(SUBSTR(numero, 9) AS INTEGER)) FROM nube_registros WHERE licencia_id = ? AND perfil = ? AND tabla = 'comprobantes' AND tipo = ? AND SUBSTR(numero, 1, 7) = ?");
   $q->execute([$ctx['lic'], $ctx['perfil'], $codDoc, $serie]);
-  $siguiente = max($ultimo, (int)$q->fetchColumn()) + 1;
+  $siguiente = max($ultimo, (int)$q->fetchColumn(), emi_ultimo_pc($ctx, $serie, $codDoc)) + 1;
   if ($siguiente > 999999999) throw new WebError('Se agotaron los números del punto de emisión ' . $serie . '.');
   $d->prepare('UPDATE nube_secuencias SET ultimo = ? WHERE licencia_id = ? AND perfil = ? AND serie = ? AND cod_doc = ?')->execute([$siguiente, $ctx['lic'], $ctx['perfil'], $serie, $codDoc]);
   return $siguiente;
@@ -331,7 +483,7 @@ function emi_frenar(array $ctx): void {
 }
 
 // Emite la factura en la nube. $cli e $items ya vienen validados por facturar_guardar.php.
-function emi_emitir_factura(array $ctx, array $cli, array $items, string $formaPago, int $diasCredito, string $observacion, string $canal = 'Web'): array {
+function emi_emitir_factura(array $ctx, array $cli, array $items, string $formaPago, int $diasCredito, string $observacion, string $canal = 'Web', ?array $dado = null): array {
   emi_esquema(); // antes de la transacción: en MySQL un CREATE TABLE confirma la transacción abierta
   emi_frenar($ctx);
   $e = emi_empresa($ctx);
@@ -339,9 +491,11 @@ function emi_emitir_factura(array $ctx, array $cli, array $items, string $formaP
   $tot = emi_totales($items, $tarifas);
   if ($tot['importeTotal'] <= 0) throw new WebError('El total debe ser mayor a cero.');
   if ($cli['tipo'] === 'CF' && $tot['importeTotal'] > 50) throw new WebError('Las ventas a consumidor final no pueden pasar de $50. Identifica al cliente.');
-  $serie = emi_serie_web($ctx);
+  $serie = $dado ? $dado['serie'] : emi_serie_activa($ctx);
   [$estab, $pto] = explode('-', $serie);
-  $fecha = date('Y-m-d');
+  $fecha = $dado ? $dado['fecha'] : date('Y-m-d');
+  // La PC acepta facturas web en su propio punto solo si así lo eligió el administrador (y las renumera si chocan).
+  $compartida = $serie === emi_serie_pc($ctx);
   $campos = [
     ['nombre' => 'Dirección', 'valor' => $cli['direccion']], ['nombre' => 'Teléfono', 'valor' => $cli['telefono']], ['nombre' => 'Email', 'valor' => $cli['email']],
     ['nombre' => 'Condición', 'valor' => $diasCredito > 0 ? 'Crédito ' . $diasCredito . ' días' : 'Contado'],
@@ -352,20 +506,20 @@ function emi_emitir_factura(array $ctx, array $cli, array $items, string $formaP
   $d = db();
   $d->beginTransaction();
   try {
-    $sec = emi_tomar_secuencial($ctx, $serie, '01');
-    $clave = emi_clave($fecha, '01', $ctx['perfil'], (string)$e['ambiente'], $estab, $pto, $sec, str_pad((string)random_int(0, 99999999), 8, '0', STR_PAD_LEFT));
+    $sec = $dado ? $dado['sec'] : emi_tomar_secuencial($ctx, $serie, '01');
+    $clave = $dado ? $dado['clave'] : emi_clave($fecha, '01', $ctx['perfil'], (string)$e['ambiente'], $estab, $pto, $sec, str_pad((string)random_int(0, 99999999), 8, '0', STR_PAD_LEFT));
     $numero = $serie . '-' . str_pad((string)$sec, 9, '0', STR_PAD_LEFT);
     $xml = emi_factura_xml(['estab' => $estab, 'ptoEmi' => $pto] + $e, $fecha, $sec, $clave, $cli, $tot, ['formaPago' => $formaPago, 'plazo' => $diasCredito], $campos);
     $ahora = web_ahora_iso();
     $c = [
-      'id' => web_uuid(), 'cod_doc' => '01', 'numero' => $numero, 'fecha' => $fecha, 'cliente_nombre' => $cli['nombre'], 'cliente_identificacion' => $cli['identificacion'],
+      'id' => $dado ? $dado['id'] : web_uuid(), 'cod_doc' => '01', 'numero' => $numero, 'fecha' => $fecha, 'cliente_nombre' => $cli['nombre'], 'cliente_identificacion' => $cli['identificacion'],
       'total' => $tot['importeTotal'], 'clave_acceso' => $clave, 'estado' => 'GENERADO', 'xml' => $xml, 'xml_autorizado' => '', 'numero_autorizacion' => '', 'fecha_autorizacion' => '',
       'mensajes' => '[]', 'anulado' => 0, 'anulacion' => '', 'referencia' => '', 'vendedor' => '', 'created_at' => $ahora, 'updated_at' => $ahora,
       'data' => [
         'cliente' => $cli, 'items' => $tot['lineas'], 'totales' => $tot, 'formaPago' => $formaPago, 'diasCredito' => $diasCredito, 'observacion' => $observacion,
         'guiaRemision' => '', 'camposAdicionales' => $campos, 'vendedor' => '', 'vendedorNombre' => '', 'proformaId' => '', 'emitidoPor' => $quien,
         'origen' => 'WEB', 'canal' => $canal, 'usuarioWeb' => $ctx['usuario']['usuario'], 'adoptadoPor' => '',
-      ],
+      ] + ($compartida ? ['serieCompartida' => true] : []) + ($dado ? ['sinInternet' => true, 'creadoEnTelefono' => $dado['creado']] : []),
     ];
     nube_guardar($ctx['lic'], $ctx['perfil'], 'comprobantes', $c);
     // El cliente queda en la lista de la nube para la próxima venta (también llega al programa).

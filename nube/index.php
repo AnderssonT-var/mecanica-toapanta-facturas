@@ -57,7 +57,7 @@ try {
   if ($ruta === 'sync/pull' && $metodo === 'GET') {
     $desde = max(0, (int)($_GET['desde'] ?? 0));
     nube_marcar_contacto($lic, $perfil, $a['equipo']);
-    salir(200, ['ok' => true, 'soloPortal' => $soloPortal] + nube_pull($lic, $perfil, $desde, $soloPortal));
+    salir(200, ['ok' => true, 'soloPortal' => $soloPortal, 'secuenciasWeb' => nube_secuencias_web($lic, $perfil)] + nube_pull($lic, $perfil, $desde, $soloPortal));
   }
   if ($ruta === 'compartir' && $metodo === 'POST') {
     $in = cuerpo_json(8 * 1024 * 1024);

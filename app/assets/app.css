@@ -297,3 +297,20 @@ a.doc:hover, a.fila-item:hover { background: var(--soft); }
 .filtros .check { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; }
 @media (max-width: 640px) { .inv-linea { grid-template-columns: 1fr 1fr; } .inv-cab { display: none; } .inv-linea > :first-child { grid-column: 1 / -1; } }
 .filtros .check input { width: 18px; height: 18px; min-height: 0; padding: 0; margin: 0; flex: none; accent-color: var(--navy, #0F1B2D); }
+
+/* Punto de emisión de la web y la app */
+.punto-web { margin-top: 14px; }
+.punto-web p { margin: 6px 0 10px; }
+.chip { display: inline-block; padding: 3px 10px; border-radius: 999px; background: var(--soft); border: 1px solid var(--border); font-size: 13px; }
+.dialogo { border: 0; border-radius: 18px; padding: 22px; width: min(520px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; background: var(--card); color: var(--ink); box-shadow: 0 24px 60px rgba(15, 27, 45, .28); }
+.dialogo::backdrop { background: rgba(15, 27, 45, .45); }
+.dialogo h2 { font: 700 19px var(--display); margin-bottom: 14px; }
+.opcion-punto { display: flex; flex-direction: row; gap: 12px; align-items: flex-start; font-size: 14px; font-weight: 400; padding: 12px 14px; border: 1px solid var(--border); border-radius: 14px; margin-bottom: 10px; cursor: pointer; }
+.opcion-punto:has(input:checked) { border-color: var(--navy); background: var(--soft); }
+.opcion-punto:has(input:disabled) { opacity: .55; cursor: not-allowed; }
+.opcion-punto input { margin: 2px 0 0; width: 18px; height: 18px; min-height: 0; padding: 0; border: 0; border-radius: 50%; box-shadow: none; flex: none; accent-color: var(--navy); }
+.opcion-punto span { display: grid; gap: 3px; }
+.opcion-punto b { font-size: 14.5px; }
+.opcion-punto small { color: var(--muted); font-size: 13px; font-weight: 400; line-height: 1.4; }
+.dialogo .acciones { display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; }
+.sin-partir { white-space: nowrap; }

@@ -64,6 +64,10 @@ try {
           $p = web_inv_registrar($ctx, $_POST);
           web_aviso(INV_OPERACIONES[$p['operacion']] . ' registrado. Tu programa lo aplica en el inventario al sincronizar.');
           web_ir('v=inventario');
+        case 'punto':
+          $pu = emi_cambiar_punto($ctx, (string)($_POST['modo'] ?? ''));
+          web_aviso('Listo: la web y la app facturan con ' . mb_strtolower($pu['nombre']) . ' (' . $pu['serie'] . ').');
+          web_ir('v=facturar');
         case 'whatsapp':
           web_exigir($ctx, 'facturar');
           if (($_POST['accion'] ?? '') === 'quitar') {

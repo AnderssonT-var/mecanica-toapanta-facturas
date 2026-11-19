@@ -471,3 +471,15 @@ function nube_resumen_licencia(int $lic): array {
   foreach ($p->fetchAll() as $f) $ult[$f['perfil']] = $f;
   return array_map(fn($f) => $f + ['ultima_sync' => $ult[$f['perfil']]['ultima_sync'] ?? null], $r->fetchAll());
 }
+
+// Últimos números de factura que la nube ya entregó por serie (facturas web y bloques reservados por teléfonos).
+// El programa no los usa en su propio punto cuando la web y la app facturan con el punto de la computadora.
+function nube_secuencias_web(int $lic, string $perfil): array {
+  $r = [];
+  try {
+    $q = db()->prepare("SELECT serie, ultimo FROM nube_secuencias WHERE licencia_id = ? AND perfil = ? AND cod_doc = '01'");
+    $q->execute([$lic, $perfil]);
+    foreach ($q->fetchAll() as $f) $r[(string)$f['serie']] = (int)$f['ultimo'];
+  } catch (Throwable $e) { /* la tabla aún no existe: nadie facturó desde la web */ }
+  return $r;
+}

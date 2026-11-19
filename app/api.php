@@ -78,8 +78,26 @@ function api_yo(array $ctx): array {
     'empresa' => ['ruc' => $emp['ruc'] ?? $ctx['perfil'], 'razonSocial' => $emp['razonSocial'] ?? '', 'nombreComercial' => $emp['nombreComercial'] ?? '', 'ambiente' => (string)($emp['ambiente'] ?? '')],
     'licencia' => ['plan' => api_plan_nombre($ctx['licencia']), 'vence' => $ctx['licencia']['vence'] ?? null, 'estado' => $ctx['estado']['code'] ?? ''],
     'pcMinutos' => web_pc_minutos($ctx), 'ultimaSync' => $emp['_ultima_sync'] ?? null,
+    'punto' => api_punto($ctx),
     'version' => FX_VERSION, 'api' => API_VERSION,
   ];
+}
+
+function api_punto(array $ctx): ?array {
+  if (!web_puede($ctx, 'facturar')) return null;
+  try { return emi_punto_info($ctx); } catch (Throwable $e) { return null; }
+}
+
+function api_datos_facturar(array $ctx): array {
+  web_exigir($ctx, 'facturar');
+  $tarifas = web_tarifas($ctx);
+  $lista = [];
+  foreach ($tarifas as $k => $t) $lista[] = ['codigo' => (string)$k, 'pct' => (float)$t['pct'], 'nombre' => $t['label']];
+  $formas = [];
+  foreach (WEB_FORMAS_PAGO as $k => $t) $formas[] = ['codigo' => (string)$k, 'nombre' => $t];
+  return ['tarifas' => $lista, 'tarifaDefecto' => isset($tarifas['4']) ? '4' : (string)array_key_first($tarifas), 'formasPago' => $formas,
+    'formaPago' => (string)($ctx['empresa']['formaPagoDefecto'] ?? '20'), 'limiteCF' => 50, 'bloquearSinStock' => !empty(web_cfg_inventario($ctx)['bloquearSinStock']),
+    'rapidos' => web_rapidos($ctx), 'aviso' => api_aviso($ctx), 'punto' => api_punto($ctx)];
 }
 
 // Nombre del plan como se vende (Básico, Profesional, Completo) según las funciones de la licencia.
@@ -228,16 +246,37 @@ try {
     }
     case 'inventario_registrar': if (!$post) api_error('Usa POST.', 405); $p = web_inv_registrar($ctx, api_entrada()); api_salida(['id' => $p['id'], 'mensaje' => INV_OPERACIONES[$p['operacion']] . ' registrado. Tu programa lo aplica al sincronizar.']);
     case 'inventario_cancelar': if (!$post) api_error('Usa POST.', 405); web_inv_cancelar($ctx, web_txt_in(api_entrada(), 'id', 64)); api_salida([]);
-    case 'facturar_datos': {
-      web_exigir($ctx, 'facturar');
-      $tarifas = web_tarifas($ctx);
-      $lista = [];
-      foreach ($tarifas as $k => $t) $lista[] = ['codigo' => (string)$k, 'pct' => (float)$t['pct'], 'nombre' => $t['label']];
-      $formas = [];
-      foreach (WEB_FORMAS_PAGO as $k => $t) $formas[] = ['codigo' => (string)$k, 'nombre' => $t];
-      api_salida(['tarifas' => $lista, 'tarifaDefecto' => isset($tarifas['4']) ? '4' : (string)array_key_first($tarifas), 'formasPago' => $formas,
-        'formaPago' => (string)($ctx['empresa']['formaPagoDefecto'] ?? '20'), 'limiteCF' => 50, 'bloquearSinStock' => !empty(web_cfg_inventario($ctx)['bloquearSinStock']),
-        'rapidos' => web_rapidos($ctx), 'aviso' => api_aviso($ctx)]);
+    case 'facturar_datos': api_salida(api_datos_facturar($ctx));
+    case 'offline_datos': {
+      // Todo lo necesario para facturar sin internet: datos de facturación, catálogo completo y clientes recientes.
+      $d = api_datos_facturar($ctx);
+      [$prods] = web_lista($ctx, 'productos', [], 3000);
+      [$clis] = web_lista($ctx, 'clientes', [], 1500);
+      api_salida($d + ['productos' => web_productos_salida($ctx, $prods), 'clientes' => array_map('web_cliente_salida', $clis), 'generado' => web_ahora_iso()]);
+    }
+    case 'punto_cambiar': {
+      if (!$post) api_error('Usa POST.', 405);
+      api_salida(['punto' => emi_cambiar_punto($ctx, web_txt_in(api_entrada(), 'modo', 10))]);
+    }
+    case 'reservar': {
+      if (!$post) api_error('Usa POST.', 405);
+      $in = api_entrada();
+      api_salida(['reserva' => emi_reservar($ctx, web_txt_in($in, 'dispositivo', 36), (int)($in['cantidad'] ?? 10))]);
+    }
+    case 'facturar_offline': {
+      if (!$post) api_error('Usa POST.', 405);
+      $in = api_entrada();
+      // La factura se hizo con la empresa que estaba elegida en ese momento (puede no ser la de ahora).
+      $p = web_txt_in($in, 'perfil', 13);
+      if ($p !== '' && $p !== $ctx['perfil']) {
+        if (!in_array($p, $ctx['perfiles'], true)) api_error('Esa empresa no pertenece a tu licencia.');
+        $ctx = web_contexto_usuario((int)$ctx['usuario']['id'], $p) ?: api_error('Esa empresa no pertenece a tu licencia.');
+        if ($ctx['bloqueo'] !== '') api_error($ctx['bloqueo'], 403, 'BLOQUEO');
+      }
+      $c = emi_facturar_offline($ctx, $in);
+      web_avisar_dueno($ctx);
+      $reg = web_registro($ctx, 'comprobantes', (string)$c['id']) ?? $c;
+      api_salida(['comprobante' => api_doc_detalle($ctx, $reg)]);
     }
     case 'facturar': {
       if (!$post) api_error('Usa POST.', 405);
