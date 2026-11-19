@@ -15,6 +15,7 @@ web_cabeceras();
     <label>Contraseña<input name="clave" type="password" autocomplete="current-password" required></label>
     <button class="btn btn-primario btn-lg">Entrar</button>
   </form>
+  <p class="login-pie muted">¿Usas Android? <a href="../descargar.php?app=android">Descarga la app de <?= e(fx_marca()) ?></a> y entra con este mismo usuario.</p>
   <p class="login-pie muted">¿Olvidaste tu contraseña? Cámbiala desde el programa de escritorio o pide ayuda a soporte.</p>
   <p class="login-pie muted">Al entrar aceptas los <a href="../legal.php?doc=terminos" target="_blank" rel="noopener">términos de uso</a> y la <a href="../legal.php?doc=privacidad" target="_blank" rel="noopener">política de privacidad</a>.</p>
 </main>

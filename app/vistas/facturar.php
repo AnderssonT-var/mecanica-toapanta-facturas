@@ -2,23 +2,7 @@
 if (!defined('FX_PORTAL')) exit;
 web_exigir($ctx, 'facturar');
 $tarifas = web_tarifas($ctx);
-// Accesos rápidos: productos más facturados en los últimos 180 días (o los primeros del catálogo).
-$r = db()->prepare("SELECT datos FROM nube_registros WHERE licencia_id = ? AND perfil = ? AND tabla = 'comprobantes' AND tipo = '01' AND borrado = 0 AND fecha >= ? ORDER BY fecha DESC LIMIT 400");
-$r->execute([$ctx['lic'], $ctx['perfil'], date('Y-m-d', strtotime('-180 days'))]);
-$cuenta = [];
-foreach ($r->fetchAll(PDO::FETCH_COLUMN) as $j) {
-  $d = web_json((json_decode($j, true) ?: [])['data'] ?? []);
-  foreach (($d['items'] ?? []) as $it) if (!empty($it['codigo'])) $cuenta[$it['codigo']] = ($cuenta[$it['codigo']] ?? 0) + 1;
-}
-arsort($cuenta);
-[$catalogo] = web_lista($ctx, 'productos', [], 1000);
-$porCodigo = [];
-foreach ($catalogo as $p) $porCodigo[$p['codigo']] = $p;
-$rapidos = [];
-foreach (array_keys($cuenta) as $cod) { if (isset($porCodigo[$cod])) $rapidos[] = $porCodigo[$cod]; if (count($rapidos) >= 12) break; }
-foreach ($catalogo as $p) { if (count($rapidos) >= 12) break; if (!in_array($p, $rapidos, true)) $rapidos[] = $p; }
-$stockRap = web_stock($ctx, array_map(fn($p) => $p['codigo'], $rapidos));
-$rapidos = array_map(fn($p) => ['id' => $p['id'], 'codigo' => $p['codigo'], 'codigo_aux' => $p['codigo_aux'] ?? '', 'descripcion' => $p['descripcion'], 'precio' => (float)$p['precio'], 'tarifa' => (string)$p['tarifa'], 'stock' => $stockRap[mb_strtolower($p['codigo'])] ?? null], $rapidos);
+$rapidos = web_rapidos($ctx); // los más facturados en 180 días (o los primeros del catálogo)
 $emp = $ctx['empresa'];
 $config = ['tarifas' => $tarifas, 'rapidos' => $rapidos, 'bloquearSinStock' => !empty(web_cfg_inventario($ctx)['bloquearSinStock']), 'formaPago' => $emp['formaPagoDefecto'] ?? '20', 'limiteCF' => 50, 'tarifaDefecto' => isset($tarifas['4']) ? '4' : (string)array_key_first($tarifas)];
 $sync = $emp['_ultima_sync'] ?? null;

@@ -23,3 +23,8 @@ DirectoryIndex index.php
 <IfModule mod_headers.c>
   Header always set Strict-Transport-Security "max-age=31536000"
 </IfModule>
+
+# App para Android: el navegador del celular la reconoce como instalable.
+<IfModule mod_mime.c>
+  AddType application/vnd.android.package-archive .apk
+</IfModule>

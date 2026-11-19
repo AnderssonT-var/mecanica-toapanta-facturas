@@ -6,9 +6,12 @@ declare(strict_types=1);
 define('FX_PORTAL', true);
 require __DIR__ . '/lib/nucleo.php';
 
+// ?app=android: la app para celulares Android (APK firmado, el más nuevo de descargas/).
+$android = ($_GET['app'] ?? '') === 'android';
+$patron = $android ? '/Facmit-Android-(\d+\.\d+\.\d+)\.apk$/' : '/Facmit-Setup-(\d+\.\d+\.\d+)\.exe$/';
 $mejor = '';
-foreach (glob(__DIR__ . '/descargas/Facmit-Setup-*.exe') ?: [] as $f) {
-  if (!preg_match('/Facmit-Setup-(\d+\.\d+\.\d+)\.exe$/', $f, $mv)) continue;
+foreach (glob(__DIR__ . ($android ? '/descargas/Facmit-Android-*.apk' : '/descargas/Facmit-Setup-*.exe')) ?: [] as $f) {
+  if (!preg_match($patron, $f, $mv)) continue;
   if ($mejor === '' || version_compare($mv[1], $mejor[1], '>')) $mejor = [basename($f), $mv[1]];
 }
 if ($mejor) {
@@ -16,6 +19,7 @@ if ($mejor) {
   header('Location: descargas/' . rawurlencode($mejor[0]), true, 302);
   exit;
 }
+if ($android) { http_response_code(503); header('Content-Type: text/plain; charset=utf-8'); exit('La app para Android estará disponible en unos minutos.'); }
 $yml = __DIR__ . '/actualizaciones/latest.yml';
 $texto = is_file($yml) ? (string)file_get_contents($yml) : '';
 $archivo = preg_match('/^path:\s*[\'"]?([A-Za-z0-9._-]+\.exe)/m', $texto, $m) ? $m[1] : '';

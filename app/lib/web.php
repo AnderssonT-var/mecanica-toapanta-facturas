@@ -6,6 +6,7 @@ require_once dirname(__DIR__, 2) . '/lib/nucleo.php';
 require_once dirname(__DIR__, 2) . '/lib/nube.php';
 require_once __DIR__ . '/emision.php';
 require_once __DIR__ . '/whatsapp.php';
+require_once __DIR__ . '/acciones.php';
 
 const WEB_DOCS = ['01' => 'Factura', '03' => 'Liquidación de compra', '04' => 'Nota de crédito', '05' => 'Nota de débito', '06' => 'Guía de remisión', '07' => 'Retención'];
 const WEB_ESTADOS = [

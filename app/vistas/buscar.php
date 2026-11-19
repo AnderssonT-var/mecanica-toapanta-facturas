@@ -7,8 +7,5 @@ $t = (string)($_GET['t'] ?? '');
 $q = trim((string)($_GET['q'] ?? ''));
 if (!in_array($t, ['clientes', 'productos'], true)) { http_response_code(400); echo '[]'; exit; }
 [$filas] = web_lista($ctx, $t, ['q' => $q], 12);
-$stock = $t === 'productos' ? web_stock($ctx, array_map(fn($r) => $r['codigo'], $filas)) : [];
-$salida = array_map(fn($r) => $t === 'clientes'
-  ? ['id' => $r['id'], 'tipo' => $r['tipo'], 'identificacion' => $r['identificacion'], 'nombre' => $r['nombre'], 'direccion' => $r['direccion'] ?? '', 'telefono' => $r['telefono'] ?? '', 'email' => $r['email'] ?? '']
-  : ['id' => $r['id'], 'codigo' => $r['codigo'], 'codigo_aux' => $r['codigo_aux'] ?? '', 'descripcion' => $r['descripcion'], 'precio' => (float)$r['precio'], 'tarifa' => (string)$r['tarifa'], 'stock' => $stock[mb_strtolower($r['codigo'])] ?? null], $filas);
+$salida = $t === 'clientes' ? array_map('web_cliente_salida', $filas) : web_productos_salida($ctx, $filas);
 echo json_encode($salida, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
