@@ -333,3 +333,76 @@ function wa_mensaje_nuevo(string $id): bool {
     return false;
   }
 }
+
+// ---------- Historial de facturas enviadas por WhatsApp ----------
+// Junta tres fuentes: los envíos hechos desde el programa (quedan anotados en el comprobante, data.whatsapp), los
+// enlaces de WhatsApp abiertos desde el portal (tabla nube_wa_historial) y las facturas hechas escribiendo al
+// número de Facmit (canal «WhatsApp»).
+function wa_hist_esquema(): void {
+  static $listo = false;
+  if ($listo) return;
+  if (fx_config()['db']['driver'] === 'sqlite') {
+    db()->exec("CREATE TABLE IF NOT EXISTS nube_wa_historial (id INTEGER PRIMARY KEY AUTOINCREMENT, licencia_id INTEGER NOT NULL, perfil TEXT NOT NULL, comprobante_id TEXT NOT NULL, telefono TEXT NOT NULL DEFAULT '', usuario TEXT NOT NULL DEFAULT '', creado TEXT NOT NULL)");
+  } else {
+    db()->exec("CREATE TABLE IF NOT EXISTS nube_wa_historial (id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, licencia_id INT UNSIGNED NOT NULL, perfil CHAR(13) NOT NULL, comprobante_id VARCHAR(64) NOT NULL, telefono VARCHAR(20) NOT NULL DEFAULT '', usuario VARCHAR(80) NOT NULL DEFAULT '', creado DATETIME NOT NULL, KEY (licencia_id, perfil, creado)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+  }
+  $listo = true;
+}
+
+// Enlace de WhatsApp del portal para un comprobante: chat del cliente (si tiene celular) con el mensaje y el enlace
+// seguro del RIDE. El navegador no puede enviar solo: abre WhatsApp con todo listo.
+function wa_enlace_comprobante(array $ctx, array $c): array {
+  $d = web_json($c['data'] ?? []);
+  $cli = $d['cliente'] ?? [];
+  $tel = wa_tel((string)($cli['telefono'] ?? ''));
+  if (strlen($tel) < 11) $tel = '';
+  $emp = $ctx['empresa'];
+  $nombre = trim((string)($cli['nombre'] ?? $c['cliente_nombre'] ?? ''));
+  $tipo = mb_strtolower(WEB_DOCS[$c['cod_doc']] ?? 'comprobante');
+  $txt = 'Hola' . ($nombre !== '' && !preg_match('/^CONSUMIDOR FINAL$/i', $nombre) ? ' ' . $nombre : '') . ', le saluda ' . (($emp['nombreComercial'] ?? '') ?: ($emp['razonSocial'] ?? ''))
+    . '. Le enviamos su ' . $tipo . ' N.º ' . $c['numero'] . ' por ' . dinero($c['total']) . ".\nDescárguela aquí: " . nube_enlace_publico($ctx['lic'], $ctx['perfil'], (string)$c['id']) . "\nGracias por su compra.";
+  return ['telefono' => $tel, 'url' => 'https://wa.me/' . $tel . '?text=' . rawurlencode($txt)];
+}
+
+function wa_hist_registrar(array $ctx, string $comprobanteId, string $telefono): void {
+  wa_hist_esquema();
+  db()->prepare('INSERT INTO nube_wa_historial (licencia_id, perfil, comprobante_id, telefono, usuario, creado) VALUES (?, ?, ?, ?, ?, ?)')
+    ->execute([$ctx['lic'], $ctx['perfil'], $comprobanteId, $telefono, (string)($ctx['usuario']['usuario'] ?? ''), ahora()]);
+}
+
+// Filas del historial, de la más reciente a la más antigua.
+function wa_historial(array $ctx, string $q = '', int $limite = 150): array {
+  wa_hist_esquema();
+  $filas = [];
+  $buscar = mb_strtolower(trim($q));
+  $agregar = function (array $c, array $f) use (&$filas, $buscar) {
+    $fila = $f + ['id' => (string)$c['id'], 'numero' => (string)$c['numero'], 'tipo' => WEB_DOCS[$c['cod_doc']] ?? 'Comprobante', 'cliente' => (string)($c['cliente_nombre'] ?? ''), 'total' => (float)($c['total'] ?? 0), 'estadoSri' => (string)($c['estado'] ?? '')];
+    if ($buscar !== '' && !str_contains(mb_strtolower($fila['numero'] . ' ' . $fila['cliente'] . ' ' . ($fila['telefono'] ?? '')), $buscar)) return;
+    $filas[] = $fila;
+  };
+  // 1) Programa y facturas por chat.
+  $s = db()->prepare("SELECT datos FROM nube_registros WHERE licencia_id = ? AND perfil = ? AND tabla = 'comprobantes' AND borrado = 0 AND datos LIKE '%hatsapp%' ORDER BY revision DESC LIMIT 600");
+  $s->execute([$ctx['lic'], $ctx['perfil']]);
+  foreach ($s->fetchAll(PDO::FETCH_COLUMN) as $j) {
+    $c = json_decode((string)$j, true) ?: [];
+    $d = web_json($c['data'] ?? []);
+    if (($d['canal'] ?? '') === 'WhatsApp') $agregar($c, ['fecha' => (string)($c['created_at'] ?? $c['fecha'] ?? ''), 'telefono' => '', 'desde' => 'Chat de Facmit', 'estado' => 'HECHA', 'usuario' => (string)($d['usuarioWeb'] ?? ''), 'detalle' => 'Factura hecha escribiendo al WhatsApp de Facmit']);
+    foreach ((array)($d['whatsapp'] ?? []) as $w) {
+      if (!is_array($w)) continue;
+      $est = (string)($w['estado'] ?? 'ABIERTO');
+      $agregar($c, ['fecha' => (string)($w['fecha'] ?? ''), 'telefono' => (string)($w['numero'] ?? ''), 'desde' => 'Programa', 'estado' => $est, 'usuario' => (string)($w['usuario'] ?? ''),
+        'detalle' => $est === 'FALLO' ? (string)($w['error'] ?? 'No se pudo enviar') : ($est === 'ENVIADO' ? 'Enviado automáticamente' . (!empty($w['pdf']) ? ' con el PDF' : '') : 'Se abrió el chat con el mensaje')]);
+    }
+  }
+  // 2) Portal web.
+  $h = db()->prepare('SELECT comprobante_id, telefono, usuario, creado FROM nube_wa_historial WHERE licencia_id = ? AND perfil = ? ORDER BY creado DESC LIMIT 600');
+  $h->execute([$ctx['lic'], $ctx['perfil']]);
+  foreach ($h->fetchAll() as $r) {
+    $c = web_registro($ctx, 'comprobantes', (string)$r['comprobante_id']);
+    if (!$c) continue;
+    $agregar($c, ['fecha' => str_replace(' ', 'T', (string)$r['creado']), 'telefono' => (string)$r['telefono'], 'desde' => 'Portal web', 'estado' => 'ABIERTO', 'usuario' => (string)$r['usuario'], 'detalle' => 'Se abrió WhatsApp con el mensaje y el enlace']);
+  }
+  usort($filas, fn($a, $b) => strcmp(wa_hist_orden($b['fecha']), wa_hist_orden($a['fecha'])));
+  return array_slice($filas, 0, $limite);
+}
+function wa_hist_orden(string $f): string { $t = strtotime($f); return $t ? date('Y-m-d H:i:s', $t) : $f; }

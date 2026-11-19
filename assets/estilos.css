@@ -135,6 +135,9 @@ label, .g2 > * { min-width: 0; }
   table.resp td.sin-label::before { display: none; }
   table.resp td.sin-label:empty { display: none; }
   table.resp td.sin-label form, table.resp td.sin-label .btn { width: 100%; }
+  /* Varias acciones en la misma celda (Resuelto / Ignorar…): lado a lado y repartidas, sin salirse de la ficha. */
+  table.resp td.sin-label:has(form + form) { display: flex; gap: 8px; white-space: normal; }
+  table.resp td.sin-label:has(form + form) > form { flex: 1 1 0; min-width: 0; }
   table.resp td .sub { text-align: inherit; }
   .kpis { grid-template-columns: 1fr 1fr; gap: 10px; }
   .kpi { padding: 12px 14px; }

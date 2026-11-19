@@ -9,7 +9,7 @@ $porPagina = 40;
 [$cola] = web_lista($ctx, 'pedidos', ['estado' => ''], 20, 0, 'fecha DESC');
 $cola = array_values(array_filter($cola, fn($p) => ($p['tipo'] ?? '') !== 'INV' && in_array($p['estado'] ?? '', ['PENDIENTE', 'EN PROCESO', 'ERROR'], true)));
 web_cabecera($ctx, 'Comprobantes', 'comprobantes');
-echo web_titulo('Ventas y documentos', 'Comprobantes', web_puede($ctx, 'facturar') ? '<a class="btn btn-primario" href="./?v=facturar">' . icono(ICO['facturar'], 18) . 'Nueva factura</a>' : '');
+echo web_titulo('Ventas y documentos', 'Comprobantes', web_puede($ctx, 'facturar') ? '<a class="btn" href="./?v=whatsapp">' . icono(ICO['whatsapp'], 18) . 'Historial WhatsApp</a><a class="btn btn-primario" href="./?v=facturar">' . icono(ICO['facturar'], 18) . 'Nueva factura</a>' : '');
 if ($cola):
 ?>
 <section class="tarjeta cola">

@@ -7,10 +7,36 @@ $numero = wa_tel($cfg['numero']);
 $wa = fn(string $t) => 'https://wa.me/' . $numero . '?text=' . rawurlencode($t);
 $ejemplo = "Factura\nRUC: 0990000000001\nNombre: Taller Ejemplo S.A.\nCorreo: cliente@ejemplo.com\nTeléfono: 0990000000\nProducto: Cambio de aceite, 1, 38.00\nProducto: 2 x Filtro de aceite 9.50\nPago: transferencia";
 web_cabecera($ctx, 'WhatsApp', 'whatsapp');
-echo web_titulo('Facturar por WhatsApp', 'WhatsApp');
-if (!wa_activo() || $numero === ''): ?>
-<section class="tarjeta"><div class="vacio">Facturar por WhatsApp todavía no está activado en Facmit. Pregunta a soporte.</div></section>
+echo web_titulo('Comprobantes', 'WhatsApp');
+$qh = mb_substr(trim((string)($_GET['q'] ?? '')), 0, 60);
+$hist = wa_historial($ctx, $qh);
+$etq = ['ENVIADO' => ['Enviado', 't-g'], 'ABIERTO' => ['Chat abierto', 't-b'], 'FALLO' => ['No se envió', 't-r'], 'HECHA' => ['Hecha por chat', 't-g']];
+?>
+<section class="tarjeta wa-historial">
+  <div class="tarjeta-cab"><h2>Historial de facturas por WhatsApp</h2><span class="muted pequeno"><?= count($hist) ?> <?= count($hist) === 1 ? 'envío' : 'envíos' ?></span></div>
+  <form method="get" class="filtros"><input type="hidden" name="v" value="whatsapp"><input name="q" value="<?= e($qh) ?>" placeholder="Buscar por número, cliente o celular" aria-label="Buscar"><button class="btn">Buscar</button></form>
+  <?php if (!$hist): ?>
+    <div class="vacio">Todavía no hay envíos. Usa el botón <b>WhatsApp</b> de un comprobante (aquí o en el programa) y aparecerá en esta lista.</div>
+  <?php else: ?>
+  <div class="lista-wa">
+    <?php foreach ($hist as $f): $t = strtotime($f['fecha']); [$en, $tono] = $etq[$f['estado']] ?? [$f['estado'], 't-n']; ?>
+    <a class="fila-wa" href="./?v=comprobante&id=<?= e(urlencode($f['id'])) ?>">
+      <span class="wa-ico"><?= icono(ICO['whatsapp'], 18) ?></span>
+      <span class="wa-cuerpo">
+        <b><?= e($f['tipo'] . ' ' . $f['numero']) ?></b>
+        <span class="muted"><?= e($f['cliente']) ?><?= $f['telefono'] ? ' · +' . e($f['telefono']) : '' ?></span>
+        <small class="muted"><?= e($f['detalle']) ?> · <?= e($f['desde']) ?><?= $f['usuario'] ? ' · ' . e($f['usuario']) : '' ?></small>
+      </span>
+      <span class="wa-der"><span class="badge <?= $tono ?>"><?= e($en) ?></span><b class="mono"><?= e(dinero($f['total'])) ?></b><small class="muted"><?= $t ? e(date('d/m/Y H:i', $t)) : '' ?></small></span>
+    </a>
+    <?php endforeach; ?>
+  </div>
+  <?php endif; ?>
+</section>
+<?php if (!wa_activo() || $numero === ''): ?>
+<section class="tarjeta"><div class="tarjeta-cab"><h2>Facturar por WhatsApp</h2></div><p class="muted">Facturar escribiendo al WhatsApp de Facmit todavía no está activado. Pregunta a soporte.</p></section>
 <?php else: ?>
+<h2 class="sub-titulo">Facturar por WhatsApp</h2>
 <div class="columnas">
   <section class="tarjeta col-ancha">
     <div class="tarjeta-cab"><h2>1. Tu número de WhatsApp</h2></div>

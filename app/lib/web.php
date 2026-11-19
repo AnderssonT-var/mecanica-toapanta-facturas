@@ -409,7 +409,7 @@ function web_cabecera(array $ctx, string $titulo, string $activo, string $grupo 
   $nombre = $emp['nombreComercial'] ?? '' ?: ($emp['razonSocial'] ?? $ctx['licencia']['cliente']);
   $menu = [['inicio', 'Inicio'], ['facturar', 'Facturar'], ['comprobantes', 'Comprobantes'], ['clientes', 'Clientes'], ['productos', 'Productos']];
   if (web_inv_activo($ctx) && web_puede($ctx, 'ver')) $menu[] = ['inventario', 'Inventario'];
-  if (wa_activo() && web_puede($ctx, 'facturar')) $menu[] = ['whatsapp', 'WhatsApp'];
+  if (web_puede($ctx, 'facturar')) $menu[] = ['whatsapp', 'WhatsApp']; // historial siempre; facturar por chat si está activo
   if (!web_puede($ctx, 'facturar')) $menu = array_values(array_filter($menu, fn($m) => $m[0] !== 'facturar'));
   $item = fn($m) => '<a href="./?v=' . $m[0] . '" class="' . ($activo === $m[0] ? 'on' : '') . '">' . icono(ICO[$m[0]]) . '<span>' . e($m[1]) . '</span></a>';
   $iniciales = mb_strtoupper(mb_substr(preg_replace('/[^\p{L}\s]/u', '', $nombre), 0, 1) . mb_substr((string)(explode(' ', trim($nombre))[1] ?? ''), 0, 1));

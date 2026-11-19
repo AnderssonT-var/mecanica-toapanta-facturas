@@ -91,6 +91,15 @@ try {
   // Descargas y páginas sin el diseño general.
   if ($v === 'xml') { require __DIR__ . '/vistas/xml.php'; exit; }
   if ($v === 'ride') { require __DIR__ . '/vistas/ride.php'; exit; }
+  // Botón WhatsApp del portal: anota el envío en el historial y abre WhatsApp con el chat y el mensaje listos.
+  if ($v === 'wa') {
+    $c = web_registro($ctx, 'comprobantes', (string)($_GET['id'] ?? ''));
+    if (!$c) { http_response_code(404); exit('No encontrado'); }
+    $w = wa_enlace_comprobante($ctx, $c);
+    wa_hist_registrar($ctx, (string)$c['id'], $w['telefono']);
+    header('Location: ' . $w['url'], true, 302);
+    exit;
+  }
   if ($v === 'buscar') { require __DIR__ . '/vistas/buscar.php'; exit; }
 
   $vistas = ['inicio', 'comprobantes', 'comprobante', 'clientes', 'productos', 'facturar', 'pedido', 'whatsapp', 'nc', 'inventario'];

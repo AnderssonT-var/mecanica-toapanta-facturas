@@ -227,7 +227,16 @@ a.doc:hover, a.fila-item:hover { background: var(--soft); }
 .ride-barra { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 16px; background: var(--navy); color: #fff; }
 .ride-barra .btn { color: var(--ink); }
 .ride-barra .btn-primario { background: var(--accent); border-color: var(--accent); color: var(--navy); }
-.ride-marco { display: block; width: min(860px, 100%); min-height: 1100px; margin: 18px auto; border: 0; background: #fff; box-shadow: 0 6px 30px rgba(0, 0, 0, .12); }
+.pantalla-ride { overflow-x: hidden; }
+.ride-caja { margin: 18px auto; overflow: hidden; background: #fff; box-shadow: 0 6px 30px rgba(0, 0, 0, .12); }
+.ride-marco { display: block; width: 794px; height: 1100px; border: 0; background: #fff; transform-origin: 0 0; }
+.ride-num { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono, monospace); }
+@media (max-width: 600px) {
+  .ride-barra { flex-wrap: wrap; padding: 10px 12px; gap: 8px; }
+  .ride-barra .ride-num { order: -1; flex: 0 0 100%; text-align: center; font-size: 15px; }
+  .ride-barra .btn { flex: 1 1 0; min-height: 42px; padding: 0 10px; font-size: 14px; }
+  .ride-caja { margin: 8px auto; }
+}
 
 /* Celular */
 @media (max-width: 980px) {
@@ -267,7 +276,7 @@ a.doc:hover, a.fila-item:hover { background: var(--soft); }
   .barra-total b { font-size: 22px; }
   .facturar ~ * { margin-bottom: 70px; }
   .contenido:has(.facturar) { padding-bottom: calc(var(--tab) + 110px); }
-  .ride-marco { margin: 0; min-height: 900px; }
+  .ride-marco { margin: 0; }
   .grafico { height: 110px; }
 }
 @media print {
@@ -314,3 +323,17 @@ a.doc:hover, a.fila-item:hover { background: var(--soft); }
 .opcion-punto small { color: var(--muted); font-size: 13px; font-weight: 400; line-height: 1.4; }
 .dialogo .acciones { display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; }
 .sin-partir { white-space: nowrap; }
+
+/* Historial de WhatsApp */
+.wa-historial { margin-bottom: 18px; }
+.wa-historial .filtros { margin: 4px 0 10px; display: flex; gap: 8px; }
+.wa-historial .filtros input { flex: 1; min-width: 0; }
+.lista-wa { display: flex; flex-direction: column; }
+.fila-wa { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 6px; border-top: 1px solid var(--border); color: inherit; text-decoration: none; border-radius: 10px; }
+.fila-wa:hover { background: var(--soft); }
+.wa-ico { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: #DCF8E5; color: #128C4B; }
+.wa-cuerpo { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.wa-cuerpo > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wa-der { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+.sub-titulo { font: 700 18px var(--display); margin: 8px 0 12px; }
+@media (max-width: 600px) { .fila-wa { grid-template-columns: 30px minmax(0, 1fr) auto; gap: 10px; } .wa-ico { width: 30px; height: 30px; } .wa-cuerpo small { white-space: normal; } }
