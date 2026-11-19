@@ -7,6 +7,7 @@ require_once dirname(__DIR__, 2) . '/lib/nube.php';
 require_once __DIR__ . '/emision.php';
 require_once __DIR__ . '/whatsapp.php';
 require_once __DIR__ . '/acciones.php';
+require_once __DIR__ . '/inventario.php';
 
 const WEB_DOCS = ['01' => 'Factura', '03' => 'Liquidación de compra', '04' => 'Nota de crédito', '05' => 'Nota de débito', '06' => 'Guía de remisión', '07' => 'Retención'];
 const WEB_ESTADOS = [
@@ -306,7 +307,7 @@ function web_resumen(array $ctx): array {
   $pend = $q("SELECT COUNT(*) AS n $base AND tabla = 'comprobantes' AND estado NOT IN ('AUTORIZADO', 'DEVUELTA', 'NO AUTORIZADO', 'INVALIDO')");
   $rech = $q("SELECT COUNT(*) AS n $base AND tabla = 'comprobantes' AND estado IN ('DEVUELTA', 'NO AUTORIZADO', 'INVALIDO') AND fecha >= ?", [date('Y-m-d', strtotime('-30 days'))]);
   $cli = $q("SELECT COUNT(*) AS n $base AND tabla = 'clientes'");
-  $pedidos = $q("SELECT COUNT(*) AS n $base AND tabla = 'pedidos' AND estado IN ('PENDIENTE', 'EN PROCESO')");
+  $pedidos = $q("SELECT COUNT(*) AS n $base AND tabla = 'pedidos' AND tipo <> 'INV' AND estado IN ('PENDIENTE', 'EN PROCESO')");
   return ['mes' => $ventas, 'hoy' => $hoy, 'pendientes' => (int)$pend['n'], 'rechazados' => (int)$rech['n'], 'clientes' => (int)$cli['n'], 'pedidos' => (int)$pedidos['n']];
 }
 
@@ -395,6 +396,7 @@ const ICO = [
   'pedidos' => 'M12 8v4l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z',
   'salir' => 'M15 17l5-5-5-5M20 12H9M12 21H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h7',
   'whatsapp' => 'M4 20l1.4-4.2A8 8 0 1 1 8.3 18.7L4 20zM9 9.5c0 3 2.5 5.5 5.5 5.5l1-1.5-2-1-1 1a4 4 0 0 1-2-2l1-1-1-2z',
+  'inventario' => 'M4 7h16M4 7l2-3h12l2 3M4 7v12a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V7M9 11h6',
   'buscar' => 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM21 21l-4.3-4.3',
 ];
 
@@ -406,6 +408,7 @@ function web_cabecera(array $ctx, string $titulo, string $activo, string $grupo 
   $emp = $ctx['empresa'];
   $nombre = $emp['nombreComercial'] ?? '' ?: ($emp['razonSocial'] ?? $ctx['licencia']['cliente']);
   $menu = [['inicio', 'Inicio'], ['facturar', 'Facturar'], ['comprobantes', 'Comprobantes'], ['clientes', 'Clientes'], ['productos', 'Productos']];
+  if (web_inv_activo($ctx) && web_puede($ctx, 'ver')) $menu[] = ['inventario', 'Inventario'];
   if (wa_activo() && web_puede($ctx, 'facturar')) $menu[] = ['whatsapp', 'WhatsApp'];
   if (!web_puede($ctx, 'facturar')) $menu = array_values(array_filter($menu, fn($m) => $m[0] !== 'facturar'));
   $item = fn($m) => '<a href="./?v=' . $m[0] . '" class="' . ($activo === $m[0] ? 'on' : '') . '">' . icono(ICO[$m[0]]) . '<span>' . e($m[1]) . '</span></a>';

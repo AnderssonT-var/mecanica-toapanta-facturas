@@ -59,6 +59,11 @@ try {
         case 'facturar': require __DIR__ . '/vistas/facturar_guardar.php'; exit;
         case 'pedido_cancelar': require __DIR__ . '/vistas/pedido_cancelar.php'; exit;
         case 'nc': require __DIR__ . '/vistas/nc_guardar.php'; exit;
+        case 'inventario':
+          if (!empty($_POST['cancelar'])) { web_inv_cancelar($ctx, (string)$_POST['cancelar']); web_aviso('Movimiento cancelado.'); web_ir('v=inventario'); }
+          $p = web_inv_registrar($ctx, $_POST);
+          web_aviso(INV_OPERACIONES[$p['operacion']] . ' registrado. Tu programa lo aplica en el inventario al sincronizar.');
+          web_ir('v=inventario');
         case 'whatsapp':
           web_exigir($ctx, 'facturar');
           if (($_POST['accion'] ?? '') === 'quitar') {
@@ -84,7 +89,7 @@ try {
   if ($v === 'ride') { require __DIR__ . '/vistas/ride.php'; exit; }
   if ($v === 'buscar') { require __DIR__ . '/vistas/buscar.php'; exit; }
 
-  $vistas = ['inicio', 'comprobantes', 'comprobante', 'clientes', 'productos', 'facturar', 'pedido', 'whatsapp', 'nc'];
+  $vistas = ['inicio', 'comprobantes', 'comprobante', 'clientes', 'productos', 'facturar', 'pedido', 'whatsapp', 'nc', 'inventario'];
   if (!in_array($v, $vistas, true)) $v = 'inicio';
   require __DIR__ . '/vistas/' . $v . '.php';
 } catch (WebError $ex) {

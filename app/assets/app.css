@@ -287,3 +287,13 @@ a.doc:hover, a.fila-item:hover { background: var(--soft); }
 .stock-no{color:#b42318;font-weight:700}
 
 .cli-manual { margin-top: 8px; width: 100%; }
+
+/* Inventario: filas de productos en ingresos y transferencias */
+.inv-lineas { display: grid; gap: 8px; }
+.inv-linea { display: grid; grid-template-columns: minmax(140px, 2fr) repeat(4, minmax(80px, 1fr)); gap: 8px; align-items: center; }
+.inv-form .inv-linea:has(> :nth-child(3):last-child) { grid-template-columns: minmax(140px, 2fr) repeat(2, minmax(80px, 1fr)); }
+.inv-cab { font-size: 12px; font-weight: 600; color: var(--muted, #6B7484); }
+.kardex .ti-fila small { display: block; }
+.filtros .check { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; }
+@media (max-width: 640px) { .inv-linea { grid-template-columns: 1fr 1fr; } .inv-cab { display: none; } .inv-linea > :first-child { grid-column: 1 / -1; } }
+.filtros .check input { width: 18px; height: 18px; min-height: 0; padding: 0; margin: 0; flex: none; accent-color: var(--navy, #0F1B2D); }

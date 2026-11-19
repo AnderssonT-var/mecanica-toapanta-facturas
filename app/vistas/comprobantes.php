@@ -7,7 +7,7 @@ $pagina = max(1, (int)($_GET['p'] ?? 1));
 $porPagina = 40;
 [$docs, $total] = web_lista($ctx, 'comprobantes', $f, $porPagina, ($pagina - 1) * $porPagina);
 [$cola] = web_lista($ctx, 'pedidos', ['estado' => ''], 20, 0, 'fecha DESC');
-$cola = array_values(array_filter($cola, fn($p) => in_array($p['estado'] ?? '', ['PENDIENTE', 'EN PROCESO', 'ERROR'], true)));
+$cola = array_values(array_filter($cola, fn($p) => ($p['tipo'] ?? '') !== 'INV' && in_array($p['estado'] ?? '', ['PENDIENTE', 'EN PROCESO', 'ERROR'], true)));
 web_cabecera($ctx, 'Comprobantes', 'comprobantes');
 echo web_titulo('Ventas y documentos', 'Comprobantes', web_puede($ctx, 'facturar') ? '<a class="btn btn-primario" href="./?v=facturar">' . icono(ICO['facturar'], 18) . 'Nueva factura</a>' : '');
 if ($cola):

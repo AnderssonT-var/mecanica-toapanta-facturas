@@ -8,7 +8,7 @@ const NUBE_TABLAS = ['clientes', 'productos', 'comprobantes', 'catalogo', 'profo
 const NUBE_TABLAS_DESDE_PROGRAMA = ['clientes', 'productos', 'comprobantes', 'catalogo', 'proformas', 'pedidos', 'movimientos', 'compras', 'abonos', 'cajas', 'caja_movimientos', 'bodegas', 'pagos', 'bancos', 'banco_movimientos', 'conciliaciones', 'saldos_iniciales', 'asientos', 'conteos', 'existencias'];
 const NUBE_LOTE_PULL = 1000;
 // Solo portal web (sin la nube de respaldo): lo único que se guarda es lo que el portal necesita.
-const NUBE_TABLAS_PORTAL = ['clientes', 'productos', 'catalogo', 'pedidos', 'comprobantes', 'existencias'];
+const NUBE_TABLAS_PORTAL = ['clientes', 'productos', 'catalogo', 'pedidos', 'comprobantes', 'existencias', 'bodegas'];
 const NUBE_RESPALDOS = 10;
 
 class ErrorNube extends RuntimeException {
@@ -137,7 +137,7 @@ function nube_indices(string $tabla, array $r): array {
       return [$fecha($r['fecha'] ?? ''), 'PR', (string)($r['numero'] ?? ''), (string)($r['estado'] ?? ''), (float)((is_string($r['totales'] ?? null) ? json_decode($r['totales'], true) : ($r['totales'] ?? []))['importeTotal'] ?? 0),
         $txt($r['numero'] ?? '', $c['nombre'] ?? '', $c['identificacion'] ?? '')];
     case 'existencias': return [null, mb_substr((string)($r['estab'] ?? ''), 0, 20), mb_substr(mb_strtolower((string)($r['codigo'] ?? '')), 0, 20), '', (float)($r['stock'] ?? 0), $txt($r['codigo'] ?? '')];
-    case 'pedidos': return [$fecha($r['creado'] ?? ''), ($r['tipo'] ?? '') === 'NC' ? 'NC' : 'PED', '', (string)($r['estado'] ?? ''), (float)($r['total'] ?? 0), $txt($r['cliente']['nombre'] ?? '', $r['cliente']['identificacion'] ?? '')];
+    case 'pedidos': return [$fecha($r['creado'] ?? ''), in_array($r['tipo'] ?? '', ['NC', 'INV'], true) ? $r['tipo'] : 'PED', '', (string)($r['estado'] ?? ''), (float)($r['total'] ?? 0), $txt($r['cliente']['nombre'] ?? '', $r['cliente']['identificacion'] ?? '')];
     case 'compras': return [$fecha($r['fecha'] ?? ''), (string)($r['cod_doc'] ?? ''), mb_substr((string)($r['numero'] ?? ''), 0, 20), (string)($r['estado'] ?? ''), (float)($r['total'] ?? 0),
       $txt($r['numero'] ?? '', $r['proveedor_nombre'] ?? '', $r['proveedor_id'] ?? '')];
     case 'abonos': return [$fecha($r['fecha'] ?? ''), mb_substr((string)($r['tipo'] ?? ''), 0, 20), '', '', (float)($r['valor'] ?? 0), $txt($r['cliente_id'] ?? '', $r['referencia'] ?? '')];
@@ -149,6 +149,7 @@ function nube_indices(string $tabla, array $r): array {
     case 'conciliaciones': return [$fecha($r['hasta'] ?? ''), 'CONC', '', (string)($r['estado'] ?? ''), (float)($r['saldo_banco'] ?? 0), ''];
     case 'saldos_iniciales': return [$fecha($r['fecha'] ?? ''), mb_substr((string)($r['tipo'] ?? ''), 0, 20), mb_substr((string)($r['documento'] ?? ''), 0, 20), '', (float)($r['valor'] ?? 0), $txt($r['tercero_id'] ?? '', $r['tercero_nombre'] ?? '')];
     case 'asientos': return [$fecha($r['fecha'] ?? ''), 'ASI', mb_substr((string)($r['numero'] ?? ''), 0, 20), '', (float)($r['total'] ?? 0), $txt($r['concepto'] ?? '')];
+    case 'movimientos': return [$fecha($r['fecha'] ?? ''), mb_substr((string)($r['tipo'] ?? ''), 0, 20), mb_substr((string)($r['documento'] ?? ''), 0, 20), '', (float)($r['cantidad'] ?? 0), $txt($r['producto_id'] ?? '', $r['documento'] ?? '')];
     case 'bodegas': return [null, 'BOD', mb_substr((string)($r['codigo'] ?? ''), 0, 20), '', 0, $txt($r['codigo'] ?? '', $r['nombre'] ?? '')];
     default: return [null, (string)($r['tipo'] ?? ''), '', '', 0, $txt($r['clave'] ?? '')];
   }
@@ -159,6 +160,9 @@ function nube_guardar(int $lic, string $perfil, string $tabla, array $r): bool {
   if (!in_array($tabla, NUBE_TABLAS, true)) return false;
   $id = (string)($r['id'] ?? '');
   $upd = (string)($r['updated_at'] ?? '');
+  // Las existencias de bodegas que no son la principal llevan un id compuesto (producto|bodega) de 73 caracteres:
+  // se guardan con una clave corta (el registro conserva su id original). Antes se descartaban.
+  if ($tabla === 'existencias' && strlen($id) > 64 && strlen($id) <= 200) $id = 'h' . sha1($id);
   if ($id === '' || strlen($id) > 64 || !preg_match('/^\d{4}-\d{2}-\d{2}T/', $upd)) return false;
   $d = db();
   $q = $d->prepare('SELECT updated_at FROM nube_registros WHERE licencia_id = ? AND perfil = ? AND tabla = ? AND id = ?');

@@ -10,7 +10,7 @@ $actual = $editar === 'nuevo' ? ['tarifa' => '4', 'precio' => ''] : ($editar !==
 $puedeEditar = web_puede($ctx, 'editar');
 $tarifas = web_tarifas($ctx);
 web_cabecera($ctx, 'Productos', 'productos');
-echo web_titulo('Catálogo', 'Productos y servicios', $puedeEditar ? '<a class="btn btn-primario" href="./?v=productos&editar=nuevo">' . icono(ICO['facturar'], 18) . 'Nuevo producto</a>' : '');
+echo web_titulo('Catálogo', 'Productos y servicios', (web_inv_activo($ctx) ? '<a class="btn" href="./?v=inventario">' . icono(ICO['inventario'], 18) . 'Inventario</a>' : '') . ($puedeEditar ? '<a class="btn btn-primario" href="./?v=productos&editar=nuevo">' . icono(ICO['facturar'], 18) . 'Nuevo producto</a>' : ''));
 if ($actual !== null && $puedeEditar): ?>
 <section class="tarjeta editor">
   <div class="tarjeta-cab"><h2><?= isset($actual['id']) ? 'Editar producto' : 'Nuevo producto' ?></h2><a class="btn btn-sm" href="./?v=productos">Cerrar</a></div>

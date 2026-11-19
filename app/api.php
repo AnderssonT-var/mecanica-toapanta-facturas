@@ -72,7 +72,7 @@ function api_yo(array $ctx): array {
   $u = $ctx['usuario'];
   return [
     'usuario' => ['id' => (int)$u['id'], 'usuario' => $u['usuario'], 'nombre' => $u['nombre'] ?: $u['usuario'], 'rol' => $u['rol']],
-    'permisos' => ['ver' => web_puede($ctx, 'ver'), 'editar' => web_puede($ctx, 'editar'), 'facturar' => web_puede($ctx, 'facturar')],
+    'permisos' => ['ver' => web_puede($ctx, 'ver'), 'editar' => web_puede($ctx, 'editar'), 'facturar' => web_puede($ctx, 'facturar'), 'inventario' => web_inv_activo($ctx)],
     'bloqueo' => $ctx['bloqueo'],
     'perfil' => $ctx['perfil'], 'perfiles' => $perfiles,
     'empresa' => ['ruc' => $emp['ruc'] ?? $ctx['perfil'], 'razonSocial' => $emp['razonSocial'] ?? '', 'nombreComercial' => $emp['nombreComercial'] ?? '', 'ambiente' => (string)($emp['ambiente'] ?? '')],
@@ -212,6 +212,22 @@ try {
     case 'cliente_eliminar': if (!$post) api_error('Usa POST.', 405); web_cliente_eliminar($ctx, web_txt_in(api_entrada(), 'id', 64)); api_salida([]);
     case 'producto_guardar': if (!$post) api_error('Usa POST.', 405); api_salida(['producto' => web_productos_salida($ctx, [web_producto_guardar($ctx, api_entrada())])[0]]);
     case 'producto_eliminar': if (!$post) api_error('Usa POST.', 405); web_producto_eliminar($ctx, web_txt_in(api_entrada(), 'id', 64)); api_salida([]);
+    case 'inventario': {
+      web_inv_exigir($ctx);
+      $b = isset($_GET['b']) && $_GET['b'] !== '*' ? (string)$_GET['b'] : null;
+      $bodegas = web_bodegas($ctx);
+      if ($b !== null && !in_array($b, array_column($bodegas, 'id'), true)) $b = null;
+      $lista = web_inv_existencias($ctx, web_txt_in($_GET, 'q', 80), $b, !empty($_GET['bajo']));
+      api_salida(['resumen' => web_inv_resumen(web_inv_existencias($ctx, '', $b)), 'bodegas' => array_map(fn($x) => ['id' => $x['id'], 'nombre' => $x['nombre'], 'codigo' => $x['codigo']], $bodegas),
+        'items' => $lista, 'pedidos' => web_inv_pedidos($ctx, 15), 'puedeEditar' => web_puede($ctx, 'editar'), 'ultimaSync' => $ctx['empresa']['_ultima_sync'] ?? null]);
+    }
+    case 'inventario_kardex': {
+      web_inv_exigir($ctx);
+      $b = isset($_GET['b']) && $_GET['b'] !== '*' && $_GET['b'] !== null ? (string)$_GET['b'] : null;
+      api_salida(web_inv_kardex($ctx, web_txt_in($_GET, 'id', 64), $b, 150));
+    }
+    case 'inventario_registrar': if (!$post) api_error('Usa POST.', 405); $p = web_inv_registrar($ctx, api_entrada()); api_salida(['id' => $p['id'], 'mensaje' => INV_OPERACIONES[$p['operacion']] . ' registrado. Tu programa lo aplica al sincronizar.']);
+    case 'inventario_cancelar': if (!$post) api_error('Usa POST.', 405); web_inv_cancelar($ctx, web_txt_in(api_entrada(), 'id', 64)); api_salida([]);
     case 'facturar_datos': {
       web_exigir($ctx, 'facturar');
       $tarifas = web_tarifas($ctx);
