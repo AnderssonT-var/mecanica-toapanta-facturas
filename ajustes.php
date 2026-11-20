@@ -2,6 +2,7 @@
 declare(strict_types=1);
 define('FX_PORTAL', true);
 require __DIR__ . '/lib/nucleo.php';
+require __DIR__ . '/lib/cedula.php';
 $admin = exigir_admin();
 $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -47,6 +48,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if (ajuste('wa_verify', '') === '' || !empty($_POST['wa_nuevo_verify'])) fijar_ajuste('wa_verify', bin2hex(random_bytes(16)));
       registrar_evento(null, 'WA_AJUSTES', 'Ajustes de WhatsApp actualizados por ' . $admin['usuario']);
       aviso('Ajustes de WhatsApp guardados.');
+    } elseif ($accion === 'cedula') {
+      $prov = (string)($_POST['cedula_proveedor'] ?? '');
+      if (!array_key_exists($prov, CEDULA_PROVEEDORES)) throw new RuntimeException('Elige un proveedor válido.');
+      fijar_ajuste('cedula_proveedor', $prov);
+      $cl = trim((string)($_POST['cedula_clave'] ?? ''));
+      if ($cl !== '') fijar_ajuste('cedula_clave', mb_substr($cl, 0, 300));
+      if ($prov === '') fijar_ajuste('cedula_clave', '');
+      fijar_ajuste('cedula_limite_dia', (string)max(1, min(5000, (int)($_POST['cedula_limite_dia'] ?? 150))));
+      registrar_evento(null, 'CEDULA_AJUSTES', 'Consulta de cédulas: ' . ($prov ?: 'desactivada') . ' (por ' . $admin['usuario'] . ')');
+      aviso('Consulta de cédulas guardada.');
     } elseif ($accion === 'google') {
       $id = trim((string)($_POST['google_client_id'] ?? ''));
       if ($id !== '' && !preg_match('/^[0-9]+-[a-z0-9]+\.apps\.googleusercontent\.com$/', $id)) throw new RuntimeException('El ID de cliente de Google no es válido (termina en .apps.googleusercontent.com).');
@@ -134,7 +145,7 @@ cabecera_html('Ajustes', $admin, 'ajustes');
         </div>
         <button class="btn btn-dark">Guardar soporte</button></form>
     </section>
-    <section class="card"><h2>Facturar por WhatsApp (API de WhatsApp Business)</h2>
+    <?php if (false): /* Facturar por WhatsApp en pausa (ver WA_FACTURAR_CHAT en app/lib/whatsapp.php) */ ?><section class="card"><h2>Facturar por WhatsApp (API de WhatsApp Business)</h2>
       <p class="muted">Tus clientes registran su número en la app web › WhatsApp y facturan escribiendo a este número. Se configura con una app de Meta (WhatsApp Cloud API).</p>
       <form method="post" class="form"><?= campo_csrf() ?><input type="hidden" name="accion" value="whatsapp">
         <div class="g2">
@@ -151,6 +162,19 @@ cabecera_html('Ajustes', $admin, 'ajustes');
         <span class="muted small">En Meta › WhatsApp › Configuración pega estos dos datos y suscribe el campo <b>messages</b>.</span>
         <?php endif; ?>
         <div class="row"><button class="btn btn-dark">Guardar WhatsApp</button><?php if (ajuste('wa_verify', '') !== ''): ?><label class="small"><input type="checkbox" name="wa_nuevo_verify" value="1"> Generar un token de verificación nuevo</label><?php endif; ?></div>
+      </form>
+    </section><?php endif; ?>
+    <section class="card"><h2>Nombre por cédula (Registro Civil)</h2>
+      <p class="muted">El SRI ya no entrega el nombre de las cédulas sin RUC. Con un proveedor de consulta, al escribir una cédula en el programa, la web o la app aparece el nombre solo. Se paga al proveedor por consulta; cada cédula se guarda 90 días para no pagarla dos veces.</p>
+      <?php $usoCed = cedula_uso(); ?>
+      <form method="post" class="form"><?= campo_csrf() ?><input type="hidden" name="accion" value="cedula">
+        <div class="g2">
+          <label>Proveedor<select name="cedula_proveedor"><?php foreach (CEDULA_PROVEEDORES as $k => $t): ?><option value="<?= e($k) ?>"<?= ajuste('cedula_proveedor', '') === $k ? ' selected' : '' ?>><?= e($t) ?></option><?php endforeach; ?></select></label>
+          <label><span>Clave de la API <?= ajuste('cedula_clave', '') !== '' ? '<span class="badge t-g">guardada</span>' : '' ?></span><input type="password" name="cedula_clave" autocomplete="off" placeholder="<?= ajuste('cedula_clave', '') !== '' ? 'Déjalo vacío para mantener la actual' : 'Clave que te da el proveedor' ?>"></label>
+          <label>Límite por licencia y día<input type="number" name="cedula_limite_dia" min="1" max="5000" value="<?= e(ajuste('cedula_limite_dia', '150')) ?>"></label>
+          <div class="small muted" style="align-self:end">Consultas pagadas: <b><?= (int)$usoCed['hoy'] ?></b> hoy · <b><?= (int)$usoCed['mes'] ?></b> este mes</div>
+        </div>
+        <div class="row"><button class="btn btn-dark">Guardar consulta de cédulas</button></div>
       </form>
     </section>
     <section class="card"><h2>Enviar correos con Google (Conectar con Google)</h2>

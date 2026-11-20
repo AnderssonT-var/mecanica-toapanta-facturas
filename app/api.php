@@ -246,6 +246,10 @@ try {
     }
     case 'inventario_registrar': if (!$post) api_error('Usa POST.', 405); $p = web_inv_registrar($ctx, api_entrada()); api_salida(['id' => $p['id'], 'mensaje' => INV_OPERACIONES[$p['operacion']] . ' registrado. Tu programa lo aplica al sincronizar.']);
     case 'inventario_cancelar': if (!$post) api_error('Usa POST.', 405); web_inv_cancelar($ctx, web_txt_in(api_entrada(), 'id', 64)); api_salida([]);
+    case 'cedula': {
+      try { $r = cedula_consultar((int)$ctx['lic'], (string)($_GET['id'] ?? '')); api_salida(['nombre' => $r ? $r['nombre'] : null]); }
+      catch (RuntimeException $e) { api_salida(['nombre' => null, 'aviso' => $e->getMessage()]); }
+    }
     case 'facturar_datos': api_salida(api_datos_facturar($ctx));
     case 'offline_datos': {
       // Todo lo necesario para facturar sin internet: datos de facturación, catálogo completo y clientes recientes.

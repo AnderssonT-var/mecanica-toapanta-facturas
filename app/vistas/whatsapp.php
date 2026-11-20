@@ -1,5 +1,5 @@
 <?php
-// Facturar por WhatsApp: el usuario registra su número y lo confirma enviando un código desde ese WhatsApp.
+// WhatsApp: historial de comprobantes enviados. (Facturar escribiendo al chat está en pausa: WA_FACTURAR_CHAT.)
 if (!defined('FX_PORTAL')) exit;
 $reg = wa_registro_usuario((int)$ctx['usuario']['id']);
 $cfg = wa_cfg();
@@ -33,7 +33,8 @@ $etq = ['ENVIADO' => ['Enviado', 't-g'], 'ABIERTO' => ['Chat abierto', 't-b'], '
   </div>
   <?php endif; ?>
 </section>
-<?php if (!wa_activo() || $numero === ''): ?>
+<?php if (!WA_FACTURAR_CHAT): ?>
+<?php elseif (!wa_activo() || $numero === ''): ?>
 <section class="tarjeta"><div class="tarjeta-cab"><h2>Facturar por WhatsApp</h2></div><p class="muted">Facturar escribiendo al WhatsApp de Facmit todavía no está activado. Pregunta a soporte.</p></section>
 <?php else: ?>
 <h2 class="sub-titulo">Facturar por WhatsApp</h2>

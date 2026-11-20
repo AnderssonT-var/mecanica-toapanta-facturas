@@ -11,6 +11,7 @@ define('FX_PORTAL', true);
 require __DIR__ . '/lib/nucleo.php';
 require __DIR__ . '/lib/licencias.php';
 require __DIR__ . '/lib/monitor.php';
+require __DIR__ . '/lib/cedula.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
@@ -57,6 +58,14 @@ try {
       $id = (string)ajuste('google_client_id', ''); $sec = (string)ajuste('google_client_secret', '');
       if ($id === '' || $sec === '') responder(200, ['ok' => true, 'google' => null]);
       responder(200, ['ok' => true, 'google' => ['clientId' => $id, 'clientSecret' => $sec]]);
+    }
+    // Nombre de una cédula sin RUC (Registro Civil por el proveedor configurado en Ajustes).
+    case 'cedula': {
+      api_verificar($clave, $equipo);
+      $l = licencia_por_clave($clave);
+      try { $r = cedula_consultar((int)$l['id'], (string)($in['cedula'] ?? '')); }
+      catch (RuntimeException $e) { responder(200, ['ok' => true, 'nombre' => null, 'aviso' => $e->getMessage()]); }
+      responder(200, ['ok' => true, 'nombre' => $r ? $r['nombre'] : null, 'activo' => cedula_activo()]);
     }
     case 'latido': responder(200, api_latido($clave, $equipo, $in));
     default: responder(404, ['ok' => false, 'codigo' => 'ACCION', 'error' => 'Acción desconocida.']);

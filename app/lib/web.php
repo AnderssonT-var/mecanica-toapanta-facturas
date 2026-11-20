@@ -6,6 +6,7 @@ require_once dirname(__DIR__, 2) . '/lib/nucleo.php';
 require_once dirname(__DIR__, 2) . '/lib/nube.php';
 require_once __DIR__ . '/emision.php';
 require_once __DIR__ . '/whatsapp.php';
+require_once dirname(__DIR__, 2) . '/lib/cedula.php';
 require_once __DIR__ . '/acciones.php';
 require_once __DIR__ . '/inventario.php';
 

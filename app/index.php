@@ -66,6 +66,7 @@ try {
           web_ir('v=inventario');
         case 'whatsapp':
           web_exigir($ctx, 'facturar');
+          if (!WA_FACTURAR_CHAT) throw new WebError('Facturar por WhatsApp no está disponible por ahora.');
           if (($_POST['accion'] ?? '') === 'quitar') {
             wa_esquema();
             db()->prepare('DELETE FROM nube_wa_numeros WHERE usuario_id = ?')->execute([$ctx['usuario']['id']]);
@@ -97,6 +98,12 @@ try {
     exit;
   }
   if ($v === 'buscar') { require __DIR__ . '/vistas/buscar.php'; exit; }
+  if ($v === 'cedula') {
+    header('Content-Type: application/json; charset=utf-8'); header('Cache-Control: no-store');
+    try { $r = cedula_consultar((int)$ctx['lic'], (string)($_GET['id'] ?? '')); $out = ['nombre' => $r ? $r['nombre'] : null]; }
+    catch (RuntimeException $e) { $out = ['nombre' => null, 'aviso' => $e->getMessage()]; }
+    echo json_encode($out, JSON_UNESCAPED_UNICODE); exit;
+  }
 
   $vistas = ['inicio', 'comprobantes', 'comprobante', 'clientes', 'productos', 'facturar', 'pedido', 'whatsapp', 'nc', 'inventario'];
   if (!in_array($v, $vistas, true)) $v = 'inicio';

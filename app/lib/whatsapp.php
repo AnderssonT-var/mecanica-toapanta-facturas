@@ -10,6 +10,9 @@ if (!defined('FX_PORTAL')) { http_response_code(403); exit; }
 const WA_GRAPH = 'https://graph.facebook.com/v21.0';
 const WA_MINUTOS_CONFIRMAR = 15;
 
+// Facturar escribiendo al WhatsApp de Facmit: en pausa por ahora (se conserva el código para reactivarlo).
+const WA_FACTURAR_CHAT = false;
+
 function wa_cfg(): array {
   return ['token' => (string)ajuste('wa_token', ''), 'phone_id' => (string)ajuste('wa_phone_id', ''), 'secreto' => (string)ajuste('wa_app_secret', ''),
     'verificar' => (string)ajuste('wa_verify', ''), 'numero' => (string)ajuste('wa_numero', ''), 'graph' => (string)(fx_config()['wa_graph'] ?? WA_GRAPH)];

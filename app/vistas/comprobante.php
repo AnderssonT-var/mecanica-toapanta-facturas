@@ -31,7 +31,7 @@ echo web_titulo($tipo, $c['numero'], $btnNc . '<a class="btn" href="./?v=ride&id
       <div><span>Fecha de emisión</span><b><?= e(web_fecha($c['fecha'])) ?></b></div>
       <?php if (!empty($cli['email'])): ?><div><span>Correo</span><b><?= e($cli['email']) ?></b></div><?php endif; ?>
       <?php if (!empty($cli['direccion'])): ?><div><span>Dirección</span><b><?= e($cli['direccion']) ?></b></div><?php endif; ?>
-      <?php if (!empty($d['formaPago'])): ?><div><span>Forma de pago</span><b><?= e(WEB_FORMAS_PAGO[$d['formaPago']] ?? $d['formaPago']) ?></b></div><?php endif; ?>
+      <?php if (!empty($d['pagos']) && is_array($d['pagos'])): ?><div><span>Formas de pago</span><b><?= e(implode(' · ', array_map(fn($p) => (WEB_FORMAS_PAGO[$p['formaPago'] ?? ''] ?? ($p['formaPago'] ?? '')) . ' ' . dinero((float)($p['valor'] ?? 0)), $d['pagos']))) ?></b></div><?php elseif (!empty($d['formaPago'])): ?><div><span>Forma de pago</span><b><?= e(WEB_FORMAS_PAGO[$d['formaPago']] ?? $d['formaPago']) ?></b></div><?php endif; ?>
       <?php if (isset($d['diasCredito'])): ?><div><span>Condición</span><b><?= (int)$d['diasCredito'] > 0 ? 'Crédito ' . (int)$d['diasCredito'] . ' días' : 'Contado' ?></b></div><?php endif; ?>
     </div>
     <?php if ($items): ?>

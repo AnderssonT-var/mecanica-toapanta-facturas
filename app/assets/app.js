@@ -136,6 +136,7 @@
     else if (q && !/^\d+$/.test(q) && !campos.nombre.value) campos.nombre.value = q.toUpperCase();
     mostrarDatosCliente();
     (campos.identificacion.value ? campos.nombre : campos.identificacion).focus();
+    nombrePorCedula(campos.identificacion.value.replace(/\D/g, ''));
     pintarResumen();
   });
   $$('[data-tipo-cli]').forEach((b) => b.addEventListener('click', () => {
@@ -145,9 +146,23 @@
     $('#cli-cf').hidden = !st.cf;
     pintarResumen();
   }));
+  // Cédula sin RUC: el portal pide el nombre al Registro Civil (si está activado) y lo pone si aún está vacío.
+  let cedulaPedida = '';
+  async function nombrePorCedula(v) {
+    if (v.length !== 10 || v === cedulaPedida || campos.nombre.value.trim() || campos.tipo.value !== 'CEDULA') return;
+    cedulaPedida = v;
+    campos.nombre.placeholder = 'Buscando el nombre…';
+    try {
+      const r = await fetch('./?v=cedula&id=' + encodeURIComponent(v), { headers: { Accept: 'application/json' } });
+      const j = await r.json();
+      if (j.nombre && !campos.nombre.value.trim() && campos.identificacion.value.replace(/\D/g, '') === v) { campos.nombre.value = j.nombre; pintarResumen(); guardarBorrador(); }
+    } catch (e) { /* sin conexión: se escribe a mano */ }
+    campos.nombre.placeholder = '';
+  }
   campos.identificacion.addEventListener('input', () => {
     const v = campos.identificacion.value.replace(/\D/g, '');
     if (campos.tipo.value !== 'PASAPORTE') { if (v.length === 13) campos.tipo.value = 'RUC'; else if (v.length === 10) campos.tipo.value = 'CEDULA'; }
+    nombrePorCedula(v);
     pintarResumen();
   });
   Object.values(campos).forEach((el) => el.addEventListener('input', () => { pintarResumen(); guardarBorrador(); }));

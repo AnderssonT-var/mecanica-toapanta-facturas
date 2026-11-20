@@ -15,6 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
   exit(preg_replace('/[^0-9A-Za-z_-]/', '', (string)($_GET['hub_challenge'] ?? '')));
 }
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); exit; }
+if (!WA_FACTURAR_CHAT) { http_response_code(200); exit('pausado'); } // facturar por chat en pausa: no se procesa nada
 
 $cuerpo = (string)file_get_contents('php://input', false, null, 0, 512 * 1024);
 if (!wa_firma_ok($cuerpo, (string)($_SERVER['HTTP_X_HUB_SIGNATURE_256'] ?? ''), $cfg['secreto'])) { http_response_code(401); exit('Firma no válida'); }
