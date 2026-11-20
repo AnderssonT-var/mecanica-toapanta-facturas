@@ -142,7 +142,6 @@ label, .g2 > * { min-width: 0; }
   .kpis { grid-template-columns: 1fr 1fr; gap: 10px; }
   .kpi { padding: 12px 14px; }
   .kpi b { font-size: 22px; }
-  .kpi.dark { grid-column: 1 / -1; }
   table.resp tfoot, table.resp tfoot tr { display: block; width: 100%; }
   table.resp tfoot tr { display: flex; justify-content: space-between; padding-top: 10px; border-top: 2px solid var(--ink); }
   table.resp tfoot td { display: block; width: auto; padding: 0; border: 0; }
