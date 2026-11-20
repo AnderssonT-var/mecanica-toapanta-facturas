@@ -166,7 +166,8 @@ cabecera_html('Ajustes', $admin, 'ajustes');
     </section><?php endif; ?>
     <section class="card"><h2>Nombre por cédula (Registro Civil)</h2>
       <p class="muted">El SRI ya no entrega el nombre de las cédulas sin RUC. Con un proveedor de consulta, al escribir una cédula en el programa, la web o la app aparece el nombre solo. Se paga al proveedor por consulta; cada cédula se guarda 90 días para no pagarla dos veces.</p>
-      <?php $usoCed = cedula_uso(); ?>
+      <?php $usoCed = cedula_uso(); $dirCed = directorio_stats(); ?>
+      <p class="muted">Directorio global de Facmit: <b><?= number_format($dirCed['total']) ?></b> en total (<?= number_format($dirCed['cedulas']) ?> cédulas, <?= number_format($dirCed['rucs']) ?> RUC). Crece solo con cada factura; el proveedor solo se usa cuando una cédula no está aquí.</p>
       <form method="post" class="form"><?= campo_csrf() ?><input type="hidden" name="accion" value="cedula">
         <div class="g2">
           <label>Proveedor<select name="cedula_proveedor"><?php foreach (CEDULA_PROVEEDORES as $k => $t): ?><option value="<?= e($k) ?>"<?= ajuste('cedula_proveedor', '') === $k ? ' selected' : '' ?>><?= e($t) ?></option><?php endforeach; ?></select></label>

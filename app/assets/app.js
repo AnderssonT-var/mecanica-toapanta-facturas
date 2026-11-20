@@ -146,16 +146,20 @@
     $('#cli-cf').hidden = !st.cf;
     pintarResumen();
   }));
-  // Cédula sin RUC: el portal pide el nombre al Registro Civil (si está activado) y lo pone si aún está vacío.
+  // Nombre (y dirección) por cédula o RUC: el portal consulta el directorio global de Facmit y, si falta, el proveedor.
   let cedulaPedida = '';
   async function nombrePorCedula(v) {
-    if (v.length !== 10 || v === cedulaPedida || campos.nombre.value.trim() || campos.tipo.value !== 'CEDULA') return;
+    if ((v.length !== 10 && v.length !== 13) || v === cedulaPedida || campos.nombre.value.trim()) return;
     cedulaPedida = v;
     campos.nombre.placeholder = 'Buscando el nombre…';
     try {
       const r = await fetch('./?v=cedula&id=' + encodeURIComponent(v), { headers: { Accept: 'application/json' } });
       const j = await r.json();
-      if (j.nombre && !campos.nombre.value.trim() && campos.identificacion.value.replace(/\D/g, '') === v) { campos.nombre.value = j.nombre; pintarResumen(); guardarBorrador(); }
+      if (j.nombre && !campos.nombre.value.trim() && campos.identificacion.value.replace(/\D/g, '') === v) {
+        campos.nombre.value = j.nombre;
+        if (j.direccion && campos.direccion && !campos.direccion.value.trim()) campos.direccion.value = j.direccion;
+        pintarResumen(); guardarBorrador();
+      }
     } catch (e) { /* sin conexión: se escribe a mano */ }
     campos.nombre.placeholder = '';
   }

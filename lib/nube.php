@@ -183,6 +183,12 @@ function nube_guardar(int $lic, string $perfil, string $tabla, array $r): bool {
       ON DUPLICATE KEY UPDATE datos = VALUES(datos), updated_at = VALUES(updated_at), revision = VALUES(revision), borrado = VALUES(borrado),
       fecha = VALUES(fecha), tipo = VALUES(tipo), numero = VALUES(numero), estado = VALUES(estado), total = VALUES(total), texto = VALUES(texto)')->execute($vals);
   }
+  // Vía 1 del directorio global: un cliente que un negocio guarda (al facturar o a mano) aporta su nombre y dirección
+  // al directorio compartido, sin su correo ni teléfono. Solo clientes vivos; nunca consumidor final.
+  if ($tabla === 'clientes' && !$borrado) {
+    require_once __DIR__ . '/directorio.php';
+    directorio_guardar((string)($r['identificacion'] ?? ''), (string)($r['nombre'] ?? ''), (string)($r['direccion'] ?? ''), 'factura');
+  }
   return true;
 }
 

@@ -4,6 +4,7 @@ define('FX_PORTAL', true);
 require __DIR__ . '/lib/nucleo.php';
 require __DIR__ . '/lib/licencias.php';
 require __DIR__ . '/lib/monitor.php';
+require __DIR__ . '/lib/directorio.php';
 $admin = exigir_admin();
 $d = db();
 $hoy = hoy();
@@ -25,6 +26,7 @@ $proximas = $q("SELECT * FROM licencias WHERE estado = 'ACTIVA' AND vence <= ? O
 $actividad = $q('SELECT e.*, l.cliente FROM eventos e LEFT JOIN licencias l ON l.id = e.licencia_id ORDER BY e.id DESC LIMIT 6')->fetchAll();
 
 $mon = mon_resumen();
+$dir = directorio_stats();
 cabecera_html('Panel', $admin, 'panel');
 ?>
 <div class="head"><div><span class="crumb">Resumen</span><h1>Panel</h1></div><a class="btn btn-accent" href="licencia.php">+ Nueva licencia</a></div>
@@ -35,6 +37,7 @@ cabecera_html('Panel', $admin, 'panel');
   <div class="kpi"><span>Vencidas / suspendidas</span><b class="<?= ($vencidas + $suspendidas) ? 'c-r' : '' ?>"><?= $vencidas ?> / <?= $suspendidas ?></b><small>sin poder facturar</small></div>
   <div class="kpi"><span>Equipos activados</span><b><?= $equipos ?></b><small>programas instalados</small></div>
   <div class="kpi dark"><span>Cobrado este mes</span><b>$<?= number_format($ingresosMes, 2) ?></b><small>Ingreso mensual recurrente $<?= number_format($mrr, 2) ?></small></div>
+  <div class="kpi"><span>Directorio global</span><b><?= number_format($dir['total']) ?></b><small><?= number_format($dir['cedulas']) ?> cédulas · <?= number_format($dir['rucs']) ?> RUC<?= $dir['hoy'] ? ' · +' . number_format($dir['hoy']) . ' hoy' : '' ?></small></div>
 </section>
 <div class="cols">
   <section class="card col-2">

@@ -8,8 +8,12 @@
 //   misma cédula.
 if (!defined('FX_PORTAL')) exit;
 
+require_once __DIR__ . '/directorio.php';
+
 const CEDULA_PROVEEDORES = ['' => 'Desactivado', 'ecuadorapi' => 'EcuadorAPI (ecuadorapi.com)', 'datacil' => 'Datacil (datacil.com)'];
-const CEDULA_CACHE_DIAS = 90;
+// Caché técnica corta del proveedor: evita pagar dos veces la misma cédula en días seguidos, dentro de lo que
+// permiten sus términos (p. ej. Datacil guarda la consulta por cédula hasta 48 h). No alimenta el directorio global.
+const CEDULA_CACHE_DIAS = 2;
 
 function cedula_esquema(): void {
   static $listo = false;
@@ -87,9 +91,16 @@ function cedula_proveedor(string $c): string {
   return is_array($j) ? cedula_nombre_de($j) : '';
 }
 
-// Nombre de una cédula para una licencia. ['nombre' => string, 'fuente' => 'cache'|proveedor] o null si no hay datos.
+// Nombre (y dirección, si la hay) de una cédula o RUC para una licencia.
+// Orden: 1) directorio global de Facmit (gratis) → 2) caché corta del proveedor → 3) proveedor (solo cédula, de pago).
+// Devuelve ['nombre','direccion','fuente'] o null. El proveedor NO se archiva en el directorio global (sus términos lo
+// prohíben): entra al directorio recién cuando el negocio emita la factura con ese cliente (vía nube_guardar).
 function cedula_consultar(int $licencia, string $c): ?array {
   $c = preg_replace('/\D/', '', $c);
+  // 1) Directorio global: cubre cédulas y RUC, es gratis y no gasta saldo del proveedor.
+  $dir = directorio_consultar($c);
+  if ($dir) return ['nombre' => $dir['nombre'], 'direccion' => $dir['direccion'], 'fuente' => 'directorio'];
+  // De aquí en adelante solo cédulas: el RUC lo resuelven el directorio y la consulta del SRI en el programa.
   if (!cedula_valida($c)) return null;
   cedula_esquema();
   $r = db()->prepare('SELECT nombre, creado FROM cedula_nombres WHERE cedula = ?');
@@ -97,7 +108,7 @@ function cedula_consultar(int $licencia, string $c): ?array {
   $g = $r->fetch();
   if ($g && strtotime((string)$g['creado']) > time() - CEDULA_CACHE_DIAS * 86400) {
     db()->prepare('INSERT INTO cedula_consultas (licencia_id, pagada, creado) VALUES (?, 0, ?)')->execute([$licencia, ahora()]);
-    return ['nombre' => (string)$g['nombre'], 'fuente' => 'cache'];
+    return ['nombre' => (string)$g['nombre'], 'direccion' => '', 'fuente' => 'cache'];
   }
   if (!cedula_activo()) return null;
   $limite = max(1, (int)ajuste('cedula_limite_dia', '150'));
@@ -110,7 +121,7 @@ function cedula_consultar(int $licencia, string $c): ?array {
   $prov = (string)ajuste('cedula_proveedor', '');
   db()->prepare('DELETE FROM cedula_nombres WHERE cedula = ?')->execute([$c]);
   db()->prepare('INSERT INTO cedula_nombres (cedula, nombre, fuente, creado) VALUES (?, ?, ?, ?)')->execute([$c, $nombre, $prov, ahora()]);
-  return ['nombre' => $nombre, 'fuente' => $prov];
+  return ['nombre' => $nombre, 'direccion' => '', 'fuente' => $prov];
 }
 
 // Consultas de hoy y del mes (para Ajustes).

@@ -100,7 +100,7 @@ try {
   if ($v === 'buscar') { require __DIR__ . '/vistas/buscar.php'; exit; }
   if ($v === 'cedula') {
     header('Content-Type: application/json; charset=utf-8'); header('Cache-Control: no-store');
-    try { $r = cedula_consultar((int)$ctx['lic'], (string)($_GET['id'] ?? '')); $out = ['nombre' => $r ? $r['nombre'] : null]; }
+    try { $r = cedula_consultar((int)$ctx['lic'], (string)($_GET['id'] ?? '')); $out = ['nombre' => $r ? $r['nombre'] : null, 'direccion' => $r['direccion'] ?? '']; }
     catch (RuntimeException $e) { $out = ['nombre' => null, 'aviso' => $e->getMessage()]; }
     echo json_encode($out, JSON_UNESCAPED_UNICODE); exit;
   }

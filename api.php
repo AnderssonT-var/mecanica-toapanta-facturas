@@ -59,13 +59,20 @@ try {
       if ($id === '' || $sec === '') responder(200, ['ok' => true, 'google' => null]);
       responder(200, ['ok' => true, 'google' => ['clientId' => $id, 'clientSecret' => $sec]]);
     }
-    // Nombre de una cédula sin RUC (Registro Civil por el proveedor configurado en Ajustes).
+    // Nombre y dirección de una cédula o RUC: directorio global de Facmit y, si no está, el proveedor (solo cédula).
     case 'cedula': {
       api_verificar($clave, $equipo);
       $l = licencia_por_clave($clave);
       try { $r = cedula_consultar((int)$l['id'], (string)($in['cedula'] ?? '')); }
       catch (RuntimeException $e) { responder(200, ['ok' => true, 'nombre' => null, 'aviso' => $e->getMessage()]); }
-      responder(200, ['ok' => true, 'nombre' => $r ? $r['nombre'] : null, 'activo' => cedula_activo()]);
+      responder(200, ['ok' => true, 'nombre' => $r ? $r['nombre'] : null, 'direccion' => $r['direccion'] ?? '', 'fuente' => $r['fuente'] ?? '', 'activo' => cedula_activo()]);
+    }
+    // Vía 2 del directorio global: el programa reporta datos públicos de un RUC que obtuvo del SRI, para compartirlos.
+    case 'directorio_aportar': {
+      api_verificar($clave, $equipo);
+      require_once __DIR__ . '/lib/directorio.php';
+      directorio_guardar((string)($in['identificacion'] ?? ''), (string)($in['nombre'] ?? ''), (string)($in['direccion'] ?? ''), 'sri');
+      responder(200, ['ok' => true]);
     }
     case 'latido': responder(200, api_latido($clave, $equipo, $in));
     default: responder(404, ['ok' => false, 'codigo' => 'ACCION', 'error' => 'Acción desconocida.']);
