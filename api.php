@@ -51,6 +51,13 @@ try {
     case 'activar': responder(200, api_activar($clave, $equipo));
     case 'verificar': responder(200, api_verificar($clave, $equipo));
     case 'desactivar': responder(200, api_desactivar($clave, $equipo));
+    // Datos del cliente OAuth de Google (para «Conectar con Google» del correo). Solo para equipos con licencia vigente.
+    case 'oauth': {
+      api_verificar($clave, $equipo);
+      $id = (string)ajuste('google_client_id', ''); $sec = (string)ajuste('google_client_secret', '');
+      if ($id === '' || $sec === '') responder(200, ['ok' => true, 'google' => null]);
+      responder(200, ['ok' => true, 'google' => ['clientId' => $id, 'clientSecret' => $sec]]);
+    }
     case 'latido': responder(200, api_latido($clave, $equipo, $in));
     default: responder(404, ['ok' => false, 'codigo' => 'ACCION', 'error' => 'Acción desconocida.']);
   }

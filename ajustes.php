@@ -47,6 +47,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if (ajuste('wa_verify', '') === '' || !empty($_POST['wa_nuevo_verify'])) fijar_ajuste('wa_verify', bin2hex(random_bytes(16)));
       registrar_evento(null, 'WA_AJUSTES', 'Ajustes de WhatsApp actualizados por ' . $admin['usuario']);
       aviso('Ajustes de WhatsApp guardados.');
+    } elseif ($accion === 'google') {
+      $id = trim((string)($_POST['google_client_id'] ?? ''));
+      if ($id !== '' && !preg_match('/^[0-9]+-[a-z0-9]+\.apps\.googleusercontent\.com$/', $id)) throw new RuntimeException('El ID de cliente de Google no es válido (termina en .apps.googleusercontent.com).');
+      fijar_ajuste('google_client_id', $id);
+      // El secreto solo se cambia si se escribe uno nuevo (nunca se muestra).
+      if (trim((string)($_POST['google_client_secret'] ?? '')) !== '') fijar_ajuste('google_client_secret', trim((string)$_POST['google_client_secret']));
+      if ($id === '') fijar_ajuste('google_client_secret', '');
+      registrar_evento(null, 'GOOGLE_AJUSTES', 'Ajustes de «Conectar con Google» actualizados por ' . $admin['usuario']);
+      aviso('Ajustes de Google guardados. Los programas los usan la próxima vez que alguien pulse «Conectar con Google».');
     } elseif ($accion === 'clave') {
       $r = db()->prepare('SELECT hash FROM admins WHERE id = ?');
       $r->execute([$admin['id']]);
@@ -142,6 +151,17 @@ cabecera_html('Ajustes', $admin, 'ajustes');
         <span class="muted small">En Meta › WhatsApp › Configuración pega estos dos datos y suscribe el campo <b>messages</b>.</span>
         <?php endif; ?>
         <div class="row"><button class="btn btn-dark">Guardar WhatsApp</button><?php if (ajuste('wa_verify', '') !== ''): ?><label class="small"><input type="checkbox" name="wa_nuevo_verify" value="1"> Generar un token de verificación nuevo</label><?php endif; ?></div>
+      </form>
+    </section>
+    <section class="card"><h2>Enviar correos con Google (Conectar con Google)</h2>
+      <p class="muted">Con estos datos, el botón <b>Conectar con Google</b> del programa deja enviar las facturas desde la cuenta de Gmail del cliente sin contraseñas de aplicación. Se obtienen en Google Cloud › APIs y servicios › Credenciales › ID de cliente de OAuth de tipo <b>App de escritorio</b>, con la API de Gmail habilitada y el permiso <span class="mono">gmail.send</span>.</p>
+      <form method="post" class="form"><?= campo_csrf() ?><input type="hidden" name="accion" value="google">
+        <div class="g2">
+          <label>ID de cliente<input name="google_client_id" maxlength="120" class="mono" value="<?= e(ajuste('google_client_id', '')) ?>" placeholder="1234567890-abc….apps.googleusercontent.com"></label>
+          <label><span>Secreto del cliente <?= ajuste('google_client_secret', '') !== '' ? '<span class="badge t-g">guardado</span>' : '' ?></span><input type="password" name="google_client_secret" autocomplete="off" placeholder="<?= ajuste('google_client_secret', '') !== '' ? 'Déjalo vacío para mantener el actual' : 'GOCSPX-…' ?>"></label>
+        </div>
+        <span class="muted small">Para apps de escritorio Google no considera confidencial este secreto, pero igual se guarda solo aquí y se entrega únicamente a programas con licencia vigente.</span>
+        <div class="row"><button class="btn btn-dark">Guardar Google</button></div>
       </form>
     </section>
     <section class="card"><h2>Administradores</h2>
