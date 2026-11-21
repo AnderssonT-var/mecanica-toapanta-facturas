@@ -5,7 +5,7 @@ declare(strict_types=1);
 if (!defined('FX_PORTAL')) { http_response_code(403); exit; }
 date_default_timezone_set('America/Guayaquil');
 
-const FX_VERSION = '1.26.0';
+const FX_VERSION = '1.27.0';
 const FX_MARCA = 'Facmit';
 
 // Nombre del producto. Los portales instalados antes del cambio de marca guardaron el nombre anterior en su
@@ -129,7 +129,7 @@ function plan_de(array $l): string { return nombre_plan(funciones_licencia($l));
 // sugerido de cada licencia, la página facmit.com (lee esta función) y api.php?a=precios: si cambias un precio en
 // el portal, cambia en todas partes. Lo que nunca se configuró usa estos valores de referencia.
 const FX_PRECIOS_BASE = [
-  'basico' => 10, 'profesional' => 20, 'completo' => 25,
+  'basico' => 20, 'profesional' => 30, 'completo' => 35,
   'extra' => ['documentos' => 2, 'retenciones' => 2, 'inventario' => 4, 'compras' => 3, 'cartera' => 3, 'pos' => 5, 'nube' => 5, 'contabilidad' => 5, 'movil' => 3],
 ];
 // En el pago anual se cobran estos meses (por defecto 10: usas 12 y pagas 10).
