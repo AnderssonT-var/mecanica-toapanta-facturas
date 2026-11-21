@@ -14,6 +14,9 @@ const PAR_AREAS = ['SRI' => 'SRI y comprobantes', 'NUMERACION' => 'Numeración',
 // Historial: lo que ya se aplicó y lo que viene en esta versión. Cada despliegue agrega solo los códigos nuevos.
 function par_semilla(): array {
   return [
+    ['ME-015', 'MEJORA', 'PORTAL', 'MEDIO', '', '1.26.0', 'APLICADO', '2026-11-20', 'Precios de los planes más claros y coherentes',
+      'Los precios no eran redondos (9 / 19.90 / 24.90) y, al armar un plan juntando funciones sueltas sobre el Básico, el total podía igualar o superar al plan Profesional dando menos funciones: el cliente pagaba más por menos.',
+      'Precios redondos y amigables con el IVA: Básico $10, Profesional $20, Completo $25 (sin IVA). Nueva regla única en el portal, el armador de la página y el precio sugerido de la licencia: siempre se cobra la forma más barata de cubrir lo elegido, así que armar funciones sueltas nunca sale más caro que el paquete que las contiene. El aviso ahora invita al plan que conviene. Contabilidad sigue como módulo que se suma a cualquier plan. Los precios configurados a mano en Ajustes mandan sobre estos valores.'],
     ['AF-001', 'ANTIFALLO', 'SRI', 'ALTO', '0.13.1', '', 'APLICADO', '2026-11-09', 'Bloqueo de emojis y caracteres que el SRI no acepta',
       'Un emoji o un carácter raro (por ejemplo «pag👆s») hacía inválido el XML y el SRI devolvía el comprobante.',
       'Las pantallas no dejan escribir esos caracteres y, antes de firmar, el XML se limpia: comillas tipográficas, guiones largos y letras con signos raros se cambian por su equivalente aceptado.'],

@@ -5,7 +5,7 @@ declare(strict_types=1);
 if (!defined('FX_PORTAL')) { http_response_code(403); exit; }
 date_default_timezone_set('America/Guayaquil');
 
-const FX_VERSION = '1.25.0';
+const FX_VERSION = '1.26.0';
 const FX_MARCA = 'Facmit';
 
 // Nombre del producto. Los portales instalados antes del cambio de marca guardaron el nombre anterior en su
@@ -129,7 +129,7 @@ function plan_de(array $l): string { return nombre_plan(funciones_licencia($l));
 // sugerido de cada licencia, la página facmit.com (lee esta función) y api.php?a=precios: si cambias un precio en
 // el portal, cambia en todas partes. Lo que nunca se configuró usa estos valores de referencia.
 const FX_PRECIOS_BASE = [
-  'basico' => 9, 'profesional' => 19.9, 'completo' => 24.9,
+  'basico' => 10, 'profesional' => 20, 'completo' => 25,
   'extra' => ['documentos' => 2, 'retenciones' => 2, 'inventario' => 4, 'compras' => 3, 'cartera' => 3, 'pos' => 5, 'nube' => 5, 'contabilidad' => 5, 'movil' => 3],
 ];
 // En el pago anual se cobran estos meses (por defecto 10: usas 12 y pagas 10).
@@ -154,15 +154,18 @@ function precios_publicos(): array {
   return ['moneda' => 'USD', 'iva' => 'no incluido', 'mensual' => precios_mensuales(), 'mesesAnual' => meses_pago_anual(), 'pro' => FX_PRO, 'completo' => array_merge(FX_PRO, ['nube', 'movil']), 'funciones' => $f, 'basico' => FX_BASICO];
 }
 
-// Precio sugerido por mes según las funciones marcadas (la misma regla que la página).
+// Precio sugerido por mes según las funciones marcadas (la misma regla que la página y el portal).
+// Se cobra la forma MÁS BARATA de cubrir lo elegido: suelto sobre Básico, o el plan Profesional/Completo
+// (que ya incluyen sus funciones) más lo que sobre. Así armar funciones sueltas nunca sale más caro que
+// el paquete que las contiene: el paquete siempre conviene.
 function precio_sugerido(array $f): float {
   $m = precios_mensuales();
   $f = normalizar_funciones($f);
-  $cat = categoria_plan($f);
-  if ($cat === 'Completo') { $t = $m['completo']; foreach (array_diff($f, FX_PRO, ['nube', 'movil']) as $x) $t += $m['extra'][$x]; return round($t, 2); }
-  $total = $cat === 'Profesional' ? $m['profesional'] : $m['basico'];
-  foreach (array_diff($f, $cat === 'Profesional' ? FX_PRO : []) as $x) $total += $m['extra'][$x];
-  return round($total, 2);
+  $ex = fn(array $lista) => array_reduce($lista, fn($t, $x) => $t + (float)($m['extra'][$x] ?? 0), 0.0);
+  $optBasico      = $m['basico']      + $ex($f);
+  $optProfesional = $m['profesional'] + $ex(array_values(array_diff($f, FX_PRO)));
+  $optCompleto    = $m['completo']    + $ex(array_values(array_diff($f, FX_PRO, ['nube', 'movil'])));
+  return round(min($optBasico, $optProfesional, $optCompleto), 2);
 }
 
 function fx_config(): array {

@@ -46,19 +46,21 @@ document.querySelectorAll('table').forEach((t) => {
     let extras = f.filter((x) => !(pro && PRO.includes(x)));
     return (pro ? 'Profesional' : 'Básico') + (extras.length ? ' + ' + extras.map((x) => CORTOS[x]).join(' + ') : '');
   }
-  function precio(f, n) {
-    if (n.startsWith('Completo')) { let c = precios.completo || 0; f.filter((x) => !PRO.includes(x) && !COMPLETO.includes(x)).forEach((x) => { c += (precios.extra || {})[x] || 0; }); return Math.round(c * 100) / 100; }
-    const pro = n.startsWith('Profesional');
-    let t = (pro ? precios.profesional : precios.basico) || 0;
-    f.filter((x) => !(pro && PRO.includes(x))).forEach((x) => { t += (precios.extra || {})[x] || 0; });
-    return Math.round(t * 100) / 100;
+  // Se cobra la forma más barata de cubrir lo elegido: suelto sobre Básico, o el plan Profesional/Completo
+  // (que ya incluyen sus funciones) más lo que sobre. El paquete nunca sale más caro que armarlo suelto.
+  function precio(f) {
+    const ex = (lista) => lista.reduce((t, x) => t + ((precios.extra || {})[x] || 0), 0);
+    const optB = (precios.basico || 0) + ex(f);
+    const optP = (precios.profesional || 0) + ex(f.filter((x) => !PRO.includes(x)));
+    const optC = (precios.completo || 0) + ex(f.filter((x) => !PRO.includes(x) && !COMPLETO.includes(x)));
+    return Math.round(Math.min(optB, optP, optC) * 100) / 100;
   }
   function pintar() {
     const f = marcadas();
     const n = nombre(f);
     document.getElementById('plan-nombre').textContent = n;
     const ps = document.getElementById('precio-sugerido');
-    const p = precio(f, n);
+    const p = precio(f);
     ps.innerHTML = p > 0 ? 'Precio sugerido: <b>$' + p.toFixed(2) + ' al mes</b> <button type="button" class="btn btn-sm" id="usar-precio">Usar</button>' : '<span class="muted small">Define los precios de referencia en Ajustes para ver un precio sugerido.</span>';
     const b = document.getElementById('usar-precio');
     if (b) b.onclick = () => { const i = document.querySelector('input[name=precio]'); const per = (document.querySelector('select[name=periodo]') || {}).value; const m = { TRIMESTRAL: 3, SEMESTRAL: 6, ANUAL: precios.mesesAnual || 12 }[per] || 1; i.value = (p * m).toFixed(2); };
